@@ -1,0 +1,8 @@
+**/bin/
+**/obj/
+Tests/
+.env
+.git
+.claude
+documentos
+README.md

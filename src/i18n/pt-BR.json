@@ -1,0 +1,388 @@
+{
+  "badge": {
+    "open": "Em Aberto",
+    "overdue": "Em Atraso",
+    "sent": "Notificado",
+    "paid": "Pago",
+    "pending": "Pend. Dados",
+    "cancelled": "Cancelado",
+    "complete": "Completo",
+    "partial": "Parcial"
+  },
+  "channel": {
+    "email": "E-mail",
+    "wa": "WA",
+    "whatsapp": "WhatsApp",
+    "instagram": "Instagram"
+  },
+  "common": {
+    "cancel": "Cancelar",
+    "save": "Salvar",
+    "export": "Exportar",
+    "edit": "Editar",
+    "add": "Adicionar",
+    "actions": "Ações",
+    "status": "Status",
+    "allStatuses": "Todos os status",
+    "vsLastMonth": "vs mês anterior",
+    "records": "registros",
+    "active": "Ativo",
+    "pending": "Pendente",
+    "configured": "Configurado",
+    "online": "Online",
+    "import": "Importar",
+    "viewAll": "Ver todos",
+    "both": "Ambos"
+  },
+  "nav": {
+    "overview": "Visão Geral",
+    "dashboard": "Dashboard",
+    "analytics": "Analytics",
+    "collection": "Cobrança",
+    "titles": "Títulos",
+    "importData": "Importar Dados",
+    "contactsCRM": "Contatos (CRM)",
+    "workers": "Usuários Worker",
+    "configuration": "Configuração",
+    "collectionSequence": "Régua de Cobrança",
+    "templates": "Templates",
+    "integrationSMTP": "Integrações (SMTP/API)",
+    "tenants": "Empresas"
+  },
+  "topbar": {
+    "apiConnected": "API externa conectada",
+    "pendingContactData": "3 títulos pendentes de dados de contato"
+  },
+  "sidebar": {
+    "companyLabel": "ATOS CAPITAL · 2026",
+    "userName": "Fernando Dória",
+    "userRole": "Head of Bank"
+  },
+  "pageMeta": {
+    "dashboard": {
+      "title": "Dashboard",
+      "subtitle": "Visão geral da operação em tempo real"
+    },
+    "analytics": {
+      "title": "Analytics",
+      "subtitle": "Indicadores de desempenho e ROI"
+    },
+    "titles": {
+      "title": "Títulos",
+      "subtitle": ""
+    },
+    "import": {
+      "title": "Importar Dados",
+      "subtitle": "Operação de upload e sincronização"
+    },
+    "contacts": {
+      "title": "Gestão de Contatos (CRM)",
+      "subtitle": "5 contatos aguardando dados completos"
+    },
+    "sequence": {
+      "title": "Régua de Cobrança",
+      "subtitle": "Configure os gatilhos de envio automático"
+    },
+    "templates": {
+      "title": "Templates de Mensagem",
+      "subtitle": ""
+    },
+    "integration": {
+      "title": "Integração & SMTP",
+      "subtitle": "Configure SMTP, WhatsApp e API externa"
+    },
+    "workers": {
+      "title": "Usuários Worker",
+      "subtitle": "Gerencie acesso operacional da sua empresa"
+    },
+    "tenants": {
+      "title": "Empresas",
+      "subtitle": "Cadastre e acompanhe empresas clientes da plataforma"
+    }
+  },
+  "activityLog": {
+    "title": "Log de Atividades",
+    "subtitle": "Mensagens enviadas em tempo real",
+    "noLogs": "Nenhum log disponível",
+    "statusSent": "ENVIADO",
+    "statusError": "ERRO"
+  },
+  "toast": {
+    "importAreaOpened": "Área de importação aberta!",
+    "exportingExcel": "Exportando para Excel...",
+    "manualCollectionSent": "Cobrança manual enviada!",
+    "titleCreated": "Título criado e adicionado à régua!",
+    "titleDetails": "Detalhes:",
+    "contactSaved": "Contato salvo! Título saindo do pendente.",
+    "sequenceSaved": "Régua salva com sucesso!",
+    "triggerAdded": "Gatilho adicionado!",
+    "variableCopied": "copiado!",
+    "templateCreated": "Template criado com sucesso!",
+    "smtpTestSent": "Teste enviado para fernando@atoscapital.com.br",
+    "smtpSaved": "SMTP salvo!",
+    "configSaved": "Configuração salva!",
+    "openingSwagger": "Abrindo Swagger...",
+    "testingEndpoint": "Testando endpoint...",
+    "fileUploaded": "enviado! Processando...",
+    "importComplete": "47 títulos importados · 2 com pendências de dados",
+    "syncStarted": "Sincronização manual iniciada...",
+    "checkingOccurrences": "Verificando ocorrências..."
+  },
+  "dashboard": {
+    "totalReceivable": "Total a Receber",
+    "totalOverdue": "Total em Atraso",
+    "totalRecovered": "Total Pago",
+    "recoveryRate": "Taxa de Pagamento",
+    "recoveryFunnel": "Funil de Recuperação",
+    "monthlyEvolution": "Evolução mensal (R$ mil)",
+    "receivable": "A Receber",
+    "overdue": "Em Atraso",
+    "recovered": "Recuperado",
+    "agingList": "Aging List",
+    "agingSubtitle": "Distribuição por vencimento",
+    "dueSoon": "A Vencer",
+    "1to30days": "1 a 30 dias",
+    "31to60days": "31 a 60 dias",
+    "61to90days": "61 a 90 dias",
+    "over90days": "> 90 dias",
+    "topDefaulters": "Top Inadimplentes",
+    "byOutstandingAmount": "Por valor em aberto",
+    "channelEffectiveness": "Eficácia dos Canais",
+    "engagementMetrics": "Métricas de engajamento",
+    "sent": "Enviados",
+    "delivered": "Entregues",
+    "opened": "Abertos",
+    "read": "Lidos",
+    "totalPaid": "Total Pago",
+    "criticalityMatrix": "Matriz de Criticidade",
+    "criticalitySubtitle": "Prioridade por status operacional",
+    "statusOpen": "Em Aberto",
+    "statusPending": "Pend. de Dados",
+    "statusOverdue": "Em Atraso",
+    "statusPaid": "Pago",
+    "statusCancelled": "Cancelado"
+  },
+  "analytics": {
+    "recoveryRate": "Taxa de Pagamento",
+    "thisMonthUp": "4,1pp este mês",
+    "recoveredMonth": "Total Pago",
+    "recoveredUp": "+23% vs mês anterior",
+    "overdueTitles": "Títulos em Atraso",
+    "pendingTitles": "Pendentes de Dados",
+    "criticalityShare": "Distribuição por Criticidade",
+    "criticalTitles": "Títulos Críticos",
+    "overdueAmount": "Valor em Atraso",
+    "avgDeliveryRate": "Entregabilidade Média",
+    "avgPaymentTime": "Tempo Médio de Pagamento",
+    "afterFirstNotification": "Após 1ª notificação",
+    "recoveryByAging": "Recuperação por Faixa de Aging",
+    "valueInThousands": "Valor em R$ mil",
+    "valueThousandsLabel": "Valor (R$ mil)",
+    "titlesByStatus": "Títulos por Status",
+    "sendsPerDay": "Envios por Dia – Últimas 2 Semanas"
+  },
+  "titles": {
+    "searchPlaceholder": "Buscar por cliente, CNPJ ou código...",
+    "newTitle": "+ Novo Título",
+    "downloadExport": "Exportar",
+    "col": {
+      "code": "CÓDIGO",
+      "clientCnpj": "CLIENTE / CNPJ",
+      "dueDate": "VENCIMENTO",
+      "amount": "VALOR",
+      "status": "STATUS",
+      "channel": "CANAL",
+      "lastAction": "ÚLTIMA AÇÃO",
+      "actions": "AÇÕES",
+      "channels": "CANAIS"
+    },
+    "noResults": "Nenhum título encontrado",
+    "adjustFilters": "Tente ajustar os filtros de busca",
+    "modalTitle": "Novo Título Manual",
+    "saveTitle": "Salvar Título",
+    "clientName": "Nome do Cliente",
+    "companyName": "Razão Social",
+    "titleCode": "Código do Título",
+    "amount": "Valor (R$)",
+    "dueDate": "Data de Vencimento",
+    "issueDate": "Data de Emissão",
+    "debtorEmail": "E-mail do Devedor",
+    "ticketLink": "Link do Boleto",
+    "filterOpen": "Em Aberto",
+    "filterPending": "Pendente de dados",
+    "filterSent": "Notificado",
+    "filterPaid": "Pago",
+    "filterOverdue": "Em Atraso"
+  },
+  "import": {
+    "tabUpload": "Upload Excel/CSV",
+    "tabApi": "Integração API",
+    "dragOrClick": "Arraste o arquivo ou clique para selecionar",
+    "fileTypes": "Planilha Excel (.xlsx) ou arquivo CSV",
+    "requiredColumns": "Colunas obrigatórias: nome_cliente · cnpj · codigo_titulo · valor · status · data_vencimento",
+    "expectedLayout": "Layout Esperado da Planilha",
+    "col": {
+      "field": "Campo",
+      "type": "Tipo",
+      "required": "Obrigatório",
+      "example": "Exemplo"
+    },
+    "type": {
+      "text": "Texto",
+      "numeric": "Numérico",
+      "date": "Data (DD/MM/AAAA)",
+      "email": "E-mail",
+      "phone": "Telefone",
+      "url": "URL"
+    },
+    "endpoint1": {
+      "title": "Endpoint 1 – Títulos Pendentes",
+      "subtitle": "Sincronização 2× por dia · Upsert automático"
+    },
+    "endpoint2": {
+      "title": "Endpoint 2 – Ocorrências",
+      "subtitle": "Baixas e cancelamentos · D-1 / D-0"
+    },
+    "lastSync": "Última sincronização",
+    "recordsImported": "Registros importados",
+    "nextSync": "Próxima sincronização",
+    "newInserted": "Novos inseridos",
+    "updated": "Atualizados: 35",
+    "syncNow": "Sincronizar Agora",
+    "lastExecution": "Última execução",
+    "paidTitles": "Títulos pagos",
+    "cancelled": "Cancelados",
+    "thanksSent": "Agradecimentos enviados",
+    "checkNow": "Verificar Agora"
+  },
+  "contacts": {
+    "searchPlaceholder": "Buscar por empresa ou CNPJ...",
+    "newContact": "+ Novo Contato",
+    "col": {
+      "companyCnpj": "Empresa / CNPJ",
+      "contact": "Contato",
+      "type": "Tipo",
+      "email": "E-mail",
+      "whatsapp": "WhatsApp",
+      "titles": "Títulos",
+      "status": "Status",
+      "actions": "Ações"
+    },
+    "titleSingular": "título",
+    "titlePlural": "títulos",
+    "addData": "+ Adicionar",
+    "edit": "Editar",
+    "modalTitle": "Contato do Devedor",
+    "saveContact": "Salvar Contato",
+    "companyCnpj": "CNPJ da Empresa",
+    "contactType": "Tipo de Contato",
+    "typeFinance": "Financeiro",
+    "typePurchasing": "Compras",
+    "typePartner": "Sócio",
+    "typeOther": "Outro",
+    "contactName": "Nome do Contato",
+    "fullName": "Nome completo",
+    "mobileWhatsapp": "Celular / WhatsApp",
+    "position": "Cargo",
+    "positionPlaceholder": "Ex: Diretor Financeiro"
+  },
+  "sequence": {
+    "saveSequence": "Salvar Régua",
+    "sendTriggers": "Gatilhos de Envio",
+    "triggerSubtitle": "Configure os disparos da régua",
+    "addTrigger": "+ Adicionar Gatilho",
+    "stopRules": "Regras de Parada Automática",
+    "rule": {
+      "paidTitle": "Título Pago",
+      "paidDesc": "Excluído imediatamente da fila. Se template de agradecimento ativo, dispara mensagem de confirmação.",
+      "cancelledTitle": "Título Cancelado",
+      "cancelledDesc": "Inativado imediatamente. Nenhuma notificação adicional é enviada.",
+      "frequencyTitle": "Frequência de Verificação",
+      "frequencyDesc": "Endpoint 2 verificado diariamente às 08:00 e 18:00 com parâmetros D-1 e D-0.",
+      "pendingTitle": "Dados Pendentes",
+      "pendingDesc": "Títulos sem e-mail/telefone ficam em 'Pendente de Dados' e não entram na régua até serem completados."
+    }
+  },
+  "templates": {
+    "createTemplate": "Criar Template",
+    "trigger": "Gatilho:",
+    "newTemplate": "Novo Template",
+    "availableVars": "Variáveis Disponíveis",
+    "availableVarsSubtitle": "Use nas mensagens para personalizar automaticamente",
+    "modalTitle": "Criar Template de Mensagem",
+    "saveTemplate": "Salvar Template",
+    "templateName": "Nome do Template",
+    "templateNamePlaceholder": "Ex: Lembrete D-3",
+    "channel": "Canal",
+    "emailSubject": "Assunto (para e-mail)",
+    "emailSubjectPlaceholder": "Lembrete de vencimento – {{NomeEmpresa}}",
+    "message": "Mensagem",
+    "messagePlaceholder": "Olá {{NomeCliente}}, seu título de {{Valor}} vence em {{DataVencimento}}...",
+    "varsClickToInsert": "Variáveis disponíveis (clique para inserir)",
+    "channelEmail": "E-mail",
+    "channelWhatsapp": "WhatsApp"
+  },
+  "integration": {
+    "smtpTitle": "SMTP Próprio (White-label)",
+    "smtpSubtitle": "E-mail com domínio do cliente",
+    "smtpHost": "Host SMTP",
+    "port": "Porta",
+    "user": "Usuário",
+    "password": "Senha",
+    "senderFrom": "Remetente (De)",
+    "senderName": "Nome do Remetente",
+    "testSend": "Testar Envio",
+    "whatsappTitle": "WhatsApp Business API",
+    "whatsappSubtitle": "Mensageria multicanal",
+    "selectProvider": "Selecionar provedor...",
+    "numberId": "ID do número",
+    "accessToken": "Token de acesso",
+    "webhookUrl": "Webhook URL",
+    "apiMockTitle": "API Externa – Atos Capital",
+    "baseUrl": "Base URL:",
+    "endpoint1": "Endpoint 1:",
+    "endpoint2": "Endpoint 2:",
+    "documentation": "Documentação:",
+    "swaggerAvailable": "Swagger disponível",
+    "authentication": "Autenticação:",
+    "bearerToken": "Bearer Token",
+    "viewDocs": "Ver Documentação",
+    "testEndpoint": "Testar Endpoint"
+  },
+  "step": {
+    "preExpiration": "Lembrete pré-vencimento",
+    "preExpirationDesc": "3 dias antes do vencimento",
+    "dayBefore": "Aviso véspera",
+    "dayBeforeDesc": "1 dia antes do vencimento",
+    "postExpiration": "Cobrança pós-vencimento",
+    "postExpirationDesc": "1 dia após o vencimento",
+    "secondCollection": "Segunda cobrança",
+    "secondCollectionDesc": "7 dias após o vencimento",
+    "finalWarning": "Aviso final",
+    "finalWarningDesc": "10 dias após o vencimento"
+  },
+  "statusPie": {
+    "open": "Em Aberto",
+    "sent": "Notificado",
+    "paid": "Pago",
+    "cancelled": "Cancelado",
+    "pending": "Pendente"
+  },
+  "aging": {
+    "dueSoon": "A Vencer",
+    "1to30": "1-30 dias",
+    "31to60": "31-60 dias",
+    "61to90": "61-90 dias",
+    "over90": "> 90 dias"
+  },
+  "login": {
+    "title": "SmartCollect",
+    "subtitle": "Plataforma de Cobrança Multicanal",
+    "emailLabel": "E-mail",
+    "passwordLabel": "Senha",
+    "loginButton": "Entrar",
+    "loggingIn": "Entrando...",
+    "forgotPassword": "Problema com o acesso? Contate o administrador.",
+    "fillAll": "Informe e-mail e senha."
+  }
+}

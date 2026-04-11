@@ -4,7 +4,7 @@ import { ICONS } from "../utils/icons";
 import { formatBRLFull } from "../utils/formatters";
 import { Badge, ChannelPills, Button, Modal, FormInput } from "../components/UI";
 import {
-  ApiError, getTitles, getClients, createTitle, sendCollection, getTitleHistory,
+  ApiError, getTitles, getClients, createTitle, sendCollection, getTitleHistory, updateTitleStatus,
   type TitleResponse, type ClientResponse, type StoredSession, type TitleHistoryResponse, type SendCollectionRequest,
 } from "../services/api";
 import type { ShowToast } from "../types";
@@ -31,6 +31,8 @@ export const PageTitles = ({
   const [historyItems, setHistoryItems] = useState<TitleHistoryResponse[]>([]);
   const [historyTitleCode, setHistoryTitleCode] = useState("");
   const [selected, setSelected] = useState<TitleResponse | null>(null);
+  const [statusDraft, setStatusDraft] = useState("");
+  const [statusSaving, setStatusSaving] = useState(false);
   const [collectOpen, setCollectOpen] = useState(false);
   const [collectTarget, setCollectTarget] = useState<TitleResponse | null>(null);
   const [useQuickTemplate, setUseQuickTemplate] = useState(false);
@@ -100,6 +102,40 @@ export const PageTitles = ({
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const openViewModal = (title: TitleResponse) => {
+    setSelected(title);
+    setStatusDraft(title.status);
+    setViewOpen(true);
+  };
+
+  const handleUpdateStatus = async () => {
+    if (!selected) return;
+
+    if (!statusDraft) {
+      showToast(`${ICONS.warning} Selecione um status.`, "warn");
+      return;
+    }
+
+    if (statusDraft === selected.status) {
+      showToast(`${ICONS.info} O título já está nesse status.`, "info");
+      return;
+    }
+
+    try {
+      setStatusSaving(true);
+      const updated = await updateTitleStatus(selected.id, { status: statusDraft });
+      setSelected(updated);
+      setStatusDraft(updated.status);
+      showToast(`${ICONS.checkmark} Status do título atualizado.`, "success");
+      void load();
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Erro ao atualizar status do título.";
+      showToast(`${ICONS.cross} ${msg}`, "error");
+    } finally {
+      setStatusSaving(false);
     }
   };
 
@@ -259,7 +295,7 @@ export const PageTitles = ({
                 </td>
                 <td className="px-4 py-[13px]">
                   <div className="flex gap-1.5">
-                    <Button size="sm" variant="secondary" onClick={() => { setSelected(title); setViewOpen(true); }}>
+                    <Button size="sm" variant="secondary" onClick={() => openViewModal(title)}>
                       {ICONS.eye}
                     </Button>
                     {canWrite && (
@@ -321,6 +357,11 @@ export const PageTitles = ({
           footer={<>
             <Button variant="secondary" onClick={() => setViewOpen(false)}>Fechar</Button>
             {canWrite && (
+              <Button variant="secondary" onClick={handleUpdateStatus} disabled={statusSaving}>
+                {statusSaving ? "Salvando status..." : "Salvar status"}
+              </Button>
+            )}
+            {canWrite && (
               <Button variant="primary" onClick={() => { setViewOpen(false); openCollectModal(selected); }}>
                 Reenviar Cobrança
               </Button>
@@ -337,6 +378,21 @@ export const PageTitles = ({
               <div className="text-[11px] text-text-muted mb-1 uppercase font-bold tracking-wider">Status</div>
               <Badge status={selected.status.toLowerCase()} />
             </div>
+            {canWrite && (
+              <div className="col-span-2">
+                <label className="block text-[11px] text-text-muted mb-1 uppercase font-bold tracking-wider">Alterar status</label>
+                <select
+                  value={statusDraft}
+                  onChange={e => setStatusDraft(e.target.value)}
+                  className="bg-surface border border-border-subtle-2 rounded-lg px-[13px] py-[9px] text-[13px] text-text-primary outline-none w-full focus:border-accent"
+                >
+                  <option value="Open">Em Aberto</option>
+                  <option value="Overdue">Em Atraso</option>
+                  <option value="Paid">Pago</option>
+                  <option value="Cancelled">Cancelado</option>
+                </select>
+              </div>
+            )}
             <div>
               <div className="text-[11px] text-text-muted mb-1 uppercase font-bold tracking-wider">Vencimento</div>
               <div className="text-sm font-medium">{new Date(selected.dueDate).toLocaleDateString("pt-BR")}</div>

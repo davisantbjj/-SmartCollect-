@@ -193,7 +193,7 @@ public class DashboardService : IDashboardService
     {
         var (start, end) = ResolveRange(startDate, endDate);
 
-        var query = tenantId.HasValue
+        var dispatchQuery = tenantId.HasValue
             ? _db.Dispatches
                 .Include(d => d.Title)
                 .Include(d => d.Contact)
@@ -202,11 +202,11 @@ public class DashboardService : IDashboardService
                 .Include(d => d.Title)
                 .Include(d => d.Contact);
 
-        query = query.Where(d => d.ScheduledFor >= start && d.ScheduledFor <= end);
+        dispatchQuery = dispatchQuery.Where(d => (d.SentAt ?? d.ScheduledFor) >= start && (d.SentAt ?? d.ScheduledFor) <= end);
 
-        var items = await query
-            .OrderByDescending(d => d.ScheduledFor)
-            .Take(20)
+        var dispatchItems = await dispatchQuery
+            .OrderByDescending(d => d.SentAt ?? d.ScheduledFor)
+            .Take(30)
             .Select(d => new ActivityLogItem(
                 d.Id,
                 d.SentAt ?? d.ScheduledFor,
@@ -215,6 +215,33 @@ public class DashboardService : IDashboardService
                 d.Contact.Name,
                 $"Cobrança ref. {d.Title.UniqueCode}"))
             .ToListAsync();
+
+        var historyQuery = tenantId.HasValue
+            ? _db.TitleHistories
+                .Include(h => h.Title)
+                .Where(h => h.TenantId == tenantId.Value)
+            : _db.TitleHistories
+                .Include(h => h.Title);
+
+        historyQuery = historyQuery.Where(h => h.CreatedAt >= start && h.CreatedAt <= end);
+
+        var historyItems = await historyQuery
+            .OrderByDescending(h => h.CreatedAt)
+            .Take(30)
+            .Select(h => new ActivityLogItem(
+                h.Id,
+                h.CreatedAt,
+                "System",
+                "Info",
+                h.Title.UniqueCode,
+                $"{h.Action}: {h.Description}"))
+            .ToListAsync();
+
+        var items = dispatchItems
+            .Concat(historyItems)
+            .OrderByDescending(i => i.Timestamp)
+            .Take(30)
+            .ToList();
 
         return new ActivityLogResponse(items);
     }

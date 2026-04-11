@@ -79,8 +79,16 @@ export const PageDashboard = ({
         setActivityLogs(act.items.map((i, idx) => ({
           id: idx + 1,
           timestamp: new Date(i.timestamp).toLocaleTimeString("pt-BR", { hour12: false }),
-          channel: i.channel.toLowerCase().includes("whatsapp") ? "wa" : "email",
-          status: i.status.toLowerCase().includes("error") ? "error" : "sent",
+          channel: i.channel.toLowerCase().includes("whatsapp")
+            ? "wa"
+            : i.channel.toLowerCase().includes("email")
+              ? "email"
+              : "system",
+          status: i.status.toLowerCase().includes("error")
+            ? "error"
+            : i.status.toLowerCase().includes("info")
+              ? "info"
+              : "sent",
           recipient: i.recipient,
           summary: i.summary,
         })));

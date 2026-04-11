@@ -27,7 +27,7 @@ const badgeConfig: Record<string, { label: string; cls: string }> = {
 };
 
 const badgeStyles: Record<string, { bg: string; text: string; dot: string }> = {
-  open:      { bg: "bg-accent/12", text: "text-accent", dot: "bg-accent" },
+  open:      { bg: "bg-[#FDE0471F]", text: "text-[#FDE047]", dot: "bg-[#FDE047]" },
   overdue:   { bg: "bg-danger/12", text: "text-danger", dot: "bg-danger" },
   sent:      { bg: "bg-success/12", text: "text-success", dot: "bg-success" },
   paid:      { bg: "bg-success/12", text: "text-success", dot: "bg-success" },
@@ -242,8 +242,9 @@ export const ActivityLog = ({ logs = [] }: { logs?: ActivityLogEntry[] }) => {
       wa:        { symbol: ICONS.chat, label: "WhatsApp",  color: colors.wa },
       instagram: { symbol: ICONS.camera, label: "Instagram", color: "#E4405F" },
       email:     { symbol: ICONS.mail, label: "E-mail",    color: colors.accent },
+      system:    { symbol: ICONS.clipboard, label: "Sistema", color: colors.text2 },
     };
-    return icons[channel] || { symbol: ICONS.email, label: channel, color: colors.text2 };
+    return icons[channel] || { symbol: ICONS.info, label: channel, color: colors.text2 };
   };
 
   return (
@@ -263,23 +264,24 @@ export const ActivityLog = ({ logs = [] }: { logs?: ActivityLogEntry[] }) => {
           logs.map((log) => {
             const channel = getChannelIcon(log.channel);
             const isError = log.status === "error";
+            const isInfo = log.status === "info";
             return (
               <div
                 key={log.id}
                 className="p-3 bg-surface-2 rounded-[9px] flex gap-3 items-start transition-all duration-200"
                 style={{
-                  border: `1px solid ${isError ? "rgba(220,38,38,0.2)" : colors.border2}`,
-                  borderLeft: `4px solid ${isError ? colors.danger : channel.color}`,
+                  border: `1px solid ${isError ? "rgba(220,38,38,0.2)" : isInfo ? "rgba(148,163,184,0.26)" : colors.border2}`,
+                  borderLeft: `4px solid ${isError ? colors.danger : isInfo ? colors.text2 : channel.color}`,
                 }}
               >
                 <div
                   className="w-9 h-9 rounded-lg flex items-center justify-center text-base shrink-0"
                   style={{
-                    background: isError ? "rgba(220,38,38,0.12)" : `${channel.color}22`,
-                    border: `1px solid ${isError ? "rgba(220,38,38,0.2)" : `${channel.color}44`}`,
+                    background: isError ? "rgba(220,38,38,0.12)" : isInfo ? "rgba(148,163,184,0.12)" : `${channel.color}22`,
+                    border: `1px solid ${isError ? "rgba(220,38,38,0.2)" : isInfo ? "rgba(148,163,184,0.24)" : `${channel.color}44`}`,
                   }}
                 >
-                  {isError ? ICONS.cross : channel.symbol}
+                  {isError ? ICONS.cross : isInfo ? ICONS.info : channel.symbol}
                 </div>
 
                 <div className="flex-1 min-w-0">
@@ -291,9 +293,9 @@ export const ActivityLog = ({ logs = [] }: { logs?: ActivityLogEntry[] }) => {
                     <span className="text-[11px] text-text-muted whitespace-nowrap">{log.timestamp}</span>
                   </div>
                   <div className="text-xs text-text-secondary leading-[1.4] mb-1.5 line-clamp-2">{log.summary}</div>
-                  <div className={`inline-flex items-center gap-[5px] px-2 py-[3px] rounded-[5px] text-[10px] font-bold ${isError ? "bg-danger/12 text-danger" : "bg-success/12 text-success"}`}>
-                    <span className={`w-1 h-1 rounded-full inline-block ${isError ? "bg-danger" : "bg-success"}`} />
-                    {log.status === "error" ? t("activityLog.statusError") : t("activityLog.statusSent")}
+                  <div className={`inline-flex items-center gap-[5px] px-2 py-[3px] rounded-[5px] text-[10px] font-bold ${isError ? "bg-danger/12 text-danger" : isInfo ? "bg-surface-3 text-text-secondary" : "bg-success/12 text-success"}`}>
+                    <span className={`w-1 h-1 rounded-full inline-block ${isError ? "bg-danger" : isInfo ? "bg-text-secondary" : "bg-success"}`} />
+                    {log.status === "error" ? t("activityLog.statusError") : log.status === "info" ? "HISTÓRICO" : t("activityLog.statusSent")}
                   </div>
                 </div>
               </div>

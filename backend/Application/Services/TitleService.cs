@@ -168,6 +168,52 @@ public class TitleService : ITitleService
         return (await GetByIdAsync(tenantId, title.Id))!;
     }
 
+    public async Task<TitleResponse?> UpdateStatusAsync(Guid tenantId, Guid id, string status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+            throw new InvalidOperationException("Informe o status do título.");
+
+        if (!Enum.TryParse<TitleStatus>(status, true, out var newStatus))
+            throw new InvalidOperationException("Status inválido para o título.");
+
+        if (newStatus == TitleStatus.PendingData)
+            throw new InvalidOperationException("Status 'Pendente de Dados' é controlado pelo sistema.");
+
+        var title = await _db.Titles
+            .Where(t => t.TenantId == tenantId && t.Id == id)
+            .FirstOrDefaultAsync();
+
+        if (title is null) return null;
+
+        var oldStatus = title.Status;
+        if (oldStatus == newStatus)
+            return await GetByIdAsync(tenantId, id);
+
+        title.Status = newStatus;
+
+        if (newStatus is TitleStatus.Paid or TitleStatus.Cancelled)
+        {
+            var pendingDispatches = await _db.Dispatches
+                .Where(d => d.TitleId == title.Id && d.Status == DispatchStatus.Pending)
+                .ToListAsync();
+
+            foreach (var dispatch in pendingDispatches)
+                dispatch.Status = DispatchStatus.Cancelled;
+        }
+
+        await _db.TitleHistories.AddAsync(new Domain.Entities.TitleHistory
+        {
+            Id = Guid.NewGuid(),
+            TitleId = title.Id,
+            TenantId = tenantId,
+            Action = "Atualizacao manual de status",
+            Description = $"Status alterado de {oldStatus} para {newStatus}"
+        });
+
+        await _db.SaveChangesAsync();
+        return await GetByIdAsync(tenantId, id);
+    }
+
     public async Task<bool> SendCollectionAsync(Guid tenantId, Guid titleId, SendCollectionRequest? request = null)
     {
         var title = await _db.Titles
@@ -338,6 +384,7 @@ public class TitleService : ITitleService
 
         return new TitleResponse(
             t.Id,
+            t.ClientId,
             t.Client.LegalName,
             t.Client.TaxId,
             t.UniqueCode,

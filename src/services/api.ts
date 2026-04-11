@@ -128,6 +128,7 @@ export interface PaginatedResponse<T> {
 
 export interface TitleResponse {
   id: string;
+  clientId: string;
   clientName: string;
   clientTaxId: string;
   uniqueCode: string;
@@ -163,6 +164,10 @@ export interface SendCollectionRequest {
   channel?: string;
   subject?: string;
   body?: string;
+}
+
+export interface UpdateTitleStatusRequest {
+  status: string;
 }
 
 export interface ClientResponse {
@@ -638,6 +643,13 @@ export async function getTitleHistory(id: string) {
 export async function createTitle(payload: CreateTitleRequest) {
   return request<TitleResponse>("/api/titles", {
     method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateTitleStatus(id: string, payload: UpdateTitleStatusRequest) {
+  return request<TitleResponse>(`/api/titles/${id}/status`, {
+    method: "PATCH",
     body: JSON.stringify(payload),
   });
 }

@@ -31,6 +31,21 @@ public class TitlesController : ControllerBase
     public async Task<IActionResult> GetHistory(Guid id)
         => Ok(await _titleService.GetHistoryAsync(GetTenantId(), id));
 
+    [HttpPatch("{id:guid}/status")]
+    [Authorize(Roles = "Admin,Worker")]
+    public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] UpdateTitleStatusRequest request)
+    {
+        try
+        {
+            var result = await _titleService.UpdateStatusAsync(GetTenantId(), id, request.Status);
+            return result is null ? NotFound() : Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     /// <summary>Create or update a title by UniqueCode (RN01 — upsert). Admin and Worker allowed.</summary>
     [HttpPost]
     [Authorize(Roles = "Admin,Worker")]

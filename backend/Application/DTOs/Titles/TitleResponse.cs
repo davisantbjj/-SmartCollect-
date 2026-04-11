@@ -2,6 +2,7 @@ namespace SmartCollect.Application.DTOs.Titles;
 
 public record TitleResponse(
     Guid Id,
+    Guid ClientId,
     string ClientName,
     string ClientTaxId,
     string UniqueCode,

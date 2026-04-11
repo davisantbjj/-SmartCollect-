@@ -223,6 +223,23 @@ public class FileImportServiceTests
         Assert.Equal(0, result.SuccessRows);
     }
 
+    [Fact]
+    public async Task Upload_WhenTenantDoesNotExist_ThrowsFriendlyMessage()
+    {
+        var db = TestDbContextFactory.Create();
+        var service = new FileImportService(db, NullLogger<FileImportService>.Instance);
+        var unknownTenantId = Guid.NewGuid();
+
+        var csv = string.Join('\n',
+            "nome_cliente;cnpj;codigo_titulo;valor;status;data_vencimento",
+            "Cliente;11.111.111/0001-11;TIT-999;100.00;aberto;2099-01-01");
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.UploadAsync(unknownTenantId, BuildFormFile("import.csv", csv, "text/csv")));
+
+        Assert.Equal("Tenant não encontrado para esta sessão. Faça login novamente.", ex.Message);
+    }
+
     private static IFormFile BuildFormFile(string fileName, string content, string contentType)
     {
         var bytes = Encoding.UTF8.GetBytes(content);

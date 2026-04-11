@@ -48,6 +48,10 @@ public class FileImportService : IFileImportService
 
     public async Task<ImportResultResponse> UploadAsync(Guid tenantId, IFormFile file)
     {
+        var tenantExists = await _db.Tenants.AnyAsync(t => t.Id == tenantId);
+        if (!tenantExists)
+            throw new InvalidOperationException("Tenant não encontrado para esta sessão. Faça login novamente.");
+
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
         var type = extension switch
         {

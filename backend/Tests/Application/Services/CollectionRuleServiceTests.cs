@@ -1,9 +1,11 @@
 using SmartCollect.Tests;
 namespace SmartCollect.Tests.Application.Services;
 
+using Microsoft.EntityFrameworkCore;
 using SmartCollect.Application.DTOs.CollectionRules;
 using SmartCollect.Application.Services;
 using SmartCollect.Domain.Entities;
+using SmartCollect.Domain.Enums;
 
 public class CollectionRuleServiceTests
 {
@@ -21,7 +23,7 @@ public class CollectionRuleServiceTests
     }
 
     [Fact]
-    public async Task RN13_ActivatingRule_DeactivatesOthers()
+    public async Task MultiActive_ActivatingAnotherRule_KeepsPreviousActive()
     {
         var (svc, db, tenantId, templateId) = await SetupAsync();
 
@@ -37,10 +39,10 @@ public class CollectionRuleServiceTests
 
         Assert.True(rule2.Active);
 
-        // Rule 1 should now be inactive
+        // Rule 1 remains active when another active rule is created.
         var allRules = await svc.ListAsync(tenantId);
         var updatedRule1 = allRules.First(r => r.Id == rule1.Id);
-        Assert.False(updatedRule1.Active);
+        Assert.True(updatedRule1.Active);
     }
 
     [Fact]
@@ -67,5 +69,126 @@ public class CollectionRuleServiceTests
 
         Assert.True(r1.Active);
         Assert.True(r2.Active);
+    }
+
+    [Fact]
+    public async Task UpdateRule_WhenTriggerHasDispatch_PreservesOldTriggerAndDispatch()
+    {
+        var (svc, db, tenantId, templateId) = await SetupAsync();
+
+        var created = await svc.CreateAsync(tenantId, new CreateCollectionRuleRequest(
+            "Rule Histórico", "Teste", true,
+            new List<CreateTriggerDto> { new(templateId, "Email", -3, "DueDate", 1, true) }));
+
+        var oldTrigger = await db.Triggers
+            .SingleAsync(t => t.CollectionRuleId == created.Id && t.Order == 1);
+
+        var userId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var contactId = Guid.NewGuid();
+        var titleId = Guid.NewGuid();
+
+        db.Users.Add(new User { Id = userId, TenantId = tenantId, Name = "U", Email = "u@test.com", PasswordHash = "x", Role = UserRole.Admin, Active = true });
+        db.Clients.Add(new Client { Id = clientId, TenantId = tenantId, UserId = userId, LegalName = "Cliente", TaxId = "999" });
+        db.Contacts.Add(new Contact { Id = contactId, ClientId = clientId, Name = "Contato", Email = "contato@test.com", IsPrimary = true });
+        db.Titles.Add(new Title
+        {
+            Id = titleId,
+            TenantId = tenantId,
+            ClientId = clientId,
+            UniqueCode = "T-HIST-001",
+            Amount = 100,
+            DueDate = DateTime.UtcNow.AddDays(3),
+            IssueDate = DateTime.UtcNow,
+            Status = TitleStatus.Open
+        });
+        db.Dispatches.Add(new Dispatch
+        {
+            Id = Guid.NewGuid(),
+            TitleId = titleId,
+            ContactId = contactId,
+            TriggerId = oldTrigger.Id,
+            Channel = CollectionChannel.Email,
+            Status = DispatchStatus.Pending,
+            ScheduledFor = DateTime.UtcNow.AddDays(1)
+        });
+        await db.SaveChangesAsync();
+
+        var updated = await svc.UpdateAsync(tenantId, created.Id, new CreateCollectionRuleRequest(
+            "Rule Histórico v2", "Teste 2", true,
+            new List<CreateTriggerDto> { new(templateId, "Email", 2, "DueDate", 1, true) }));
+
+        Assert.NotNull(updated);
+
+        var preservedOldTrigger = await db.Triggers.FirstOrDefaultAsync(t => t.Id == oldTrigger.Id);
+        Assert.NotNull(preservedOldTrigger);
+        Assert.False(preservedOldTrigger!.Active);
+
+        var preservedDispatch = await db.Dispatches.FirstOrDefaultAsync(d => d.TriggerId == oldTrigger.Id);
+        Assert.NotNull(preservedDispatch);
+
+        var activeTriggers = await db.Triggers
+            .Where(t => t.CollectionRuleId == created.Id && t.Active)
+            .ToListAsync();
+        Assert.Single(activeTriggers);
+        Assert.NotEqual(oldTrigger.Id, activeTriggers[0].Id);
+    }
+
+    [Fact]
+    public async Task List_WhenCreatingDefaultRules_UsesBothChannelInCombinedTriggers()
+    {
+        var db = TestDbContextFactory.Create();
+        var tenantId = Guid.NewGuid();
+
+        db.Tenants.Add(new Tenant { Id = tenantId, CompanyName = "Tenant Defaults", TaxId = "123" });
+
+        db.MessageTemplates.AddRange(
+            new MessageTemplate
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                Name = "Lembrete D-3",
+                Body = "Body D-3",
+                Channel = CollectionChannel.Email,
+                Active = true,
+            },
+            new MessageTemplate
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                Name = "Lembrete D-1",
+                Body = "Body D-1",
+                Channel = CollectionChannel.WhatsApp,
+                Active = true,
+            },
+            new MessageTemplate
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                Name = "Cobranca D+1",
+                Body = "Body D+1",
+                Channel = CollectionChannel.Both,
+                Active = true,
+            },
+            new MessageTemplate
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                Name = "Cobranca D+7",
+                Body = "Body D+7",
+                Channel = CollectionChannel.Email,
+                Active = true,
+            });
+
+        await db.SaveChangesAsync();
+
+        var svc = new CollectionRuleService(db);
+        var rules = await svc.ListAsync(tenantId);
+
+        var moderada = rules.Single(r => r.Name == "Régua Moderada");
+        Assert.Contains(moderada.Triggers, t => t.DaysOffset == 1 && t.Channel == "Both");
+
+        var escalonada = rules.Single(r => r.Name == "Régua Escalonada");
+        Assert.Contains(escalonada.Triggers, t => t.DaysOffset == 2 && t.Channel == "Both");
     }
 }

@@ -1,9 +1,12 @@
 using SmartCollect.Tests;
 namespace SmartCollect.Tests.Application.Services;
 
+using SmartCollect.Application.DTOs.Common;
 using SmartCollect.Application.DTOs.Titles;
+using SmartCollect.Application.Interfaces;
 using SmartCollect.Application.Services;
 using SmartCollect.Domain.Entities;
+using SmartCollect.Domain.Enums;
 
 public class TitleServiceTests
 {
@@ -36,5 +39,214 @@ public class TitleServiceTests
             null);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateAsync(tenantA, request));
+    }
+
+    [Fact]
+    public async Task SendCollection_WithMultipleActiveRules_SchedulesFromAllAndInvokesEngine()
+    {
+        var db = TestDbContextFactory.Create();
+
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var contactId = Guid.NewGuid();
+        var titleId = Guid.NewGuid();
+        var template1Id = Guid.NewGuid();
+        var template2Id = Guid.NewGuid();
+        var rule1Id = Guid.NewGuid();
+        var rule2Id = Guid.NewGuid();
+        var trigger1Id = Guid.NewGuid();
+        var trigger2Id = Guid.NewGuid();
+
+        var dueDate = DateTime.UtcNow.Date.AddDays(10);
+        var issueDate = DateTime.UtcNow.Date;
+
+        db.Tenants.Add(new Tenant { Id = tenantId, CompanyName = "Tenant A", TaxId = "111" });
+        db.Users.Add(new User { Id = userId, TenantId = tenantId, Name = "User", Email = "user@test.com", PasswordHash = "x" });
+        db.Clients.Add(new Client { Id = clientId, TenantId = tenantId, UserId = userId, LegalName = "Cliente Teste", TaxId = "123" });
+        db.Contacts.Add(new Contact
+        {
+            Id = contactId,
+            ClientId = clientId,
+            Name = "Contato",
+            Email = "contato@test.com",
+            IsPrimary = true
+        });
+        db.Titles.Add(new Title
+        {
+            Id = titleId,
+            TenantId = tenantId,
+            ClientId = clientId,
+            UniqueCode = "TIT-001",
+            Amount = 100m,
+            DueDate = dueDate,
+            IssueDate = issueDate,
+            Status = TitleStatus.Open
+        });
+
+        db.MessageTemplates.Add(new MessageTemplate
+        {
+            Id = template1Id,
+            TenantId = tenantId,
+            Name = "Template 1",
+            Channel = CollectionChannel.Email,
+            Subject = "Assunto 1",
+            Body = "Body 1",
+            Active = true
+        });
+        db.MessageTemplates.Add(new MessageTemplate
+        {
+            Id = template2Id,
+            TenantId = tenantId,
+            Name = "Template 2",
+            Channel = CollectionChannel.Email,
+            Subject = "Assunto 2",
+            Body = "Body 2",
+            Active = true
+        });
+
+        db.CollectionRules.Add(new CollectionRule { Id = rule1Id, TenantId = tenantId, Name = "Regra 1", Active = true });
+        db.CollectionRules.Add(new CollectionRule { Id = rule2Id, TenantId = tenantId, Name = "Regra 2", Active = true });
+        db.Triggers.Add(new Trigger
+        {
+            Id = trigger1Id,
+            CollectionRuleId = rule1Id,
+            TemplateId = template1Id,
+            Channel = CollectionChannel.Email,
+            DaysOffset = -1,
+            Reference = TriggerReference.DueDate,
+            Order = 1,
+            Active = true
+        });
+        db.Triggers.Add(new Trigger
+        {
+            Id = trigger2Id,
+            CollectionRuleId = rule2Id,
+            TemplateId = template2Id,
+            Channel = CollectionChannel.Email,
+            DaysOffset = 2,
+            Reference = TriggerReference.DueDate,
+            Order = 1,
+            Active = true
+        });
+
+        await db.SaveChangesAsync();
+
+        var fakeDispatchService = new FakeDispatchDeliveryService();
+        var service = new TitleService(db, fakeDispatchService);
+
+        var ok = await service.SendCollectionAsync(tenantId, titleId);
+
+        Assert.True(ok);
+
+        var dispatches = db.Dispatches.Where(d => d.TitleId == titleId).OrderBy(d => d.ScheduledFor).ToList();
+        Assert.Equal(2, dispatches.Count);
+        Assert.Contains(dispatches, d => d.TriggerId == trigger1Id);
+        Assert.Contains(dispatches, d => d.TriggerId == trigger2Id);
+
+        var history = db.TitleHistories.Single(h => h.TitleId == titleId && h.Action == "Cobranca manual");
+        Assert.Contains("2 disparos agendados em 2 régua(s) ativa(s)", history.Description);
+
+        Assert.True(fakeDispatchService.ProcessCalled);
+        Assert.Equal(tenantId, fakeDispatchService.LastTenantId);
+    }
+
+    [Fact]
+    public async Task SendCollection_QuickTemplateWithBoth_SendsEmailAndWhatsApp()
+    {
+        var db = TestDbContextFactory.Create();
+
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var contactId = Guid.NewGuid();
+        var titleId = Guid.NewGuid();
+
+        db.Tenants.Add(new Tenant { Id = tenantId, CompanyName = "Tenant A", TaxId = "111" });
+        db.Users.Add(new User { Id = userId, TenantId = tenantId, Name = "User", Email = "user@test.com", PasswordHash = "x" });
+        db.Clients.Add(new Client { Id = clientId, TenantId = tenantId, UserId = userId, LegalName = "Cliente Teste", TaxId = "123" });
+        db.Contacts.Add(new Contact
+        {
+            Id = contactId,
+            ClientId = clientId,
+            Name = "Contato",
+            Email = "contato@test.com",
+            WhatsAppPhone = "11999999999",
+            IsPrimary = true
+        });
+        db.Titles.Add(new Title
+        {
+            Id = titleId,
+            TenantId = tenantId,
+            ClientId = clientId,
+            UniqueCode = "TIT-QUICK-001",
+            Amount = 100m,
+            DueDate = DateTime.UtcNow.Date.AddDays(2),
+            IssueDate = DateTime.UtcNow.Date,
+            Status = TitleStatus.Open
+        });
+
+        await db.SaveChangesAsync();
+
+        var fakeDispatchService = new FakeDispatchDeliveryService();
+        var service = new TitleService(db, fakeDispatchService);
+
+        var ok = await service.SendCollectionAsync(tenantId, titleId, new SendCollectionRequest(
+            UseQuickTemplate: true,
+            Channel: "Both",
+            Subject: "Cobrança {{TituloCodigo}}",
+            Body: "Olá {{ClienteNome}}, valor {{Valor}}"));
+
+        Assert.True(ok);
+        Assert.Equal(1, fakeDispatchService.QuickEmailCalls);
+        Assert.Equal(1, fakeDispatchService.QuickWhatsAppCalls);
+
+        var history = db.TitleHistories.Single(h => h.TitleId == titleId && h.Action == "Cobranca manual rapida");
+        Assert.Contains("E-mail enviado", history.Description);
+        Assert.Contains("WhatsApp enviado", history.Description);
+    }
+
+    private sealed class FakeDispatchDeliveryService : IDispatchDeliveryService
+    {
+        public bool ProcessCalled { get; private set; }
+        public Guid? LastTenantId { get; private set; }
+        public int QuickEmailCalls { get; private set; }
+        public int QuickWhatsAppCalls { get; private set; }
+        public bool QuickEmailResult { get; set; } = true;
+        public bool QuickWhatsAppResult { get; set; } = true;
+
+        public Task<int> ProcessPendingDispatchesAsync(Guid? tenantId = null, CancellationToken cancellationToken = default)
+        {
+            ProcessCalled = true;
+            LastTenantId = tenantId;
+            return Task.FromResult(0);
+        }
+
+        public Task<QuickSendResult> SendQuickEmailAsync(
+            Guid tenantId,
+            string recipientName,
+            string recipientEmail,
+            string subject,
+            string body,
+            CancellationToken cancellationToken = default)
+        {
+            QuickEmailCalls++;
+            return Task.FromResult(QuickEmailResult
+                ? QuickSendResult.Success()
+                : QuickSendResult.Fail("Falha no envio SMTP"));
+        }
+
+        public Task<QuickSendResult> SendQuickWhatsAppAsync(
+            Guid tenantId,
+            string recipientName,
+            string recipientPhone,
+            string body,
+            CancellationToken cancellationToken = default)
+        {
+            QuickWhatsAppCalls++;
+            return Task.FromResult(QuickWhatsAppResult
+                ? QuickSendResult.Success()
+                : QuickSendResult.Fail("Falha no envio WhatsApp"));
+        }
     }
 }

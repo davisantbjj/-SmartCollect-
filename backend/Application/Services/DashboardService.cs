@@ -92,7 +92,7 @@ public class DashboardService : IDashboardService
     {
         var overdue = await TitlesFor(tenantId)
             .Where(t =>
-                (t.Status == TitleStatus.Open || t.Status == TitleStatus.Overdue)
+                (t.Status == TitleStatus.Open || t.Status == TitleStatus.Overdue || t.Status == TitleStatus.PendingData)
                 && t.DueDate < DateTime.UtcNow)
             .ToListAsync();
 
@@ -142,7 +142,9 @@ public class DashboardService : IDashboardService
         var start = end.AddDays(-14);
 
         var dispatches = await DispatchesFor(tenantId)
-            .Where(d => d.Status >= DispatchStatus.Sent)
+            .Where(d => d.Status == DispatchStatus.Sent
+                || d.Status == DispatchStatus.Delivered
+                || d.Status == DispatchStatus.Viewed)
             .Where(d => (d.SentAt ?? d.ScheduledFor) >= start && (d.SentAt ?? d.ScheduledFor) <= end)
             .ToListAsync();
 
@@ -172,8 +174,12 @@ public class DashboardService : IDashboardService
     public async Task<ChannelMetricsResponse> GetChannelMetricsAsync(Guid? tenantId, DateTime? startDate = null, DateTime? endDate = null)
     {
         var (start, end) = ResolveRange(startDate, endDate);
+        var sentStatuses = new[] { DispatchStatus.Sent, DispatchStatus.Delivered, DispatchStatus.Viewed };
+        var deliveredStatuses = new[] { DispatchStatus.Delivered, DispatchStatus.Viewed };
+        var viewedStatuses = new[] { DispatchStatus.Viewed };
+
         var dispatches = await DispatchesFor(tenantId)
-            .Where(d => d.ScheduledFor >= start && d.ScheduledFor <= end)
+            .Where(d => (d.SentAt ?? d.ScheduledFor) >= start && (d.SentAt ?? d.ScheduledFor) <= end)
             .ToListAsync();
 
         var email = dispatches.Where(d => d.Channel == CollectionChannel.Email).ToList();
@@ -181,12 +187,12 @@ public class DashboardService : IDashboardService
         var both = dispatches.Where(d => d.Channel == CollectionChannel.Both).ToList();
 
         return new ChannelMetricsResponse(
-            email.Count(d => d.Status >= DispatchStatus.Sent) + both.Count(d => d.Status >= DispatchStatus.Sent),
-            email.Count(d => d.Status >= DispatchStatus.Delivered) + both.Count(d => d.Status >= DispatchStatus.Delivered),
-            email.Count(d => d.Status >= DispatchStatus.Viewed) + both.Count(d => d.Status >= DispatchStatus.Viewed),
-            wa.Count(d => d.Status >= DispatchStatus.Sent) + both.Count(d => d.Status >= DispatchStatus.Sent),
-            wa.Count(d => d.Status >= DispatchStatus.Delivered) + both.Count(d => d.Status >= DispatchStatus.Delivered),
-            wa.Count(d => d.Status >= DispatchStatus.Viewed) + both.Count(d => d.Status >= DispatchStatus.Viewed));
+            email.Count(d => sentStatuses.Contains(d.Status)) + both.Count(d => sentStatuses.Contains(d.Status)),
+            email.Count(d => deliveredStatuses.Contains(d.Status)) + both.Count(d => deliveredStatuses.Contains(d.Status)),
+            email.Count(d => viewedStatuses.Contains(d.Status)) + both.Count(d => viewedStatuses.Contains(d.Status)),
+            wa.Count(d => sentStatuses.Contains(d.Status)) + both.Count(d => sentStatuses.Contains(d.Status)),
+            wa.Count(d => deliveredStatuses.Contains(d.Status)) + both.Count(d => deliveredStatuses.Contains(d.Status)),
+            wa.Count(d => viewedStatuses.Contains(d.Status)) + both.Count(d => viewedStatuses.Contains(d.Status)));
     }
 
     public async Task<ActivityLogResponse> GetActivityLogAsync(Guid? tenantId, DateTime? startDate = null, DateTime? endDate = null)

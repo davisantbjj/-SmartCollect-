@@ -62,4 +62,38 @@ public class ContactServiceTests
             svc.CreateAsync(tenantId, Guid.NewGuid(),
                 new CreateContactRequest("Test", "test@test.com", null, "Finance", false)));
     }
+
+    [Fact]
+    public async Task Create_WithOnlyInvalidPhone_MarksContactAsPending()
+    {
+        var (svc, _, tenantId, clientId) = await SetupAsync();
+
+        await svc.CreateAsync(
+            tenantId,
+            clientId,
+            new CreateContactRequest("Phone Only", "", "(", "Finance", false));
+
+        var contacts = await svc.ListByClientAsync(tenantId, clientId);
+        var created = contacts.Single(c => c.Name == "Phone Only");
+
+        Assert.Equal("pending", created.Status);
+        Assert.Null(created.WhatsAppPhone);
+    }
+
+    [Fact]
+    public async Task Create_WithEmailAndInvalidPhone_MarksContactAsPartial()
+    {
+        var (svc, _, tenantId, clientId) = await SetupAsync();
+
+        await svc.CreateAsync(
+            tenantId,
+            clientId,
+            new CreateContactRequest("Email Valid", "email@test.com", "(", "Finance", false));
+
+        var contacts = await svc.ListByClientAsync(tenantId, clientId);
+        var created = contacts.Single(c => c.Name == "Email Valid");
+
+        Assert.Equal("partial", created.Status);
+        Assert.Null(created.WhatsAppPhone);
+    }
 }

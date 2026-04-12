@@ -29,8 +29,11 @@ services:
     restart: unless-stopped
     ports:
       - "5013:5013"
+    volumes:
+      - dpkeys:/home/app/.aspnet/DataProtection-Keys
     environment:
       ASPNETCORE_ENVIRONMENT: Development
+      DATA_PROTECTION_KEYS_PATH: /home/app/.aspnet/DataProtection-Keys
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-smartcollect}
@@ -60,3 +63,4 @@ services:
 
 volumes:
   pgdata:
+  dpkeys:

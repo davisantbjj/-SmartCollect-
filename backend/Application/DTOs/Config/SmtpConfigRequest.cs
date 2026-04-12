@@ -4,7 +4,7 @@ public record SmtpConfigRequest(
     string Host,
     int Port,
     string User,
-    string Password,
+    string? Password,
     string SenderFrom,
     string SenderName
 );

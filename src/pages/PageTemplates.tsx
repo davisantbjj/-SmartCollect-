@@ -36,7 +36,7 @@ export const PageTemplates = ({
   const [form, setForm] = useState<TemplateForm>(emptyForm);
   const [saving, setSaving] = useState(false);
 
-  const canEdit = session.role === "Admin";
+  const canEdit = session.role === "Admin" || session.role === "Worker";
 
   const load = async () => {
     try {
@@ -127,7 +127,6 @@ export const PageTemplates = ({
               selected === i ? "border-accent bg-accent/[0.03]" : "border-border-subtle hover:border-border-subtle-2"
             }`}
           >
-            {selected === i && <span className="absolute top-3 right-3 text-sm">{ICONS.checkmark}</span>}
             <div className={`inline-flex items-center gap-[5px] text-[11px] font-bold px-[9px] py-[3px] rounded-full mb-3 ${
               tpl.channel === "Email"
                 ? "bg-blue-500/[0.12] text-blue-500"

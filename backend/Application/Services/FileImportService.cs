@@ -148,7 +148,7 @@ public class FileImportService : IFileImportService
                             throw new InvalidOperationException($"Invalid issue date: '{rawIssueDate}'");
                     }
 
-                    var email = GetOptionalValue(row.Values, "email");
+                    var email = NormalizeEmail(GetOptionalValue(row.Values, "email"));
                     var phone = NormalizePhone(GetOptionalValue(row.Values, "telefone_whatsapp"));
                     var boletoUrl = GetOptionalValue(row.Values, "link_boleto");
                     var hasContactInfo = !string.IsNullOrWhiteSpace(email) || !string.IsNullOrWhiteSpace(phone);
@@ -523,7 +523,7 @@ public class FileImportService : IFileImportService
             "open" or "aberto" or "em_aberto" => TitleStatus.Open,
             "pending_data" or "pendingdata" or "pendente_de_dados" or "pendente_dados" or "pendente" => TitleStatus.PendingData,
             "paid" or "pago" or "liquidado" or "recebido" => TitleStatus.Paid,
-            "overdue" or "em_atraso" or "vencido" or "atrasado" => TitleStatus.Overdue,
+            "overdue" or "em_atraso" => TitleStatus.Overdue,
             "cancelled" or "canceled" or "cancelado" => TitleStatus.Cancelled,
             _ => status
         };
@@ -531,7 +531,7 @@ public class FileImportService : IFileImportService
         return normalized is "open" or "aberto" or "em_aberto"
             or "pending_data" or "pendingdata" or "pendente_de_dados" or "pendente_dados" or "pendente"
             or "paid" or "pago" or "liquidado" or "recebido"
-            or "overdue" or "em_atraso" or "vencido" or "atrasado"
+            or "overdue" or "em_atraso"
             or "cancelled" or "canceled" or "cancelado";
     }
 
@@ -553,16 +553,41 @@ public class FileImportService : IFileImportService
         if (string.IsNullOrWhiteSpace(rawPhone))
             return null;
 
-        var digits = Regex.Replace(rawPhone, "\\D", string.Empty);
+        var value = rawPhone.Trim();
+        var hasExplicitCountryCode = value.StartsWith('+');
+        var lowered = value.ToLowerInvariant();
+        if (lowered is "-" or "n/a" or "na" or "null" or "nenhum" or "sem_telefone" or "sem_telefone_whatsapp")
+            return null;
 
-        // Accept common BR formats with or without +55 and persist as numeric canonical value.
+        var digits = Regex.Replace(value, "\\D", string.Empty);
+        if (digits.Length == 0)
+            return null;
+
+        // Accept common BR formats with or without +55 and persist in E.164 canonical format.
         if (digits.StartsWith("00", StringComparison.Ordinal))
             digits = digits[2..];
 
+        // Incomplete phone should not invalidate the whole row: treat as missing contact data.
         if (digits.Length is < 10 or > 13)
-            throw new InvalidOperationException($"Invalid phone number: '{rawPhone}'");
+            return null;
 
-        return digits;
+        if (!hasExplicitCountryCode && (digits.Length == 10 || digits.Length == 11))
+            digits = $"55{digits}";
+
+        return $"+{digits}";
+    }
+
+    private static string? NormalizeEmail(string? rawEmail)
+    {
+        if (string.IsNullOrWhiteSpace(rawEmail))
+            return null;
+
+        var value = rawEmail.Trim();
+        var normalized = value.ToLowerInvariant();
+        if (normalized is "-" or "n/a" or "na" or "null" or "nenhum" or "sem_email")
+            return null;
+
+        return value;
     }
 
     private static string BuildImportUpdateDescription(

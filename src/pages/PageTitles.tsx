@@ -151,6 +151,30 @@ export const PageTitles = ({
       "{{Empresa}}",
     ].join("\n");
 
+  const toChannelPills = (channels: string[]): string[] => {
+    const resolved = new Set<string>();
+
+    channels.forEach(channel => {
+      const normalized = channel.trim().toLowerCase();
+
+      if (normalized.includes("both") || normalized.includes("ambos")) {
+        resolved.add("email");
+        resolved.add("wa");
+        return;
+      }
+
+      if (normalized.includes("whatsapp")) {
+        resolved.add("wa");
+        return;
+      }
+
+      if (normalized.includes("email"))
+        resolved.add("email");
+    });
+
+    return Array.from(resolved);
+  };
+
   const openCollectModal = (title: TitleResponse) => {
     setCollectTarget(title);
     setUseQuickTemplate(false);
@@ -281,7 +305,7 @@ export const PageTitles = ({
                 <td className="px-4 py-[13px] font-extrabold text-sm">{formatBRLFull(title.amount)}</td>
                 <td className="px-4 py-[13px]"><Badge status={title.status.toLowerCase()} /></td>
                 <td className="px-4 py-[13px]">
-                  <ChannelPills channels={title.channels.map(c => c.toLowerCase().includes("whatsapp") ? "wa" : "email")} />
+                  <ChannelPills channels={toChannelPills(title.channels)} />
                 </td>
                 <td className="px-4 py-[13px] text-xs text-text-secondary">
                   <div className="font-semibold text-text-primary">{title.lastAction ?? "Sem ação"}</div>

@@ -333,6 +333,24 @@ export interface SmtpConfigRequest {
   senderName: string;
 }
 
+export type WhatsAppProvider = "Twilio" | "Z-API" | "Evolution API" | "360dialog";
+
+export interface WhatsAppConfigResponse {
+  provider: WhatsAppProvider;
+  numberId: string;
+  apiBaseUrl?: string | null;
+  hasAccessToken: boolean;
+  webhookUrl: string;
+}
+
+export interface WhatsAppConfigRequest {
+  provider: WhatsAppProvider;
+  numberId: string;
+  accessToken?: string;
+  apiBaseUrl?: string;
+  clearToken?: boolean;
+}
+
 export interface TenantResponse {
   id: string;
   companyName: string;
@@ -778,6 +796,21 @@ export async function saveSmtpConfig(payload: SmtpConfigRequest) {
 
 export async function testSmtpConfig() {
   return request<{ message: string }>("/api/config/smtp/test", { method: "POST" });
+}
+
+export async function getWhatsAppConfig() {
+  return request<WhatsAppConfigResponse>("/api/config/whatsapp");
+}
+
+export async function saveWhatsAppConfig(payload: WhatsAppConfigRequest) {
+  return request<{ message: string }>("/api/config/whatsapp", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function testWhatsAppConfig() {
+  return request<{ message: string }>("/api/config/whatsapp/test", { method: "POST" });
 }
 
 export async function getExternalApiConfig() {

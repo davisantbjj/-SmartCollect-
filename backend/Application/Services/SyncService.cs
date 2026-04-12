@@ -1,12 +1,15 @@
 namespace SmartCollect.Application.Services;
 
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Text.RegularExpressions;
 using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using SmartCollect.Application.DTOs.Common;
 using SmartCollect.Application.DTOs.Config;
 using SmartCollect.Application.DTOs.Sync;
 using SmartCollect.Application.Interfaces;
@@ -19,6 +22,9 @@ public class SyncService : ISyncService
     private readonly ILogger<SyncService> _logger;
     private readonly IConfiguration _configuration;
     private readonly IDataProtector _protector;
+    private readonly IDispatchDeliveryService? _dispatchDeliveryService;
+
+    private static readonly Regex TemplateRegex = new("\\{\\{\\s*([a-zA-Z0-9_]+)\\s*\\}\\}", RegexOptions.Compiled);
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -30,13 +36,15 @@ public class SyncService : ISyncService
         IHttpClientFactory httpClientFactory,
         IDataProtectionProvider dataProtectionProvider,
         IConfiguration configuration,
-        ILogger<SyncService> logger)
+        ILogger<SyncService> logger,
+        IDispatchDeliveryService? dispatchDeliveryService = null)
     {
         _db = db;
         _httpClientFactory = httpClientFactory;
         _protector = dataProtectionProvider.CreateProtector("SmartCollect.ExternalApiCredentials.v1");
         _configuration = configuration;
         _logger = logger;
+        _dispatchDeliveryService = dispatchDeliveryService;
     }
 
     public async Task<int> SyncPendingTitlesAsync(Guid tenantId)
@@ -183,21 +191,39 @@ public class SyncService : ISyncService
     public async Task<int> SyncOccurrencesAsync(Guid tenantId)
     {
         var (http, settings) = await CreateTenantApiClientAsync(tenantId);
-        var referenceDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
-        var occurrencesPath = BuildOccurrencesPath(settings.OccurrencesPath, referenceDate);
+        var processed = 0;
+        var referenceDates = new[] { DateTime.UtcNow.Date.AddDays(-1), DateTime.UtcNow.Date };
+
+        foreach (var referenceDate in referenceDates)
+        {
+            processed += await SyncOccurrencesByDateAsync(tenantId, http, settings.OccurrencesPath, referenceDate);
+        }
+
+        return processed;
+    }
+
+    private async Task<int> SyncOccurrencesByDateAsync(
+        Guid tenantId,
+        HttpClient http,
+        string occurrencesPathTemplate,
+        DateTime referenceDate)
+    {
+        var formattedDate = referenceDate.ToString("yyyy-MM-dd");
+        var occurrencesPath = BuildOccurrencesPath(occurrencesPathTemplate, formattedDate);
 
         using var response = await http.GetAsync(occurrencesPath);
         if (!response.IsSuccessStatusCode)
         {
             var body = await response.Content.ReadAsStringAsync();
             _logger.LogError(
-                "SyncOccurrences failed with status {StatusCode} for tenant {TenantId}. Response: {Body}",
+                "SyncOccurrences failed with status {StatusCode} for tenant {TenantId} and date {ReferenceDate}. Response: {Body}",
                 response.StatusCode,
                 tenantId,
+                formattedDate,
                 body);
 
             throw new HttpRequestException(
-                $"External API returned {(int)response.StatusCode} while syncing occurrences.",
+                $"External API returned {(int)response.StatusCode} while syncing occurrences for {formattedDate}.",
                 null,
                 response.StatusCode);
         }
@@ -223,7 +249,8 @@ public class SyncService : ISyncService
                 continue;
             }
 
-            await ProcessOccurrenceAsync(tenantId, occurrence.UniqueCode, newStatus);
+            var occurrenceDate = ResolveOccurrenceDate(occurrence, referenceDate);
+            await ProcessOccurrenceAsync(tenantId, occurrence.UniqueCode, newStatus, occurrenceDate);
             processed++;
         }
 
@@ -311,13 +338,40 @@ public class SyncService : ISyncService
     /// Process a single occurrence. Called by the sync pipeline.
     /// Implements RN06, RN07, RN08.
     /// </summary>
-    public async Task ProcessOccurrenceAsync(Guid tenantId, string uniqueCode, TitleStatus newStatus)
+    public async Task ProcessOccurrenceAsync(Guid tenantId, string uniqueCode, TitleStatus newStatus, DateTime? occurrenceDate = null)
     {
+        var effectiveOccurrenceDate = (occurrenceDate ?? DateTime.UtcNow).Date;
+        var startDate = effectiveOccurrenceDate;
+        var endDate = startDate.AddDays(1);
+
         var title = await _db.Titles
             .Include(t => t.Dispatches)
+            .Include(t => t.Client)
+                .ThenInclude(c => c.Contacts)
             .FirstOrDefaultAsync(t => t.TenantId == tenantId && t.UniqueCode == uniqueCode);
 
         if (title is null) return;
+
+        var existingOccurrence = await _db.Occurrences.FirstOrDefaultAsync(o =>
+            o.TitleId == title.Id
+            && o.UpdatedStatus == newStatus
+            && o.OccurrenceDate >= startDate
+            && o.OccurrenceDate < endDate);
+
+        if (existingOccurrence is not null)
+        {
+            if (newStatus == TitleStatus.Paid && !existingOccurrence.ThankYouSent)
+            {
+                var retryResult = await TrySendThankYouAsync(tenantId, title);
+                if (retryResult.Sent)
+                    existingOccurrence.ThankYouSent = true;
+
+                await RegisterThankYouHistoryAsync(tenantId, title, retryResult, isRetry: true);
+                await _db.SaveChangesAsync();
+            }
+
+            return;
+        }
 
         // RN06: idempotent — if already in terminal state, just record occurrence
         var occurrence = new Domain.Entities.Occurrence
@@ -325,7 +379,7 @@ public class SyncService : ISyncService
             Id = Guid.NewGuid(),
             TitleId = title.Id,
             UpdatedStatus = newStatus,
-            OccurrenceDate = DateTime.UtcNow,
+            OccurrenceDate = effectiveOccurrenceDate,
             ProcessedAt = DateTime.UtcNow
         };
 
@@ -347,20 +401,183 @@ public class SyncService : ISyncService
         // RN08: Send thank-you if Paid and active ThankYou template exists
         if (newStatus == TitleStatus.Paid)
         {
-            var thankYouTemplate = await _db.MessageTemplates
-                .FirstOrDefaultAsync(t => t.TenantId == tenantId
-                    && t.Type == TemplateType.ThankYou
-                    && t.Active);
-
-            if (thankYouTemplate != null)
-            {
-                occurrence.ThankYouSent = true;
-                // In production, this would queue the actual send
-            }
+            var thankYouResult = await TrySendThankYouAsync(tenantId, title);
+            occurrence.ThankYouSent = thankYouResult.Sent;
+            await RegisterThankYouHistoryAsync(tenantId, title, thankYouResult);
         }
 
         await _db.Occurrences.AddAsync(occurrence);
         await _db.SaveChangesAsync();
+    }
+
+    private async Task<ThankYouDispatchResult> TrySendThankYouAsync(Guid tenantId, Domain.Entities.Title title)
+    {
+        if (_dispatchDeliveryService is null)
+            return ThankYouDispatchResult.Fail("Serviço de envio não disponível.");
+
+        if (await _db.Occurrences.AnyAsync(o => o.TitleId == title.Id && o.ThankYouSent))
+            return ThankYouDispatchResult.Success(null);
+
+        var template = await _db.MessageTemplates
+            .FirstOrDefaultAsync(t => t.TenantId == tenantId
+                && t.Type == TemplateType.ThankYou
+                && t.Active);
+
+        if (template is null)
+            return ThankYouDispatchResult.Fail("Template de agradecimento inexistente ou inativo.");
+
+        var recipients = title.Client.Contacts
+            .Where(c => !string.IsNullOrWhiteSpace(c.Email))
+            .OrderByDescending(c => c.IsPrimary)
+            .ThenBy(c => c.CreatedAt)
+            .ToList();
+
+        if (recipients.Count == 0)
+            return ThankYouDispatchResult.Fail("Sem contato com e-mail para envio do agradecimento.");
+
+        var companyName = await _db.Tenants
+            .Where(t => t.Id == tenantId)
+            .Select(t => t.CompanyName)
+            .FirstOrDefaultAsync() ?? "SmartCollect";
+
+        var subjectTemplate = string.IsNullOrWhiteSpace(template.Subject)
+            ? "Pagamento confirmado"
+            : template.Subject;
+
+        var subject = RenderTemplate(subjectTemplate!, title, companyName);
+        var body = RenderTemplate(template.Body, title, companyName);
+
+        string? lastFailureReason = null;
+
+        foreach (var recipient in recipients)
+        {
+            if (string.IsNullOrWhiteSpace(recipient.Email))
+                continue;
+
+            var sent = await _dispatchDeliveryService.SendQuickEmailAsync(
+                tenantId,
+                recipient.Name,
+                recipient.Email,
+                subject,
+                body);
+
+            if (sent.Sent)
+                return ThankYouDispatchResult.Success(recipient.Email);
+
+            lastFailureReason = sent.Detail;
+        }
+
+        return ThankYouDispatchResult.Fail(
+            string.IsNullOrWhiteSpace(lastFailureReason)
+                ? "Falha no envio SMTP para todos os contatos com e-mail."
+                : lastFailureReason);
+    }
+
+    private async Task RegisterThankYouHistoryAsync(
+        Guid tenantId,
+        Domain.Entities.Title title,
+        ThankYouDispatchResult result,
+        bool isRetry = false)
+    {
+        if (result.Sent)
+        {
+            var description = string.IsNullOrWhiteSpace(result.RecipientEmail)
+                ? "Template de agradecimento já havia sido confirmado anteriormente."
+                : $"Template de agradecimento enviado para {result.RecipientEmail}.";
+
+            if (isRetry)
+                description = $"{description} (retry automático)";
+
+            await _db.TitleHistories.AddAsync(new Domain.Entities.TitleHistory
+            {
+                Id = Guid.NewGuid(),
+                TitleId = title.Id,
+                TenantId = tenantId,
+                Action = "Agradecimento enviado",
+                Description = description
+            });
+
+            return;
+        }
+
+        var failureDescription = string.IsNullOrWhiteSpace(result.Reason)
+            ? "Agradecimento não enviado."
+            : $"Agradecimento não enviado: {result.Reason}";
+
+        if (isRetry)
+            failureDescription = $"{failureDescription} (retry automático)";
+
+        await _db.TitleHistories.AddAsync(new Domain.Entities.TitleHistory
+        {
+            Id = Guid.NewGuid(),
+            TitleId = title.Id,
+            TenantId = tenantId,
+            Action = "Agradecimento pendente",
+            Description = failureDescription
+        });
+    }
+
+    private sealed record ThankYouDispatchResult(bool Sent, string? Reason, string? RecipientEmail)
+    {
+        public static ThankYouDispatchResult Success(string? recipientEmail)
+            => new(true, null, recipientEmail);
+
+        public static ThankYouDispatchResult Fail(string reason)
+            => new(false, reason, null);
+    }
+
+    private static string RenderTemplate(string template, Domain.Entities.Title title, string companyName)
+    {
+        var diasAtraso = Math.Max(0, (DateTime.UtcNow.Date - title.DueDate.Date).Days);
+
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["ClienteNome"] = title.Client.LegalName,
+            ["NomeCliente"] = title.Client.LegalName,
+            ["RazaoSocial"] = title.Client.LegalName,
+            ["Cnpj"] = title.Client.TaxId,
+            ["TituloCodigo"] = title.UniqueCode,
+            ["CodigoTitulo"] = title.UniqueCode,
+            ["DiasAtraso"] = diasAtraso.ToString(),
+            ["Valor"] = title.Amount.ToString("C", new CultureInfo("pt-BR")),
+            ["DataVencimento"] = title.DueDate.ToString("dd/MM/yyyy"),
+            ["DataEmissao"] = title.IssueDate.ToString("dd/MM/yyyy"),
+            ["LinkBoleto"] = title.BoletoUrl ?? string.Empty,
+            ["Empresa"] = companyName,
+        };
+
+        return TemplateRegex.Replace(template ?? string.Empty, match =>
+        {
+            var key = match.Groups[1].Value;
+            return values.TryGetValue(key, out var value) ? value : match.Value;
+        });
+    }
+
+    private static DateTime ResolveOccurrenceDate(ExternalOccurrenceDto occurrence, DateTime fallbackDate)
+    {
+        if (TryParseOccurrenceDate(occurrence.OccurrenceDate, out var parsedDate))
+            return parsedDate;
+
+        if (TryParseOccurrenceDate(occurrence.ReferenceDate, out parsedDate))
+            return parsedDate;
+
+        return DateTime.SpecifyKind(fallbackDate.Date, DateTimeKind.Utc);
+    }
+
+    private static bool TryParseOccurrenceDate(string? raw, out DateTime occurrenceDate)
+    {
+        occurrenceDate = default;
+        if (string.IsNullOrWhiteSpace(raw))
+            return false;
+
+        if (DateTime.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var parsed)
+            || DateTime.TryParse(raw, new CultureInfo("pt-BR"), DateTimeStyles.AssumeLocal, out parsed))
+        {
+            occurrenceDate = parsed.Date;
+            return true;
+        }
+
+        return false;
     }
 
     private static bool TryMapTitleStatus(string? rawStatus, out TitleStatus status)

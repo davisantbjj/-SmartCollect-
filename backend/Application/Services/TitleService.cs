@@ -1,6 +1,7 @@
 namespace SmartCollect.Application.Services;
 
 using System.Text.RegularExpressions;
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using SmartCollect.Application.DTOs.Common;
 using SmartCollect.Application.DTOs.Titles;
@@ -235,31 +236,38 @@ public class TitleService : ITitleService
         if (request?.UseQuickTemplate == true)
             return await SendQuickTemplateCollectionAsync(tenantId, title, primaryContact, request);
 
-        var activeRule = await _db.CollectionRules
+        var activeRules = await _db.CollectionRules
             .Include(r => r.Triggers)
                 .ThenInclude(tr => tr.Template)
-            .FirstOrDefaultAsync(r => r.TenantId == tenantId && r.Active);
+            .Where(r => r.TenantId == tenantId && r.Active)
+            .OrderBy(r => r.CreatedAt)
+            .ToListAsync();
 
-        if (activeRule is null) return false;
+        if (activeRules.Count == 0) return false;
 
-        foreach (var trigger in activeRule.Triggers.Where(tr => tr.Active).OrderBy(tr => tr.Order))
+        var totalDispatches = 0;
+        foreach (var rule in activeRules)
         {
-            var scheduledDate = trigger.Reference == TriggerReference.DueDate
-                ? title.DueDate.AddDays(trigger.DaysOffset)
-                : title.IssueDate.AddDays(trigger.DaysOffset);
-
-            var dispatch = new Domain.Entities.Dispatch
+            foreach (var trigger in rule.Triggers.Where(tr => tr.Active).OrderBy(tr => tr.Order))
             {
-                Id = Guid.NewGuid(),
-                TitleId = title.Id,
-                ContactId = primaryContact.Id,
-                TriggerId = trigger.Id,
-                Channel = trigger.Channel,
-                Status = DispatchStatus.Pending,
-                ScheduledFor = scheduledDate
-            };
+                var scheduledDate = trigger.Reference == TriggerReference.DueDate
+                    ? title.DueDate.AddDays(trigger.DaysOffset)
+                    : title.IssueDate.AddDays(trigger.DaysOffset);
 
-            await _db.Dispatches.AddAsync(dispatch);
+                var dispatch = new Domain.Entities.Dispatch
+                {
+                    Id = Guid.NewGuid(),
+                    TitleId = title.Id,
+                    ContactId = primaryContact.Id,
+                    TriggerId = trigger.Id,
+                    Channel = trigger.Channel,
+                    Status = DispatchStatus.Pending,
+                    ScheduledFor = scheduledDate
+                };
+
+                await _db.Dispatches.AddAsync(dispatch);
+                totalDispatches++;
+            }
         }
 
         await _db.TitleHistories.AddAsync(new Domain.Entities.TitleHistory
@@ -268,7 +276,7 @@ public class TitleService : ITitleService
             TitleId = title.Id,
             TenantId = tenantId,
             Action = "Cobranca manual",
-            Description = $"{activeRule.Triggers.Count(tr => tr.Active)} disparos agendados"
+            Description = $"{totalDispatches} disparos agendados em {activeRules.Count} régua(s) ativa(s)"
         });
 
         await _db.SaveChangesAsync();
@@ -295,11 +303,20 @@ public class TitleService : ITitleService
         if (channel == CollectionChannel.Sms)
             throw new InvalidOperationException("Canal SMS ainda não está disponível no envio manual.");
 
-        if (channel == CollectionChannel.WhatsApp)
-            throw new InvalidOperationException("Canal WhatsApp ainda não está disponível para envio rápido. Use E-mail ou Ambos.");
+        var sendEmail = channel is CollectionChannel.Email or CollectionChannel.Both;
+        var sendWhatsApp = channel is CollectionChannel.WhatsApp or CollectionChannel.Both;
 
-        if (string.IsNullOrWhiteSpace(contact.Email))
+        if (sendEmail && string.IsNullOrWhiteSpace(contact.Email)
+            && (!sendWhatsApp || string.IsNullOrWhiteSpace(contact.WhatsAppPhone)))
+        {
             throw new InvalidOperationException("Contato principal sem e-mail para envio.");
+        }
+
+        if (sendWhatsApp && string.IsNullOrWhiteSpace(contact.WhatsAppPhone)
+            && (!sendEmail || string.IsNullOrWhiteSpace(contact.Email)))
+        {
+            throw new InvalidOperationException("Contato principal sem WhatsApp para envio.");
+        }
 
         var subjectTemplate = string.IsNullOrWhiteSpace(request.Subject)
             ? $"Cobrança do título {title.UniqueCode}"
@@ -313,19 +330,58 @@ public class TitleService : ITitleService
         var body = RenderQuickTemplate(request.Body!, title, tenantCompanyName);
         var subject = RenderQuickTemplate(subjectTemplate, title, tenantCompanyName);
 
-        var sent = await _dispatchDeliveryService.SendQuickEmailAsync(
-            tenantId,
-            contact.Name,
-            contact.Email,
-            subject,
-            body);
+        var sentChannels = new List<string>();
+        var failedChannels = new List<string>();
 
-        if (!sent)
-            throw new InvalidOperationException("Falha ao enviar cobrança rápida. Verifique a configuração SMTP.");
+        if (sendEmail)
+        {
+            if (string.IsNullOrWhiteSpace(contact.Email))
+            {
+                failedChannels.Add("E-mail: contato sem e-mail.");
+            }
+            else
+            {
+                var emailResult = await _dispatchDeliveryService.SendQuickEmailAsync(
+                    tenantId,
+                    contact.Name,
+                    contact.Email,
+                    subject,
+                    body);
 
-        var details = channel == CollectionChannel.Both
-            ? $"E-mail enviado para {contact.Email}. Canal WhatsApp selecionado para uso conjunto."
-            : $"E-mail enviado para {contact.Email}.";
+                if (emailResult.Sent)
+                    sentChannels.Add($"E-mail enviado para {contact.Email}");
+                else
+                    failedChannels.Add($"E-mail: {emailResult.Detail}");
+            }
+        }
+
+        if (sendWhatsApp)
+        {
+            if (string.IsNullOrWhiteSpace(contact.WhatsAppPhone))
+            {
+                failedChannels.Add("WhatsApp: contato sem número.");
+            }
+            else
+            {
+                var whatsAppResult = await _dispatchDeliveryService.SendQuickWhatsAppAsync(
+                    tenantId,
+                    contact.Name,
+                    contact.WhatsAppPhone,
+                    body);
+
+                if (whatsAppResult.Sent)
+                    sentChannels.Add($"WhatsApp enviado para {contact.WhatsAppPhone}");
+                else
+                    failedChannels.Add($"WhatsApp: {whatsAppResult.Detail}");
+            }
+        }
+
+        if (sentChannels.Count == 0)
+            throw new InvalidOperationException($"Falha ao enviar cobrança rápida. {string.Join(" | ", failedChannels)}");
+
+        var details = string.Join(". ", sentChannels);
+        if (failedChannels.Count > 0)
+            details = $"{details}. Falhas parciais: {string.Join(" | ", failedChannels)}";
 
         await _db.TitleHistories.AddAsync(new Domain.Entities.TitleHistory
         {
@@ -356,14 +412,18 @@ public class TitleService : ITitleService
 
     private static string RenderQuickTemplate(string template, Domain.Entities.Title title, string companyName)
     {
+        var diasAtraso = Math.Max(0, (DateTime.UtcNow.Date - title.DueDate.Date).Days);
+
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["ClienteNome"] = title.Client.LegalName,
+            ["NomeCliente"] = title.Client.LegalName,
             ["RazaoSocial"] = title.Client.LegalName,
             ["Cnpj"] = title.Client.TaxId,
             ["TituloCodigo"] = title.UniqueCode,
             ["CodigoTitulo"] = title.UniqueCode,
-            ["Valor"] = title.Amount.ToString("C"),
+            ["DiasAtraso"] = diasAtraso.ToString(),
+            ["Valor"] = title.Amount.ToString("C", new CultureInfo("pt-BR")),
             ["DataVencimento"] = title.DueDate.ToString("dd/MM/yyyy"),
             ["DataEmissao"] = title.IssueDate.ToString("dd/MM/yyyy"),
             ["LinkBoleto"] = title.BoletoUrl ?? string.Empty,

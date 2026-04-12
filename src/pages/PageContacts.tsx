@@ -18,11 +18,47 @@ const formatCnpj = (v: string) => {
 };
 
 const formatPhone = (v: string) => {
-  const d = v.replace(/\D/g, "").substring(0, 11);
-  if (d.length <= 2)  return `(${d}`;
-  if (d.length <= 6)  return `(${d.slice(0,2)}) ${d.slice(2)}`;
+  const raw = v.trim();
+  let d = raw.replace(/\D/g, "").substring(0, 13);
+  if (d.length === 0) return "";
+
+  if (d.startsWith("00")) d = d.slice(2);
+
+  const explicitInternational = raw.startsWith("+");
+  if (explicitInternational && !d.startsWith("55")) {
+    return `+${d}`;
+  }
+
+  if (d.startsWith("55")) {
+    const local = d.slice(2);
+    if (local.length === 0) return "+55";
+    if (local.length <= 2) return `+55 (${local}`;
+    if (local.length <= 6) return `+55 (${local.slice(0,2)}) ${local.slice(2)}`;
+    if (local.length <= 10) return `+55 (${local.slice(0,2)}) ${local.slice(2,6)}-${local.slice(6)}`;
+    return `+55 (${local.slice(0,2)}) ${local.slice(2,7)}-${local.slice(7,11)}`;
+  }
+
+  if (d.length <= 2) return `(${d}`;
+  if (d.length <= 6) return `(${d.slice(0,2)}) ${d.slice(2)}`;
   if (d.length <= 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
-  return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7,11)}`;
+  if (d.length <= 11) return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7,11)}`;
+
+  return `+${d}`;
+};
+
+const normalizePhone = (v: string): string | undefined => {
+  const raw = v.trim();
+  const explicitInternational = raw.startsWith("+");
+
+  let d = raw.replace(/\D/g, "");
+  if (d.startsWith("00")) d = d.slice(2);
+  if (d.length < 10 || d.length > 13) return undefined;
+
+  if (!explicitInternational && (d.length === 10 || d.length === 11)) {
+    d = `55${d}`;
+  }
+
+  return `+${d}`;
 };
 
 interface FormState {
@@ -100,7 +136,10 @@ export const PageContacts = ({ showToast }: { showToast: ShowToast }) => {
   };
 
   const handleSave = async () => {
-    if (!form.name || (!form.email && !form.whatsAppPhone)) {
+    const hasEmail = form.email.trim().length > 0;
+    const normalizedPhone = normalizePhone(form.whatsAppPhone);
+
+    if (!form.name || (!hasEmail && !normalizedPhone)) {
       showToast(`${ICONS.warning} Nome e pelo menos um canal de contato são obrigatórios.`, "warn");
       return;
     }
@@ -108,8 +147,8 @@ export const PageContacts = ({ showToast }: { showToast: ShowToast }) => {
       setSaving(true);
       const payload: UpsertContactRequest = {
         name: form.name,
-        email: form.email,
-        whatsAppPhone: form.whatsAppPhone || undefined,
+        email: form.email.trim(),
+        whatsAppPhone: normalizedPhone,
         department: form.department,
         isPrimary: form.isPrimary,
       };

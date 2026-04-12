@@ -52,9 +52,11 @@ export const PageSequence = ({
   const [ruleDescription, setRuleDescription] = useState("");
   const [ruleActive, setRuleActive] = useState(true);
   const [triggers, setTriggers] = useState<TriggerFormItem[]>([newTrigger()]);
+  const [selectedRuleId, setSelectedRuleId] = useState<string>("");
 
-  const canEdit = session.role === "Admin";
-  const activeRule = rules.find(r => r.active);
+  const canEdit = session.role === "Admin" || session.role === "Worker";
+  const activeRules = rules.filter(r => r.active);
+  const selectedRule = rules.find(r => r.id === selectedRuleId) ?? activeRules[0] ?? rules[0];
 
   const templatesById = useMemo(() => {
     const map = new Map<string, MessageTemplateResponse>();
@@ -87,11 +89,24 @@ export const PageSequence = ({
     void load();
   }, []);
 
+  useEffect(() => {
+    if (rules.length === 0) {
+      setSelectedRuleId("");
+      return;
+    }
+
+    if (rules.some(r => r.id === selectedRuleId))
+      return;
+
+    const preferred = rules.find(r => r.active) ?? rules[0];
+    setSelectedRuleId(preferred.id);
+  }, [rules, selectedRuleId]);
+
   const openNew = () => {
     setEditingRuleId(null);
     setRuleName("Nova Régua");
     setRuleDescription("");
-    setRuleActive(true);
+    setRuleActive(false);
     setTriggers([
       {
         ...newTrigger(),
@@ -205,16 +220,16 @@ export const PageSequence = ({
     <div className="animate-fade-up">
       <div className="flex justify-between items-center mb-[22px]">
         <div>
-          {activeRule
-            ? <span className="text-sm text-success font-semibold">{ICONS.checkmark} Régua ativa: <strong>{activeRule.name}</strong></span>
+          {activeRules.length > 0
+            ? <span className="text-sm text-success font-semibold">{ICONS.checkmark} {activeRules.length} régua(s) ativa(s)</span>
             : <span className="text-sm text-warn font-semibold">{ICONS.warning} Nenhuma régua ativa</span>
           }
         </div>
         {canEdit && (
           <div className="flex gap-2">
-            {activeRule && (
-              <Button variant="secondary" onClick={() => openEdit(activeRule)}>
-                {ICONS.pencil} Editar Ativa
+            {selectedRule && (
+              <Button variant="secondary" onClick={() => openEdit(selectedRule)}>
+                {ICONS.pencil} Editar Selecionada
               </Button>
             )}
             <Button variant="primary" onClick={openNew}>
@@ -228,14 +243,14 @@ export const PageSequence = ({
         <div className="bg-surface border border-border-subtle rounded-[14px] overflow-hidden">
           <CardHeader title={<>{ICONS.timer} {t("sequence.sendTriggers")}</>} subtitle={t("sequence.triggerSubtitle")} />
           <div className="p-5 relative">
-            {activeRule && activeRule.triggers.length > 0 ? (
+            {selectedRule && selectedRule.triggers.length > 0 ? (
               <>
                 <div
                   className="absolute left-[40px] top-[40px] bottom-[40px] w-[2px] z-0"
                   style={{ background: `linear-gradient(to bottom, ${colors.accent}, ${colors.accent})` }}
                 />
                 <div className="flex flex-col gap-0">
-                  {activeRule.triggers.map((tr, i) => (
+                  {selectedRule.triggers.map((tr, i) => (
                     <div key={tr.id ?? i} className="flex items-center gap-3.5 py-2.5 relative">
                       <div
                         className="w-[42px] h-[42px] rounded-full shrink-0 z-[1] flex items-center justify-center font-extrabold text-xs"
@@ -281,7 +296,11 @@ export const PageSequence = ({
               <div className="text-[11px] font-bold uppercase text-text-muted mb-2 tracking-wider">Todas as Réguas</div>
               <div className="flex flex-col gap-2">
                 {rules.map(rule => (
-                  <div key={rule.id} className={`flex items-center justify-between px-3 py-2 rounded-lg border ${rule.active ? "border-accent/30 bg-accent/5" : "border-border-subtle bg-surface-2"}`}>
+                  <div
+                    key={rule.id}
+                    onClick={() => setSelectedRuleId(rule.id)}
+                    className={`flex items-center justify-between px-3 py-2 rounded-lg border cursor-pointer ${selectedRule?.id === rule.id ? "border-accent bg-accent/10" : rule.active ? "border-accent/30 bg-accent/5" : "border-border-subtle bg-surface-2"}`}
+                  >
                     <div>
                       <div className="text-sm font-semibold">{rule.name}</div>
                       <div className="text-xs text-text-muted">{rule.triggers.length} gatilhos</div>

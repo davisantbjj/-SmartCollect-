@@ -1,5 +1,5 @@
 export interface Template {
-  channel: "email" | "wa";
+  channel: "email" | "wa" | "both";
   name: string;
   trigger: string;
   preview: string;

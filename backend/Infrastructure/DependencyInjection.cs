@@ -57,6 +57,7 @@ public static class DependencyInjection
         services.AddScoped<IFileImportService, FileImportService>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<ISmtpConfigService, SmtpConfigService>();
+        services.AddScoped<IWhatsAppConfigService, WhatsAppConfigService>();
         services.AddScoped<IDispatchDeliveryService, DispatchDeliveryService>();
         services.AddScoped<ISyncService, SyncService>();
         services.AddScoped<ITenantService, TenantService>(); // B-08 - Master access

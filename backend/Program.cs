@@ -1,6 +1,7 @@
 using System.Text;
 using DotNetEnv;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
@@ -38,7 +39,15 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 });
-builder.Services.AddDataProtection();
+var dataProtectionBuilder = builder.Services.AddDataProtection()
+    .SetApplicationName("SmartCollect");
+
+var dataProtectionKeysPath = Environment.GetEnvironmentVariable("DATA_PROTECTION_KEYS_PATH");
+if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
+{
+    Directory.CreateDirectory(dataProtectionKeysPath);
+    dataProtectionBuilder.PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
+}
 
 var currentDir = Directory.GetCurrentDirectory();
 var currentEnvPath = Path.GetFullPath(Path.Combine(currentDir, ".env"));

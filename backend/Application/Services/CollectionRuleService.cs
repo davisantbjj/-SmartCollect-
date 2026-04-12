@@ -10,6 +10,10 @@ public class CollectionRuleService : ICollectionRuleService
     private readonly IAppDbContext _db;
     public CollectionRuleService(IAppDbContext db) => _db = db;
 
+    private const string DefaultRulePreventiva = "Régua Preventiva";
+    private const string DefaultRuleModerada = "Régua Moderada";
+    private const string DefaultRuleEscalonada = "Régua Escalonada";
+
     private static CollectionChannel ParseTriggerChannel(string? rawChannel)
     {
         if (string.IsNullOrWhiteSpace(rawChannel))
@@ -25,8 +29,22 @@ public class CollectionRuleService : ICollectionRuleService
 
     private async Task EnsureDefaultRuleAsync(Guid tenantId)
     {
-        var hasAnyRule = await _db.CollectionRules.AnyAsync(r => r.TenantId == tenantId);
-        if (hasAnyRule) return;
+        var existingRuleNames = await _db.CollectionRules
+            .Where(r => r.TenantId == tenantId)
+            .Select(r => r.Name)
+            .ToListAsync();
+
+        var existingNameSet = existingRuleNames
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var missingDefaultNames = new[]
+        {
+            DefaultRulePreventiva,
+            DefaultRuleModerada,
+            DefaultRuleEscalonada,
+        }.Where(name => !existingNameSet.Contains(name)).ToList();
+
+        if (missingDefaultNames.Count == 0) return;
 
         var templates = await _db.MessageTemplates
             .Where(t => t.TenantId == tenantId && t.Active)
@@ -45,41 +63,87 @@ public class CollectionRuleService : ICollectionRuleService
         var collectionEmail = templates.FirstOrDefault(t => t.Name.Contains("D+7", StringComparison.OrdinalIgnoreCase))
             ?? templates.LastOrDefault(t => t.Channel == CollectionChannel.Email);
 
-        var triggerCandidates = new List<(Domain.Entities.MessageTemplate? Template, CollectionChannel Channel, int Offset, int Order)>
-        {
-            (reminderEmail, CollectionChannel.Email, -3, 1),
-            (reminderWa, CollectionChannel.WhatsApp, -1, 2),
-            (collectionBoth, CollectionChannel.Both, 1, 3),
-            (collectionEmail, CollectionChannel.Email, 7, 4),
-        };
+        List<Domain.Entities.Trigger> BuildTriggers(params (Domain.Entities.MessageTemplate? Template, CollectionChannel Channel, int Offset, int Order)[] items)
+            => items
+                .Where(item => item.Template is not null)
+                .Select(item => new Domain.Entities.Trigger
+                {
+                    Id = Guid.NewGuid(),
+                    TemplateId = item.Template!.Id,
+                    Channel = item.Channel,
+                    DaysOffset = item.Offset,
+                    Reference = TriggerReference.DueDate,
+                    Order = item.Order,
+                    Active = true,
+                })
+                .ToList();
 
-        var triggers = triggerCandidates
-            .Where(item => item.Template is not null)
-            .Select(item => new Domain.Entities.Trigger
+        var defaultsToCreate = new List<Domain.Entities.CollectionRule>();
+
+        if (missingDefaultNames.Contains(DefaultRulePreventiva, StringComparer.OrdinalIgnoreCase))
+        {
+            var triggers = BuildTriggers(
+                (reminderEmail, CollectionChannel.Email, -3, 1),
+                (reminderWa, CollectionChannel.WhatsApp, -1, 2));
+
+            if (triggers.Count > 0)
             {
-                Id = Guid.NewGuid(),
-                TemplateId = item.Template!.Id,
-                Channel = item.Channel,
-                DaysOffset = item.Offset,
-                Reference = TriggerReference.DueDate,
-                Order = item.Order,
-                Active = true,
-            })
-            .ToList();
+                defaultsToCreate.Add(new Domain.Entities.CollectionRule
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenantId,
+                    Name = DefaultRulePreventiva,
+                    Description = "Lembretes antes do vencimento",
+                    Active = true,
+                    Triggers = triggers,
+                });
+            }
+        }
 
-        if (triggers.Count == 0) return;
-
-        var rule = new Domain.Entities.CollectionRule
+        if (missingDefaultNames.Contains(DefaultRuleModerada, StringComparer.OrdinalIgnoreCase))
         {
-            Id = Guid.NewGuid(),
-            TenantId = tenantId,
-            Name = "Régua padrão",
-            Description = "Régua inicial criada automaticamente",
-            Active = true,
-            Triggers = triggers,
-        };
+            var triggers = BuildTriggers(
+                (collectionBoth, CollectionChannel.Both, 1, 1),
+                (collectionEmail, CollectionChannel.Email, 7, 2));
 
-        await _db.CollectionRules.AddAsync(rule);
+            if (triggers.Count > 0)
+            {
+                defaultsToCreate.Add(new Domain.Entities.CollectionRule
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenantId,
+                    Name = DefaultRuleModerada,
+                    Description = "Cobrança após vencimento com escalonamento",
+                    Active = true,
+                    Triggers = triggers,
+                });
+            }
+        }
+
+        if (missingDefaultNames.Contains(DefaultRuleEscalonada, StringComparer.OrdinalIgnoreCase))
+        {
+            var triggers = BuildTriggers(
+                (reminderEmail, CollectionChannel.Email, -5, 1),
+                (collectionBoth, CollectionChannel.Both, 2, 2),
+                (collectionEmail, CollectionChannel.Email, 10, 3));
+
+            if (triggers.Count > 0)
+            {
+                defaultsToCreate.Add(new Domain.Entities.CollectionRule
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenantId,
+                    Name = DefaultRuleEscalonada,
+                    Description = "Fluxo mais intenso para títulos em atraso",
+                    Active = false,
+                    Triggers = triggers,
+                });
+            }
+        }
+
+        if (defaultsToCreate.Count == 0) return;
+
+        await _db.CollectionRules.AddRangeAsync(defaultsToCreate);
         await _db.SaveChangesAsync();
     }
 
@@ -112,15 +176,6 @@ public class CollectionRuleService : ICollectionRuleService
 
     public async Task<CollectionRuleResponse> CreateAsync(Guid tenantId, CreateCollectionRuleRequest request)
     {
-        // RN13: deactivate others if this is active
-        if (request.Active)
-        {
-            var others = await _db.CollectionRules
-                .Where(r => r.TenantId == tenantId && r.Active)
-                .ToListAsync();
-            foreach (var other in others) other.Active = false;
-        }
-
         var rule = new Domain.Entities.CollectionRule
         {
             Id = Guid.NewGuid(),
@@ -158,22 +213,40 @@ public class CollectionRuleService : ICollectionRuleService
 
         if (rule is null) return null;
 
-        // RN13: deactivate others if activating
-        if (request.Active && !rule.Active)
-        {
-            var others = await _db.CollectionRules
-                .Where(r => r.TenantId == tenantId && r.Active && r.Id != id)
-                .ToListAsync();
-            foreach (var other in others) other.Active = false;
-        }
-
         rule.Name = request.Name;
         rule.Description = request.Description;
         rule.Active = request.Active;
 
-        // Remove old triggers, add new ones
-        _db.Triggers.RemoveRange(rule.Triggers);
-        rule.Triggers = request.Triggers.Select(t =>
+        // Persist rule changes first, then rebuild triggers to avoid double-delete tracking conflicts.
+        await _db.SaveChangesAsync();
+
+        var existingTriggers = await _db.Triggers
+            .Where(t => t.CollectionRuleId == rule.Id)
+            .ToListAsync();
+
+        if (existingTriggers.Count > 0)
+        {
+            var existingTriggerIds = existingTriggers.Select(t => t.Id).ToList();
+            var referencedTriggerIds = await _db.Dispatches
+                .Where(d => existingTriggerIds.Contains(d.TriggerId))
+                .Select(d => d.TriggerId)
+                .Distinct()
+                .ToListAsync();
+
+            foreach (var trigger in existingTriggers.Where(t => referencedTriggerIds.Contains(t.Id)))
+                trigger.Active = false;
+
+            var removableTriggers = existingTriggers
+                .Where(t => !referencedTriggerIds.Contains(t.Id))
+                .ToList();
+
+            if (removableTriggers.Count > 0)
+                _db.Triggers.RemoveRange(removableTriggers);
+
+            await _db.SaveChangesAsync();
+        }
+
+        var nextTriggers = request.Triggers.Select(t =>
         {
             Enum.TryParse<TriggerReference>(t.Reference, true, out var refr);
             return new Domain.Entities.Trigger
@@ -189,6 +262,7 @@ public class CollectionRuleService : ICollectionRuleService
             };
         }).ToList();
 
+        await _db.Triggers.AddRangeAsync(nextTriggers);
         await _db.SaveChangesAsync();
 
         return (await ListAsync(tenantId)).FirstOrDefault(r => r.Id == id);

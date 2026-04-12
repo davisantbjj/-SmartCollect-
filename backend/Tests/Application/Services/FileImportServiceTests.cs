@@ -146,6 +146,31 @@ public class FileImportServiceTests
     }
 
     [Fact]
+    public async Task Upload_WithIncompletePhone_DoesNotFailAndMarksPendingData()
+    {
+        var (service, db, tenantId) = await SetupAsync();
+
+        var csv = string.Join('\n',
+            "nome_cliente;cnpj;codigo_titulo;valor;status;data_vencimento;email;telefone_whatsapp",
+            "Cliente Telefone Incompleto;66.666.666/0001-66;TIT-250;210.00;aberto;2099-07-10;;(");
+
+        var file = BuildFormFile("import.csv", csv, "text/csv");
+
+        var result = await service.UploadAsync(tenantId, file);
+
+        Assert.Equal("Completed", result.Status);
+        Assert.Equal(1, result.TotalRows);
+        Assert.Equal(1, result.SuccessRows);
+        Assert.Equal(0, result.ErrorRows);
+
+        var title = db.Titles.Single(t => t.UniqueCode == "TIT-250");
+        Assert.Equal(TitleStatus.PendingData, title.Status);
+
+        var contacts = db.Contacts.Where(c => c.ClientId == title.ClientId).ToList();
+        Assert.Empty(contacts);
+    }
+
+    [Fact]
     public async Task Upload_WithStatusColumn_UsesProvidedStatus()
     {
         var (service, db, tenantId) = await SetupAsync();

@@ -1,5 +1,6 @@
 namespace SmartCollect.Application.Services;
 
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
@@ -228,13 +229,12 @@ public class TitleService : ITitleService
         if (title.Status == TitleStatus.Paid || title.Status == TitleStatus.Cancelled)
             return false;
 
-        var primaryContact = title.Client.Contacts.FirstOrDefault(c => c.IsPrimary)
-                          ?? title.Client.Contacts.FirstOrDefault();
-
-        if (primaryContact is null) return false;
+        var recipientContacts = ResolveCollectionRecipients(title.Client, request?.ContactIds);
+        if (recipientContacts.Count == 0)
+            return false;
 
         if (request?.UseQuickTemplate == true)
-            return await SendQuickTemplateCollectionAsync(tenantId, title, primaryContact, request);
+            return await SendQuickTemplateCollectionAsync(tenantId, title, recipientContacts, request);
 
         var activeRules = await _db.CollectionRules
             .Include(r => r.Triggers)
@@ -250,25 +250,44 @@ public class TitleService : ITitleService
         {
             foreach (var trigger in rule.Triggers.Where(tr => tr.Active).OrderBy(tr => tr.Order))
             {
+                var eligibleContacts = recipientContacts
+                    .Where(c => ContactSupportsChannel(c, trigger.Channel))
+                    .ToList();
+
+                if (eligibleContacts.Count == 0)
+                    continue;
+
                 var scheduledDate = trigger.Reference == TriggerReference.DueDate
                     ? title.DueDate.AddDays(trigger.DaysOffset)
                     : title.IssueDate.AddDays(trigger.DaysOffset);
 
-                var dispatch = new Domain.Entities.Dispatch
+                foreach (var contact in eligibleContacts)
                 {
-                    Id = Guid.NewGuid(),
-                    TitleId = title.Id,
-                    ContactId = primaryContact.Id,
-                    TriggerId = trigger.Id,
-                    Channel = trigger.Channel,
-                    Status = DispatchStatus.Pending,
-                    ScheduledFor = scheduledDate
-                };
+                    var dispatch = new Domain.Entities.Dispatch
+                    {
+                        Id = Guid.NewGuid(),
+                        TitleId = title.Id,
+                        ContactId = contact.Id,
+                        TriggerId = trigger.Id,
+                        Channel = trigger.Channel,
+                        Status = DispatchStatus.Pending,
+                        ScheduledFor = scheduledDate
+                    };
 
-                await _db.Dispatches.AddAsync(dispatch);
-                totalDispatches++;
+                    await _db.Dispatches.AddAsync(dispatch);
+                    totalDispatches++;
+                }
             }
         }
+
+        if (totalDispatches == 0)
+            return false;
+
+        var recipientMode = request?.ContactIds is { Count: > 0 }
+            ? $"{recipientContacts.Count} contato(s) selecionado(s)"
+            : NormalizeDispatchMode(title.Client.DispatchMode) == "Selected"
+                ? "contatos selecionados"
+                : title.Client.SendToAllContacts ? "todos os contatos" : "contato principal";
 
         await _db.TitleHistories.AddAsync(new Domain.Entities.TitleHistory
         {
@@ -276,7 +295,7 @@ public class TitleService : ITitleService
             TitleId = title.Id,
             TenantId = tenantId,
             Action = "Cobranca manual",
-            Description = $"{totalDispatches} disparos agendados em {activeRules.Count} régua(s) ativa(s)"
+            Description = $"{totalDispatches} disparos agendados em {activeRules.Count} régua(s) ativa(s) ({recipientMode})"
         });
 
         await _db.SaveChangesAsync();
@@ -290,7 +309,7 @@ public class TitleService : ITitleService
     private async Task<bool> SendQuickTemplateCollectionAsync(
         Guid tenantId,
         Domain.Entities.Title title,
-        Domain.Entities.Contact contact,
+        IReadOnlyList<Domain.Entities.Contact> recipientContacts,
         SendCollectionRequest request)
     {
         if (_dispatchDeliveryService is null)
@@ -306,16 +325,19 @@ public class TitleService : ITitleService
         var sendEmail = channel is CollectionChannel.Email or CollectionChannel.Both;
         var sendWhatsApp = channel is CollectionChannel.WhatsApp or CollectionChannel.Both;
 
-        if (sendEmail && string.IsNullOrWhiteSpace(contact.Email)
-            && (!sendWhatsApp || string.IsNullOrWhiteSpace(contact.WhatsAppPhone)))
+        var hasAnyEmailRecipient = recipientContacts.Any(c => !string.IsNullOrWhiteSpace(c.Email));
+        var hasAnyWhatsAppRecipient = recipientContacts.Any(c => !string.IsNullOrWhiteSpace(c.WhatsAppPhone));
+
+        if (sendEmail && !hasAnyEmailRecipient
+            && (!sendWhatsApp || !hasAnyWhatsAppRecipient))
         {
-            throw new InvalidOperationException("Contato principal sem e-mail para envio.");
+            throw new InvalidOperationException("Nenhum contato com e-mail para envio.");
         }
 
-        if (sendWhatsApp && string.IsNullOrWhiteSpace(contact.WhatsAppPhone)
-            && (!sendEmail || string.IsNullOrWhiteSpace(contact.Email)))
+        if (sendWhatsApp && !hasAnyWhatsAppRecipient
+            && (!sendEmail || !hasAnyEmailRecipient))
         {
-            throw new InvalidOperationException("Contato principal sem WhatsApp para envio.");
+            throw new InvalidOperationException("Nenhum contato com WhatsApp para envio.");
         }
 
         var subjectTemplate = string.IsNullOrWhiteSpace(request.Subject)
@@ -335,12 +357,14 @@ public class TitleService : ITitleService
 
         if (sendEmail)
         {
-            if (string.IsNullOrWhiteSpace(contact.Email))
+            foreach (var contact in recipientContacts)
             {
-                failedChannels.Add("E-mail: contato sem e-mail.");
-            }
-            else
-            {
+                if (string.IsNullOrWhiteSpace(contact.Email))
+                {
+                    failedChannels.Add($"E-mail ({contact.Name}): contato sem e-mail.");
+                    continue;
+                }
+
                 var emailResult = await _dispatchDeliveryService.SendQuickEmailAsync(
                     tenantId,
                     contact.Name,
@@ -351,18 +375,20 @@ public class TitleService : ITitleService
                 if (emailResult.Sent)
                     sentChannels.Add($"E-mail enviado para {contact.Email}");
                 else
-                    failedChannels.Add($"E-mail: {emailResult.Detail}");
+                    failedChannels.Add($"E-mail ({contact.Email}): {emailResult.Detail}");
             }
         }
 
         if (sendWhatsApp)
         {
-            if (string.IsNullOrWhiteSpace(contact.WhatsAppPhone))
+            foreach (var contact in recipientContacts)
             {
-                failedChannels.Add("WhatsApp: contato sem número.");
-            }
-            else
-            {
+                if (string.IsNullOrWhiteSpace(contact.WhatsAppPhone))
+                {
+                    failedChannels.Add($"WhatsApp ({contact.Name}): contato sem número.");
+                    continue;
+                }
+
                 var whatsAppResult = await _dispatchDeliveryService.SendQuickWhatsAppAsync(
                     tenantId,
                     contact.Name,
@@ -372,7 +398,7 @@ public class TitleService : ITitleService
                 if (whatsAppResult.Sent)
                     sentChannels.Add($"WhatsApp enviado para {contact.WhatsAppPhone}");
                 else
-                    failedChannels.Add($"WhatsApp: {whatsAppResult.Detail}");
+                    failedChannels.Add($"WhatsApp ({contact.WhatsAppPhone}): {whatsAppResult.Detail}");
             }
         }
 
@@ -394,6 +420,81 @@ public class TitleService : ITitleService
 
         await _db.SaveChangesAsync();
         return true;
+    }
+
+    private static List<Domain.Entities.Contact> ResolveCollectionRecipients(
+        Domain.Entities.Client client,
+        IReadOnlyCollection<Guid>? requestedContactIds = null)
+    {
+        var orderedContacts = client.Contacts
+            .OrderByDescending(c => c.IsPrimary)
+            .ThenBy(c => c.CreatedAt)
+            .ToList();
+
+        if (orderedContacts.Count == 0)
+            return orderedContacts;
+
+        if (requestedContactIds is { Count: > 0 })
+        {
+            var selectedIds = requestedContactIds.ToHashSet();
+            return orderedContacts.Where(c => selectedIds.Contains(c.Id)).ToList();
+        }
+
+        var normalizedMode = NormalizeDispatchMode(client.DispatchMode);
+        if (normalizedMode == "Selected")
+        {
+            var persistedIds = ParseSelectedDispatchContactIds(client.SelectedDispatchContactIdsJson).ToHashSet();
+            var selectedContacts = orderedContacts.Where(c => persistedIds.Contains(c.Id)).ToList();
+            if (selectedContacts.Count > 0)
+                return selectedContacts;
+        }
+
+        if (normalizedMode == "All")
+            return orderedContacts;
+
+        if (client.SendToAllContacts)
+            return orderedContacts;
+
+        return new List<Domain.Entities.Contact> { orderedContacts[0] };
+    }
+
+    private static string NormalizeDispatchMode(string? rawMode)
+    {
+        if (string.Equals(rawMode, "All", StringComparison.OrdinalIgnoreCase))
+            return "All";
+        if (string.Equals(rawMode, "Selected", StringComparison.OrdinalIgnoreCase))
+            return "Selected";
+
+        return "Primary";
+    }
+
+    private static List<Guid> ParseSelectedDispatchContactIds(string? serialized)
+    {
+        if (string.IsNullOrWhiteSpace(serialized))
+            return new List<Guid>();
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<Guid>>(serialized) ?? new List<Guid>();
+        }
+        catch
+        {
+            return new List<Guid>();
+        }
+    }
+
+    private static bool ContactSupportsChannel(Domain.Entities.Contact contact, CollectionChannel channel)
+    {
+        var hasEmail = !string.IsNullOrWhiteSpace(contact.Email);
+        var hasWhatsApp = !string.IsNullOrWhiteSpace(contact.WhatsAppPhone);
+
+        return channel switch
+        {
+            CollectionChannel.Email => hasEmail,
+            CollectionChannel.WhatsApp => hasWhatsApp,
+            CollectionChannel.Both => hasEmail || hasWhatsApp,
+            _ => false,
+        };
     }
 
     private static CollectionChannel ParseCollectionChannel(string? channel)

@@ -4,5 +4,6 @@ public record SendCollectionRequest(
     bool UseQuickTemplate,
     string? Channel,
     string? Subject,
-    string? Body
+    string? Body,
+    List<Guid>? ContactIds = null
 );

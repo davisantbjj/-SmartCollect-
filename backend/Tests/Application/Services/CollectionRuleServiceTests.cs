@@ -119,6 +119,8 @@ public class CollectionRuleServiceTests
             new List<CreateTriggerDto> { new(templateId, "Email", 2, "DueDate", 1, true) }));
 
         Assert.NotNull(updated);
+        Assert.Single(updated!.Triggers);
+        Assert.Equal(2, updated.Triggers[0].DaysOffset);
 
         var preservedOldTrigger = await db.Triggers.FirstOrDefaultAsync(t => t.Id == oldTrigger.Id);
         Assert.NotNull(preservedOldTrigger);
@@ -190,5 +192,96 @@ public class CollectionRuleServiceTests
 
         var escalonada = rules.Single(r => r.Name == "Régua Escalonada");
         Assert.Contains(escalonada.Triggers, t => t.DaysOffset == 2 && t.Channel == "Both");
+    }
+
+    [Fact]
+    public async Task DeleteRule_WithoutDispatch_RemovesRuleAndTriggers()
+    {
+        var (svc, db, tenantId, templateId) = await SetupAsync();
+
+        var created = await svc.CreateAsync(tenantId, new CreateCollectionRuleRequest(
+            "Rule Delete", "To remove", false,
+            new List<CreateTriggerDto>
+            {
+                new(templateId, "Email", -1, "DueDate", 1, true),
+                new(templateId, "WhatsApp", 1, "DueDate", 2, true),
+            }));
+
+        var removed = await svc.DeleteAsync(tenantId, created.Id);
+
+        Assert.True(removed);
+        Assert.False(await db.CollectionRules.AnyAsync(r => r.Id == created.Id));
+        Assert.False(await db.Triggers.AnyAsync(t => t.CollectionRuleId == created.Id));
+    }
+
+    [Fact]
+    public async Task DeleteRule_WithDispatch_ArchivesRuleAndDeactivatesTriggers()
+    {
+        var (svc, db, tenantId, templateId) = await SetupAsync();
+
+        var created = await svc.CreateAsync(tenantId, new CreateCollectionRuleRequest(
+            "Rule Bound", "Has dispatch", true,
+            new List<CreateTriggerDto> { new(templateId, "Email", 0, "DueDate", 1, true) }));
+
+        var trigger = await db.Triggers.SingleAsync(t => t.CollectionRuleId == created.Id && t.Active);
+
+        var userId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var contactId = Guid.NewGuid();
+        var titleId = Guid.NewGuid();
+
+        db.Users.Add(new User { Id = userId, TenantId = tenantId, Name = "U", Email = "u@test.com", PasswordHash = "x", Role = UserRole.Admin, Active = true });
+        db.Clients.Add(new Client { Id = clientId, TenantId = tenantId, UserId = userId, LegalName = "Cliente", TaxId = "999" });
+        db.Contacts.Add(new Contact { Id = contactId, ClientId = clientId, Name = "Contato", Email = "contato@test.com", IsPrimary = true });
+        db.Titles.Add(new Title
+        {
+            Id = titleId,
+            TenantId = tenantId,
+            ClientId = clientId,
+            UniqueCode = "T-DEL-001",
+            Amount = 100,
+            DueDate = DateTime.UtcNow.AddDays(1),
+            IssueDate = DateTime.UtcNow,
+            Status = TitleStatus.Open
+        });
+        db.Dispatches.Add(new Dispatch
+        {
+            Id = Guid.NewGuid(),
+            TitleId = titleId,
+            ContactId = contactId,
+            TriggerId = trigger.Id,
+            Channel = CollectionChannel.Email,
+            Status = DispatchStatus.Pending,
+            ScheduledFor = DateTime.UtcNow
+        });
+
+        await db.SaveChangesAsync();
+
+        var removed = await svc.DeleteAsync(tenantId, created.Id);
+
+        Assert.True(removed);
+
+        var persistedRule = await db.CollectionRules
+            .Include(r => r.Triggers)
+            .FirstAsync(r => r.Id == created.Id);
+
+        Assert.False(persistedRule.Active);
+        Assert.All(persistedRule.Triggers, t => Assert.False(t.Active));
+
+        var listedRules = await svc.ListAsync(tenantId);
+        Assert.DoesNotContain(listedRules, r => r.Id == created.Id);
+    }
+
+    [Fact]
+    public async Task DeleteRule_DefaultRule_ThrowsInvalidOperationException()
+    {
+        var (svc, _, tenantId, templateId) = await SetupAsync();
+
+        var created = await svc.CreateAsync(tenantId, new CreateCollectionRuleRequest(
+            "Régua Preventiva", "Default", true,
+            new List<CreateTriggerDto> { new(templateId, "Email", 0, "DueDate", 1, true) }));
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => svc.DeleteAsync(tenantId, created.Id));
+        Assert.Contains("régua padrão", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 }

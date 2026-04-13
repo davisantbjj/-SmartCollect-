@@ -9,6 +9,7 @@ import {
   getTemplates,
   createCollectionRule,
   updateCollectionRule,
+  deleteCollectionRule,
   type CollectionRuleResponse,
   type MessageTemplateResponse,
   type StoredSession,
@@ -45,6 +46,7 @@ export const PageSequence = ({
   const [templates, setTemplates] = useState<MessageTemplateResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null);
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
@@ -207,6 +209,32 @@ export const PageSequence = ({
     }
   };
 
+  const handleDeleteRule = async (rule: CollectionRuleResponse) => {
+    if (!canEdit)
+      return;
+
+    if (rule.isDefault) {
+      showToast(`${ICONS.info} Esta é uma régua padrão e não pode ser excluída.`, "info");
+      return;
+    }
+
+    const confirmed = window.confirm(`Excluir a régua \"${rule.name}\"? Esta ação não pode ser desfeita.`);
+    if (!confirmed)
+      return;
+
+    try {
+      setDeletingRuleId(rule.id);
+      await deleteCollectionRule(rule.id);
+      showToast(`${ICONS.checkmark} Régua excluída com sucesso!`, "success");
+      await load();
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Erro ao excluir régua.";
+      showToast(`${ICONS.cross} ${msg}`, "error");
+    } finally {
+      setDeletingRuleId(null);
+    }
+  };
+
   const stopRules = [
     { color: colors.success, bg: `${colors.success}0d`, border: `${colors.success}30`, icon: ICONS.checkmark, title: t("sequence.rule.paidTitle"), desc: t("sequence.rule.paidDesc") },
     { color: colors.text3, bg: `${colors.text3}0d`, border: `${colors.text3}30`, icon: ICONS.cross, title: t("sequence.rule.cancelledTitle"), desc: t("sequence.rule.cancelledDesc") },
@@ -302,15 +330,32 @@ export const PageSequence = ({
                     className={`flex items-center justify-between px-3 py-2 rounded-lg border cursor-pointer ${selectedRule?.id === rule.id ? "border-accent bg-accent/10" : rule.active ? "border-accent/30 bg-accent/5" : "border-border-subtle bg-surface-2"}`}
                   >
                     <div>
-                      <div className="text-sm font-semibold">{rule.name}</div>
+                      <div className="text-sm font-semibold flex items-center gap-2">
+                        <span>{rule.name}</span>
+                        {rule.isDefault && (
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-accent bg-accent/10 px-1.5 py-0.5 rounded-full">
+                            Régua padrão
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-text-muted">{rule.triggers.length} gatilhos</div>
                     </div>
                     <div className="flex items-center gap-2">
                       {rule.active && <span className="text-[11px] font-bold text-success bg-success/10 px-2 py-0.5 rounded-full">Ativa</span>}
                       {canEdit && (
-                        <Button size="sm" variant="secondary" onClick={() => openEdit(rule)}>
-                          {ICONS.pencil} Editar
-                        </Button>
+                        <>
+                          <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openEdit(rule); }}>
+                            {ICONS.pencil} Editar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={(e) => { e.stopPropagation(); void handleDeleteRule(rule); }}
+                            disabled={deletingRuleId === rule.id || rule.isDefault}
+                          >
+                            {rule.isDefault ? "Padrão" : deletingRuleId === rule.id ? "Excluindo..." : "Excluir"}
+                          </Button>
+                        </>
                       )}
                     </div>
                   </div>

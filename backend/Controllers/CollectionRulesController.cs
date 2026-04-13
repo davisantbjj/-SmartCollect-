@@ -61,4 +61,23 @@ public class CollectionRulesController : ControllerBase
             return BadRequest(new { message = "Não foi possível salvar a régua. Verifique templates e gatilhos vinculados." });
         }
     }
+
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "Admin,Worker")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        try
+        {
+            var removed = await _service.DeleteAsync(GetTenantId(), id);
+            return removed ? NoContent() : NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (DbUpdateException)
+        {
+            return BadRequest(new { message = "Não foi possível excluir a régua." });
+        }
+    }
 }

@@ -164,6 +164,7 @@ export interface SendCollectionRequest {
   channel?: string;
   subject?: string;
   body?: string;
+  contactIds?: string[];
 }
 
 export interface UpdateTitleStatusRequest {
@@ -177,6 +178,15 @@ export interface ClientResponse {
   tradeName?: string | null;
   contactCount: number;
   titleCount: number;
+  sendToAllContacts: boolean;
+  dispatchMode: "Primary" | "All" | "Selected";
+  selectedContactIds: string[];
+}
+
+export interface UpdateClientDispatchPreferenceRequest {
+  sendToAllContacts?: boolean;
+  dispatchMode?: "Primary" | "All" | "Selected";
+  selectedContactIds?: string[];
 }
 
 export interface CreateClientRequest {
@@ -307,6 +317,7 @@ export interface CollectionRuleResponse {
   description?: string | null;
   active: boolean;
   triggers: TriggerResponse[];
+  isDefault: boolean;
 }
 
 export interface CreateCollectionRuleRequest {
@@ -692,6 +703,13 @@ export async function createClient(payload: CreateClientRequest) {
   });
 }
 
+export async function updateClientDispatchPreference(clientId: string, payload: UpdateClientDispatchPreferenceRequest) {
+  return request<ClientResponse>(`/api/clients/${clientId}/dispatch-preference`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
 // ── Contacts ──────────────────────────────────────────────────────────────
 
 export async function getContactsByClient(clientId: string) {
@@ -713,6 +731,12 @@ export async function updateContact(
   return request<ContactResponse>(`/api/clients/${clientId}/contacts/${contactId}`, {
     method: "PUT",
     body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteContact(clientId: string, contactId: string) {
+  return request<void>(`/api/clients/${clientId}/contacts/${contactId}`, {
+    method: "DELETE",
   });
 }
 
@@ -778,6 +802,12 @@ export async function updateCollectionRule(id: string, payload: CreateCollection
   return request<CollectionRuleResponse>(`/api/collection-rules/${id}`, {
     method: "PUT",
     body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteCollectionRule(id: string) {
+  return request<void>(`/api/collection-rules/${id}`, {
+    method: "DELETE",
   });
 }
 

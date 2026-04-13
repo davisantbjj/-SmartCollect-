@@ -14,6 +14,11 @@ public class CollectionRuleService : ICollectionRuleService
     private const string DefaultRuleModerada = "Régua Moderada";
     private const string DefaultRuleEscalonada = "Régua Escalonada";
 
+    private static bool IsDefaultRuleName(string name)
+        => name.Equals(DefaultRulePreventiva, StringComparison.OrdinalIgnoreCase)
+        || name.Equals(DefaultRuleModerada, StringComparison.OrdinalIgnoreCase)
+        || name.Equals(DefaultRuleEscalonada, StringComparison.OrdinalIgnoreCase);
+
     private static CollectionChannel ParseTriggerChannel(string? rawChannel)
     {
         if (string.IsNullOrWhiteSpace(rawChannel))
@@ -155,6 +160,7 @@ public class CollectionRuleService : ICollectionRuleService
             .Include(r => r.Triggers)
                 .ThenInclude(t => t.Template)
             .Where(r => r.TenantId == tenantId)
+            .Where(r => r.Active || r.Triggers.Any(t => t.Active))
             .OrderByDescending(r => r.Active)
             .ThenBy(r => r.CreatedAt)
             .Select(r => new CollectionRuleResponse(
@@ -162,7 +168,10 @@ public class CollectionRuleService : ICollectionRuleService
                 r.Name,
                 r.Description,
                 r.Active,
-                r.Triggers.OrderBy(t => t.Order).Select(t => new TriggerDto(
+                r.Triggers
+                    .Where(t => t.Active)
+                    .OrderBy(t => t.Order)
+                    .Select(t => new TriggerDto(
                     t.Id,
                     t.TemplateId,
                     t.Channel.ToString(),
@@ -170,7 +179,9 @@ public class CollectionRuleService : ICollectionRuleService
                     t.Reference.ToString(),
                     t.Order,
                     t.Active,
-                    t.Template.Name)).ToList()))
+                    t.Template.Name))
+                    .ToList(),
+                IsDefaultRuleName(r.Name)))
             .ToListAsync();
     }
 
@@ -266,5 +277,43 @@ public class CollectionRuleService : ICollectionRuleService
         await _db.SaveChangesAsync();
 
         return (await ListAsync(tenantId)).FirstOrDefault(r => r.Id == id);
+    }
+
+    public async Task<bool> DeleteAsync(Guid tenantId, Guid id)
+    {
+        var rule = await _db.CollectionRules
+            .Include(r => r.Triggers)
+            .FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenantId);
+
+        if (rule is null)
+            return false;
+
+        if (IsDefaultRuleName(rule.Name))
+            throw new InvalidOperationException("Esta é uma régua padrão e não pode ser excluída.");
+
+        var triggerIds = rule.Triggers.Select(t => t.Id).ToList();
+        if (triggerIds.Count > 0)
+        {
+            var hasLinkedDispatches = await _db.Dispatches.AnyAsync(d => triggerIds.Contains(d.TriggerId));
+            if (hasLinkedDispatches)
+            {
+                // Keep historical dispatch integrity: archive the rule instead of hard-deleting.
+                rule.Active = false;
+
+                foreach (var trigger in rule.Triggers)
+                    trigger.Active = false;
+
+                await _db.SaveChangesAsync();
+                return true;
+            }
+        }
+
+        if (rule.Triggers.Count > 0)
+            _db.Triggers.RemoveRange(rule.Triggers);
+
+        _db.CollectionRules.Remove(rule);
+        await _db.SaveChangesAsync();
+
+        return true;
     }
 }

@@ -29,9 +29,38 @@ const PageTenants    = lazy(() => import("./pages/PageTenants").then(m => ({ def
 
 const LOGIN_RECENT_EMAILS_KEY = "smartcollect.login.recentEmails";
 const LOGIN_RECENT_EMAILS_MAX = 6;
+const LAST_PAGE_KEY = "smartcollect.lastPage";
+const ALL_PAGE_IDS: PageId[] = [
+  "dashboard",
+  "analytics",
+  "titles",
+  "import",
+  "contacts",
+  "sequence",
+  "templates",
+  "integration",
+  "workers",
+  "tenants",
+];
+
+function isPageId(value: string): value is PageId {
+  return ALL_PAGE_IDS.includes(value as PageId);
+}
+
+function getInitialPage(): PageId {
+  try {
+    const raw = localStorage.getItem(LAST_PAGE_KEY);
+    if (raw && isPageId(raw))
+      return raw;
+  } catch {
+    // Ignore storage read issues and keep default page.
+  }
+
+  return "dashboard";
+}
 
 export default function SmartCollect() {
-  const [page, setPage] = useState<PageId>("dashboard");
+  const [page, setPage] = useState<PageId>(() => getInitialPage());
   const [session, setSessionState] = useState<StoredSession | null>(() => getSession());
   const [tenants, setTenants] = useState<TenantResponse[]>([]);
   const [selectedTenantId, setSelectedTenantId] = useState("");
@@ -126,11 +155,16 @@ export default function SmartCollect() {
     setSessionState(null);
     setTenants([]);
     setSelectedTenantId("");
+    localStorage.removeItem(LAST_PAGE_KEY);
     setPage("dashboard");
     setEmail("");
     setPassword("");
     showToast(`${ICONS.info} Sessão encerrada.`, "info");
   };
+
+  useEffect(() => {
+    localStorage.setItem(LAST_PAGE_KEY, page);
+  }, [page]);
 
   useEffect(() => {
     if (!session || session.role !== "Master") return;

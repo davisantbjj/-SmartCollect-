@@ -5,7 +5,8 @@ import { formatBRLFull, formatIsoDateBR } from "../utils/formatters";
 import { Badge, ChannelPills, Button, Modal, FormInput } from "../components/UI";
 import {
   ApiError, getTitles, getClients, createTitle, sendCollection, getTitleHistory, updateTitleStatus,
-  type TitleResponse, type ClientResponse, type StoredSession, type TitleHistoryResponse, type SendCollectionRequest,
+  getContactsByClient,
+  type TitleResponse, type ClientResponse, type StoredSession, type TitleHistoryResponse, type SendCollectionRequest, type ContactResponse,
 } from "../services/api";
 import type { ShowToast } from "../types";
 
@@ -39,6 +40,10 @@ export const PageTitles = ({
   const [quickChannel, setQuickChannel] = useState("Email");
   const [quickSubject, setQuickSubject] = useState("");
   const [quickBody, setQuickBody] = useState("");
+  const [collectContacts, setCollectContacts] = useState<ContactResponse[]>([]);
+  const [collectContactsLoading, setCollectContactsLoading] = useState(false);
+  const [collectRecipientMode, setCollectRecipientMode] = useState<"companyDefault" | "primary" | "all" | "custom">("companyDefault");
+  const [collectCustomContactIds, setCollectCustomContactIds] = useState<string[]>([]);
   const [collecting, setCollecting] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -144,6 +149,7 @@ export const PageTitles = ({
       "Olá {{ClienteNome}},",
       "",
       `Identificamos o título {{TituloCodigo}} no valor de {{Valor}} com vencimento em {{DataVencimento}}.`,
+      "Link para pagamento: {{LinkBoleto}}",
       "",
       "Se necessário, podemos ajudar com uma regularização.",
       "",
@@ -181,7 +187,32 @@ export const PageTitles = ({
     setQuickChannel("Email");
     setQuickSubject(`Cobrança do título ${title.uniqueCode}`);
     setQuickBody(buildDefaultQuickBody(title));
+    setCollectRecipientMode("companyDefault");
+    setCollectCustomContactIds([]);
+    setCollectContacts([]);
+    setCollectContactsLoading(true);
     setCollectOpen(true);
+    void getContactsByClient(title.clientId)
+      .then(items => {
+        setCollectContacts(
+          [...items].sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary) || a.name.localeCompare(b.name, "pt-BR"))
+        );
+      })
+      .catch(() => {
+        setCollectContacts([]);
+      })
+      .finally(() => setCollectContactsLoading(false));
+  };
+
+  const resolveManualContactIds = (): string[] => {
+    const ordered = [...collectContacts].sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary) || a.name.localeCompare(b.name, "pt-BR"));
+
+    if (collectRecipientMode === "companyDefault") return [];
+    if (collectRecipientMode === "all") return ordered.map(c => c.id);
+    if (collectRecipientMode === "custom") return collectCustomContactIds;
+
+    const primary = ordered.find(c => c.isPrimary) ?? ordered[0];
+    return primary ? [primary.id] : [];
   };
 
   const handleCollectConfirm = async () => {
@@ -192,18 +223,27 @@ export const PageTitles = ({
       return;
     }
 
+    const selectedContactIds = resolveManualContactIds();
+    if (collectRecipientMode !== "companyDefault" && selectedContactIds.length === 0) {
+      showToast(`${ICONS.warning} Selecione ao menos um contato para este envio.`, "warn");
+      return;
+    }
+
     try {
       setCollecting(true);
-      const payload: SendCollectionRequest | undefined = useQuickTemplate
-        ? {
-            useQuickTemplate: true,
-            channel: quickChannel,
-            subject: quickSubject,
-            body: quickBody,
-          }
-        : undefined;
+      const payload: SendCollectionRequest = {
+        ...(useQuickTemplate
+          ? {
+              useQuickTemplate: true,
+              channel: quickChannel,
+              subject: quickSubject,
+              body: quickBody,
+            }
+          : {}),
+        ...(selectedContactIds.length > 0 ? { contactIds: selectedContactIds } : {}),
+      };
 
-      await sendCollection(collectTarget.id, payload);
+      await sendCollection(collectTarget.id, useQuickTemplate || selectedContactIds.length > 0 ? payload : undefined);
       showToast(`${ICONS.checkmark} ${t("toast.manualCollectionSent")}`, "success");
       setCollectOpen(false);
       void load();
@@ -253,7 +293,6 @@ export const PageTitles = ({
         >
           <option value="all">{t("common.allStatuses")}</option>
           <option value="Open">{t("titles.filterOpen")}</option>
-          <option value="PendingData">{t("titles.filterPending")}</option>
           <option value="Paid">{t("titles.filterPaid")}</option>
           <option value="Overdue">{t("titles.filterOverdue")}</option>
           <option value="Cancelled">{t("badge.cancelled")}</option>
@@ -464,6 +503,62 @@ export const PageTitles = ({
               <div className="text-[11px] uppercase font-bold tracking-wider text-text-muted">Cliente</div>
               <div className="text-sm font-semibold text-text-primary mt-0.5">{collectTarget.clientName}</div>
               <div className="text-xs text-text-secondary mt-0.5">{collectTarget.uniqueCode} • {formatBRLFull(collectTarget.amount)}</div>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted mb-[5px]">Destinatários</label>
+            <select
+              value={collectRecipientMode}
+              onChange={e => {
+                const mode = e.target.value as "companyDefault" | "primary" | "all" | "custom";
+                setCollectRecipientMode(mode);
+                if (mode !== "custom")
+                  setCollectCustomContactIds([]);
+              }}
+              className="bg-surface-2 border border-border-subtle-2 rounded-lg px-[13px] py-[9px] text-[13px] text-text-primary outline-none w-full focus:border-accent"
+            >
+              <option value="companyDefault">Padrão da empresa (principal/todos)</option>
+              <option value="primary">Somente contato principal</option>
+              <option value="all">Todos os contatos</option>
+              <option value="custom">Escolher contatos</option>
+            </select>
+            <div className="text-[11px] text-text-muted mt-1">
+              {collectRecipientMode === "companyDefault"
+                ? "Usa a configuração da empresa definida na tela de contatos."
+                : collectRecipientMode === "primary"
+                  ? "Será usado apenas o contato principal da empresa."
+                  : collectRecipientMode === "all"
+                    ? "Será enviado para todos os contatos disponíveis."
+                    : "Selecione manualmente os contatos abaixo."}
+            </div>
+          </div>
+
+          {collectRecipientMode === "custom" && (
+            <div className="space-y-2 bg-surface-2 border border-border-subtle rounded-lg p-3">
+              {collectContactsLoading ? (
+                <div className="text-xs text-text-muted">Carregando contatos...</div>
+              ) : collectContacts.length === 0 ? (
+                <div className="text-xs text-text-muted">Nenhum contato disponível para seleção.</div>
+              ) : (
+                collectContacts.map(contact => (
+                  <label key={contact.id} className="flex items-start gap-2 text-sm text-text-secondary">
+                    <input
+                      type="checkbox"
+                      checked={collectCustomContactIds.includes(contact.id)}
+                      onChange={e => setCollectCustomContactIds(prev => e.target.checked
+                        ? [...prev, contact.id]
+                        : prev.filter(id => id !== contact.id))}
+                      className="accent-accent mt-0.5"
+                    />
+                    <span>
+                      <span className="font-semibold text-text-primary">{contact.name}</span>
+                      {contact.isPrimary && <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-success/10 text-success">Principal</span>}
+                      <span className="block text-xs text-text-muted">{contact.email || "sem e-mail"} • {contact.whatsAppPhone || "sem WhatsApp"}</span>
+                    </span>
+                  </label>
+                ))
+              )}
             </div>
           )}
 

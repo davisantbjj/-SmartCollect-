@@ -6,4 +6,5 @@ public interface IClientService
 {
     Task<List<ClientResponse>> ListAsync(Guid tenantId);
     Task<ClientResponse> CreateAsync(Guid tenantId, Guid userId, CreateClientRequest request);
+    Task<ClientResponse?> UpdateDispatchPreferenceAsync(Guid tenantId, Guid clientId, UpdateClientDispatchPreferenceRequest request);
 }

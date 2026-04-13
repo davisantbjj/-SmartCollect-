@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SmartCollect.Infrastructure.Data;
@@ -11,9 +12,11 @@ using SmartCollect.Infrastructure.Data;
 namespace SmartCollect.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260413143224_ClientDispatchPreference")]
+    partial class ClientDispatchPreference
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -31,15 +34,8 @@ namespace SmartCollect.Api.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("DispatchMode")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<string>("LegalName")
                         .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("SelectedDispatchContactIdsJson")
                         .HasColumnType("text");
 
                     b.Property<bool>("SendToAllContacts")

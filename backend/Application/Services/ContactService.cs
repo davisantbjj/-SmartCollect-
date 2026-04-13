@@ -1,5 +1,6 @@
 namespace SmartCollect.Application.Services;
 
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SmartCollect.Application.DTOs.Contacts;
 using SmartCollect.Application.Interfaces;
@@ -49,7 +50,7 @@ public class ContactService : IContactService
                 existing.IsPrimary = false;
         }
 
-        if (!Enum.TryParse<ContactDepartment>(request.Department, true, out var dept))
+        if (!TryParseDepartment(request.Department, out var dept))
             dept = ContactDepartment.Finance;
 
         var contact = new Domain.Entities.Contact
@@ -93,13 +94,61 @@ public class ContactService : IContactService
         contact.WhatsAppPhone = NormalizePhoneOrNull(request.WhatsAppPhone);
         contact.IsPrimary = request.IsPrimary;
 
-        if (Enum.TryParse<ContactDepartment>(request.Department, true, out var dept))
+        if (TryParseDepartment(request.Department, out var dept))
             contact.Department = dept;
 
         await RecalculateClientTitlesStatusAsync(tenantId, contact.Client);
         await _db.SaveChangesAsync();
 
         return (await ListByClientAsync(tenantId, clientId)).FirstOrDefault(c => c.Id == contactId);
+    }
+
+    public async Task<bool> DeleteAsync(Guid tenantId, Guid clientId, Guid contactId)
+    {
+        var contact = await _db.Contacts
+            .Include(c => c.Client)
+                .ThenInclude(cl => cl.Contacts)
+            .Include(c => c.Client)
+                .ThenInclude(cl => cl.Titles)
+            .Include(c => c.Dispatches)
+            .FirstOrDefaultAsync(c => c.Id == contactId && c.ClientId == clientId && c.Client.TenantId == tenantId);
+
+        if (contact is null)
+            return false;
+
+        if (contact.Dispatches.Count > 0)
+            throw new InvalidOperationException("Este contato já possui disparos vinculados e não pode ser excluído.");
+
+        var client = contact.Client;
+
+        _db.Contacts.Remove(contact);
+
+        var siblings = client.Contacts.Where(c => c.Id != contactId).OrderBy(c => c.CreatedAt).ToList();
+
+        if (contact.IsPrimary && siblings.Count > 0)
+            siblings[0].IsPrimary = true;
+
+        var selectedDispatchIds = ParseSelectedContactIds(client.SelectedDispatchContactIdsJson)
+            .Where(id => id != contactId)
+            .ToList();
+
+        if (string.Equals(client.DispatchMode, "Selected", StringComparison.OrdinalIgnoreCase))
+        {
+            if (selectedDispatchIds.Count == 0)
+            {
+                client.DispatchMode = "Primary";
+                client.SendToAllContacts = false;
+                client.SelectedDispatchContactIdsJson = null;
+            }
+            else
+            {
+                client.SelectedDispatchContactIdsJson = JsonSerializer.Serialize(selectedDispatchIds);
+            }
+        }
+
+        await RecalculateClientTitlesStatusAsync(tenantId, client);
+        await _db.SaveChangesAsync();
+        return true;
     }
 
     private async Task RecalculateClientTitlesStatusAsync(Guid tenantId, Domain.Entities.Client client)
@@ -137,6 +186,43 @@ public class ContactService : IContactService
 
     private static string? NullIfWhiteSpace(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static bool TryParseDepartment(string? rawDepartment, out ContactDepartment department)
+    {
+        if (Enum.TryParse<ContactDepartment>(rawDepartment, true, out department))
+            return true;
+
+        if (string.Equals(rawDepartment, "Purchasing", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(rawDepartment, "Compras", StringComparison.OrdinalIgnoreCase))
+        {
+            department = ContactDepartment.Commercial;
+            return true;
+        }
+
+        if (string.Equals(rawDepartment, "Partner", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(rawDepartment, "Socio", StringComparison.OrdinalIgnoreCase))
+        {
+            department = ContactDepartment.Management;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static List<Guid> ParseSelectedContactIds(string? serialized)
+    {
+        if (string.IsNullOrWhiteSpace(serialized))
+            return new List<Guid>();
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<Guid>>(serialized) ?? new List<Guid>();
+        }
+        catch
+        {
+            return new List<Guid>();
+        }
+    }
 
     private static bool HasMeaningfulEmail(string? email)
         => !string.IsNullOrWhiteSpace(email);

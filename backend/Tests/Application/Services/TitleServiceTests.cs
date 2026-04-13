@@ -206,6 +206,246 @@ public class TitleServiceTests
         Assert.Contains("WhatsApp enviado", history.Description);
     }
 
+    [Fact]
+    public async Task SendCollection_QuickTemplate_SendToAllContacts_SendsForAllRecipients()
+    {
+        var db = TestDbContextFactory.Create();
+
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var contact1Id = Guid.NewGuid();
+        var contact2Id = Guid.NewGuid();
+        var titleId = Guid.NewGuid();
+
+        db.Tenants.Add(new Tenant { Id = tenantId, CompanyName = "Tenant A", TaxId = "111" });
+        db.Users.Add(new User { Id = userId, TenantId = tenantId, Name = "User", Email = "user@test.com", PasswordHash = "x" });
+        db.Clients.Add(new Client { Id = clientId, TenantId = tenantId, UserId = userId, LegalName = "Cliente Teste", TaxId = "123", SendToAllContacts = true });
+        db.Contacts.Add(new Contact
+        {
+            Id = contact1Id,
+            ClientId = clientId,
+            Name = "Contato 1",
+            Email = "contato1@test.com",
+            WhatsAppPhone = "11999999999",
+            IsPrimary = true
+        });
+        db.Contacts.Add(new Contact
+        {
+            Id = contact2Id,
+            ClientId = clientId,
+            Name = "Contato 2",
+            Email = "contato2@test.com",
+            WhatsAppPhone = "11988888888",
+            IsPrimary = false
+        });
+        db.Titles.Add(new Title
+        {
+            Id = titleId,
+            TenantId = tenantId,
+            ClientId = clientId,
+            UniqueCode = "TIT-QUICK-ALL-001",
+            Amount = 100m,
+            DueDate = DateTime.UtcNow.Date.AddDays(2),
+            IssueDate = DateTime.UtcNow.Date,
+            Status = TitleStatus.Open
+        });
+
+        await db.SaveChangesAsync();
+
+        var fakeDispatchService = new FakeDispatchDeliveryService();
+        var service = new TitleService(db, fakeDispatchService);
+
+        var ok = await service.SendCollectionAsync(tenantId, titleId, new SendCollectionRequest(
+            UseQuickTemplate: true,
+            Channel: "Both",
+            Subject: "Cobrança {{TituloCodigo}}",
+            Body: "Olá {{ClienteNome}}, valor {{Valor}}"));
+
+        Assert.True(ok);
+        Assert.Equal(2, fakeDispatchService.QuickEmailCalls);
+        Assert.Equal(2, fakeDispatchService.QuickWhatsAppCalls);
+    }
+
+    [Fact]
+    public async Task SendCollection_RuleMode_SendToAllContacts_CreatesDispatchForEachEligibleContact()
+    {
+        var db = TestDbContextFactory.Create();
+
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var contact1Id = Guid.NewGuid();
+        var contact2Id = Guid.NewGuid();
+        var titleId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+        var ruleId = Guid.NewGuid();
+        var triggerId = Guid.NewGuid();
+
+        db.Tenants.Add(new Tenant { Id = tenantId, CompanyName = "Tenant A", TaxId = "111" });
+        db.Users.Add(new User { Id = userId, TenantId = tenantId, Name = "User", Email = "user@test.com", PasswordHash = "x" });
+        db.Clients.Add(new Client { Id = clientId, TenantId = tenantId, UserId = userId, LegalName = "Cliente Teste", TaxId = "123", SendToAllContacts = true });
+        db.Contacts.Add(new Contact
+        {
+            Id = contact1Id,
+            ClientId = clientId,
+            Name = "Contato 1",
+            Email = "contato1@test.com",
+            IsPrimary = true
+        });
+        db.Contacts.Add(new Contact
+        {
+            Id = contact2Id,
+            ClientId = clientId,
+            Name = "Contato 2",
+            Email = "contato2@test.com",
+            IsPrimary = false
+        });
+        db.Titles.Add(new Title
+        {
+            Id = titleId,
+            TenantId = tenantId,
+            ClientId = clientId,
+            UniqueCode = "TIT-RULE-ALL-001",
+            Amount = 100m,
+            DueDate = DateTime.UtcNow.Date.AddDays(2),
+            IssueDate = DateTime.UtcNow.Date,
+            Status = TitleStatus.Open
+        });
+        db.MessageTemplates.Add(new MessageTemplate
+        {
+            Id = templateId,
+            TenantId = tenantId,
+            Name = "Template",
+            Channel = CollectionChannel.Email,
+            Subject = "Assunto",
+            Body = "Body",
+            Active = true,
+        });
+        db.CollectionRules.Add(new CollectionRule
+        {
+            Id = ruleId,
+            TenantId = tenantId,
+            Name = "Regra",
+            Active = true,
+        });
+        db.Triggers.Add(new Trigger
+        {
+            Id = triggerId,
+            CollectionRuleId = ruleId,
+            TemplateId = templateId,
+            Channel = CollectionChannel.Email,
+            DaysOffset = 0,
+            Reference = TriggerReference.DueDate,
+            Order = 1,
+            Active = true
+        });
+
+        await db.SaveChangesAsync();
+
+        var fakeDispatchService = new FakeDispatchDeliveryService();
+        var service = new TitleService(db, fakeDispatchService);
+
+        var ok = await service.SendCollectionAsync(tenantId, titleId);
+
+        Assert.True(ok);
+        Assert.Equal(2, db.Dispatches.Count(d => d.TitleId == titleId));
+        Assert.Contains(db.Dispatches, d => d.ContactId == contact1Id);
+        Assert.Contains(db.Dispatches, d => d.ContactId == contact2Id);
+    }
+
+    [Fact]
+    public async Task SendCollection_RuleMode_WithSelectedContacts_CreatesDispatchOnlyForChosenRecipients()
+    {
+        var db = TestDbContextFactory.Create();
+
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var contact1Id = Guid.NewGuid();
+        var contact2Id = Guid.NewGuid();
+        var titleId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+        var ruleId = Guid.NewGuid();
+        var triggerId = Guid.NewGuid();
+
+        db.Tenants.Add(new Tenant { Id = tenantId, CompanyName = "Tenant A", TaxId = "111" });
+        db.Users.Add(new User { Id = userId, TenantId = tenantId, Name = "User", Email = "user@test.com", PasswordHash = "x" });
+        db.Clients.Add(new Client { Id = clientId, TenantId = tenantId, UserId = userId, LegalName = "Cliente Teste", TaxId = "123", SendToAllContacts = true });
+        db.Contacts.Add(new Contact
+        {
+            Id = contact1Id,
+            ClientId = clientId,
+            Name = "Contato 1",
+            Email = "contato1@test.com",
+            IsPrimary = true
+        });
+        db.Contacts.Add(new Contact
+        {
+            Id = contact2Id,
+            ClientId = clientId,
+            Name = "Contato 2",
+            Email = "contato2@test.com",
+            IsPrimary = false
+        });
+        db.Titles.Add(new Title
+        {
+            Id = titleId,
+            TenantId = tenantId,
+            ClientId = clientId,
+            UniqueCode = "TIT-RULE-SELECT-001",
+            Amount = 100m,
+            DueDate = DateTime.UtcNow.Date.AddDays(2),
+            IssueDate = DateTime.UtcNow.Date,
+            Status = TitleStatus.Open
+        });
+        db.MessageTemplates.Add(new MessageTemplate
+        {
+            Id = templateId,
+            TenantId = tenantId,
+            Name = "Template",
+            Channel = CollectionChannel.Email,
+            Subject = "Assunto",
+            Body = "Body",
+            Active = true,
+        });
+        db.CollectionRules.Add(new CollectionRule
+        {
+            Id = ruleId,
+            TenantId = tenantId,
+            Name = "Regra",
+            Active = true,
+        });
+        db.Triggers.Add(new Trigger
+        {
+            Id = triggerId,
+            CollectionRuleId = ruleId,
+            TemplateId = templateId,
+            Channel = CollectionChannel.Email,
+            DaysOffset = 0,
+            Reference = TriggerReference.DueDate,
+            Order = 1,
+            Active = true
+        });
+
+        await db.SaveChangesAsync();
+
+        var fakeDispatchService = new FakeDispatchDeliveryService();
+        var service = new TitleService(db, fakeDispatchService);
+
+        var ok = await service.SendCollectionAsync(tenantId, titleId, new SendCollectionRequest(
+            UseQuickTemplate: false,
+            Channel: null,
+            Subject: null,
+            Body: null,
+            ContactIds: new List<Guid> { contact2Id }));
+
+        Assert.True(ok);
+        Assert.Single(db.Dispatches.Where(d => d.TitleId == titleId));
+        Assert.Contains(db.Dispatches, d => d.TitleId == titleId && d.ContactId == contact2Id);
+        Assert.DoesNotContain(db.Dispatches, d => d.TitleId == titleId && d.ContactId == contact1Id);
+    }
+
     private sealed class FakeDispatchDeliveryService : IDispatchDeliveryService
     {
         public bool ProcessCalled { get; private set; }

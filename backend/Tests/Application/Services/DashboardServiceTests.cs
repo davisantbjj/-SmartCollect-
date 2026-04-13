@@ -196,10 +196,10 @@ public class DashboardServiceTests
         var metrics = await svc.GetChannelMetricsAsync(tenantId, createdAt.AddDays(-1), createdAt.AddDays(1));
 
         Assert.Equal(1, metrics.EmailSent);
-        Assert.Equal(0, metrics.EmailDelivered);
+        Assert.Equal(1, metrics.EmailDelivered);
         Assert.Equal(0, metrics.EmailViewed);
         Assert.Equal(1, metrics.WhatsAppSent);
-        Assert.Equal(0, metrics.WhatsAppDelivered);
+        Assert.Equal(1, metrics.WhatsAppDelivered);
         Assert.Equal(0, metrics.WhatsAppViewed);
     }
 }

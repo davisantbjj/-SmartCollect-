@@ -5,5 +5,6 @@ public record CollectionRuleResponse(
     string Name,
     string? Description,
     bool Active,
-    List<TriggerDto> Triggers
+    List<TriggerDto> Triggers,
+    bool IsDefault
 );

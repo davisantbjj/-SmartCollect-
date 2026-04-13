@@ -69,10 +69,31 @@ public class DashboardService : IDashboardService
             return (0, 0);
 
         var normalized = NormalizeText(description);
-        var emailSent = normalized.Contains("e-mail enviado") || normalized.Contains("email enviado");
-        var whatsAppSent = normalized.Contains("whatsapp enviado");
+        var emailCount = CountOccurrences(normalized, "e-mail enviado") + CountOccurrences(normalized, "email enviado");
+        var whatsAppCount = CountOccurrences(normalized, "whatsapp enviado");
 
-        return (emailSent ? 1 : 0, whatsAppSent ? 1 : 0);
+        return (emailCount, whatsAppCount);
+    }
+
+    private static int CountOccurrences(string text, string token)
+    {
+        if (string.IsNullOrWhiteSpace(text) || string.IsNullOrWhiteSpace(token))
+            return 0;
+
+        var count = 0;
+        var index = 0;
+
+        while (true)
+        {
+            index = text.IndexOf(token, index, StringComparison.Ordinal);
+            if (index < 0)
+                break;
+
+            count++;
+            index += token.Length;
+        }
+
+        return count;
     }
 
     public async Task<DashboardSummaryResponse> GetSummaryAsync(Guid? tenantId)
@@ -248,7 +269,9 @@ public class DashboardService : IDashboardService
     {
         var (start, end) = ResolveRange(startDate, endDate);
         var sentStatuses = new[] { DispatchStatus.Sent, DispatchStatus.Delivered, DispatchStatus.Viewed };
-        var deliveredStatuses = new[] { DispatchStatus.Delivered, DispatchStatus.Viewed };
+        // Delivery callbacks are not yet integrated for all channels/providers.
+        // Consider provider-accepted sends as delivered for operational dashboard metrics.
+        var deliveredStatuses = new[] { DispatchStatus.Sent, DispatchStatus.Delivered, DispatchStatus.Viewed };
         var viewedStatuses = new[] { DispatchStatus.Viewed };
 
         var dispatches = await DispatchesFor(tenantId)
@@ -266,20 +289,24 @@ public class DashboardService : IDashboardService
 
         var quickEmailSent = 0;
         var quickWhatsAppSent = 0;
+        var quickEmailDelivered = 0;
+        var quickWhatsAppDelivered = 0;
 
         foreach (var history in quickManualHistories)
         {
             var parsed = ParseQuickManualChannels(history.Description);
             quickEmailSent += parsed.EmailCount;
             quickWhatsAppSent += parsed.WhatsAppCount;
+            quickEmailDelivered += parsed.EmailCount;
+            quickWhatsAppDelivered += parsed.WhatsAppCount;
         }
 
         return new ChannelMetricsResponse(
             email.Count(d => sentStatuses.Contains(d.Status)) + both.Count(d => sentStatuses.Contains(d.Status)) + quickEmailSent,
-            email.Count(d => deliveredStatuses.Contains(d.Status)) + both.Count(d => deliveredStatuses.Contains(d.Status)),
+                email.Count(d => deliveredStatuses.Contains(d.Status)) + both.Count(d => deliveredStatuses.Contains(d.Status)) + quickEmailDelivered,
             email.Count(d => viewedStatuses.Contains(d.Status)) + both.Count(d => viewedStatuses.Contains(d.Status)),
             wa.Count(d => sentStatuses.Contains(d.Status)) + both.Count(d => sentStatuses.Contains(d.Status)) + quickWhatsAppSent,
-            wa.Count(d => deliveredStatuses.Contains(d.Status)) + both.Count(d => deliveredStatuses.Contains(d.Status)),
+                wa.Count(d => deliveredStatuses.Contains(d.Status)) + both.Count(d => deliveredStatuses.Contains(d.Status)) + quickWhatsAppDelivered,
             wa.Count(d => viewedStatuses.Contains(d.Status)) + both.Count(d => viewedStatuses.Contains(d.Status)));
     }
 

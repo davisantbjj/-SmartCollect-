@@ -6,5 +6,8 @@ public record ClientResponse(
     string TaxId,
     string? TradeName,
     int ContactCount,
-    int TitleCount
+    int TitleCount,
+    bool SendToAllContacts,
+    string DispatchMode,
+    List<Guid> SelectedContactIds
 );

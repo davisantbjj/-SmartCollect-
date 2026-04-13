@@ -457,6 +457,10 @@ export const PageTitles = ({
               </div>
             )}
             <div>
+              <div className="text-[11px] text-text-muted mb-1 uppercase font-bold tracking-wider">Emissão</div>
+              <div className="text-sm font-medium">{selected.issueDate ? formatIsoDateBR(selected.issueDate) : "-"}</div>
+            </div>
+            <div>
               <div className="text-[11px] text-text-muted mb-1 uppercase font-bold tracking-wider">Vencimento</div>
               <div className="text-sm font-medium">{formatIsoDateBR(selected.dueDate)}</div>
             </div>

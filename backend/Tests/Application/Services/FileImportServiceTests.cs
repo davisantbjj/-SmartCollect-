@@ -265,6 +265,123 @@ public class FileImportServiceTests
         Assert.Equal("Tenant não encontrado para esta sessão. Faça login novamente.", ex.Message);
     }
 
+    [Fact]
+    public async Task Upload_TodayDueDateWithD0Rule_CreatesAutomaticPendingDispatch()
+    {
+        var (service, db, tenantId) = await SetupAsync();
+
+        var templateId = Guid.NewGuid();
+        var ruleId = Guid.NewGuid();
+        var triggerId = Guid.NewGuid();
+
+        db.MessageTemplates.Add(new MessageTemplate
+        {
+            Id = templateId,
+            TenantId = tenantId,
+            Name = "Template D0",
+            Channel = CollectionChannel.Email,
+            Subject = "Assunto",
+            Body = "Body",
+            Type = TemplateType.Collection,
+            Active = true,
+        });
+
+        db.CollectionRules.Add(new CollectionRule
+        {
+            Id = ruleId,
+            TenantId = tenantId,
+            Name = "Regra D0",
+            Active = true,
+        });
+
+        db.Triggers.Add(new Trigger
+        {
+            Id = triggerId,
+            CollectionRuleId = ruleId,
+            TemplateId = templateId,
+            Channel = CollectionChannel.Email,
+            DaysOffset = 0,
+            Reference = TriggerReference.DueDate,
+            Order = 1,
+            Active = true,
+        });
+
+        await db.SaveChangesAsync();
+
+        var today = DateTime.UtcNow.Date.ToString("yyyy-MM-dd");
+        var csv = string.Join('\n',
+            "nome_cliente;cnpj;codigo_titulo;valor;status;data_vencimento;email",
+            $"Cliente D0;99.999.999/0001-99;TIT-D0-001;100.00;aberto;{today};d0@cliente.com");
+
+        var result = await service.UploadAsync(tenantId, BuildFormFile("import-d0.csv", csv, "text/csv"));
+
+        Assert.Equal("Completed", result.Status);
+
+        var title = db.Titles.Single(t => t.UniqueCode == "TIT-D0-001");
+        var dispatches = db.Dispatches.Where(d => d.TitleId == title.Id).ToList();
+
+        Assert.Single(dispatches);
+        Assert.Equal(DispatchStatus.Pending, dispatches[0].Status);
+        Assert.Equal(title.DueDate.Date, dispatches[0].ScheduledFor.Date);
+    }
+
+    [Fact]
+    public async Task Upload_ReimportSameTitle_DoesNotCreateDuplicateAutomaticDispatch()
+    {
+        var (service, db, tenantId) = await SetupAsync();
+
+        var templateId = Guid.NewGuid();
+        var ruleId = Guid.NewGuid();
+        var triggerId = Guid.NewGuid();
+
+        db.MessageTemplates.Add(new MessageTemplate
+        {
+            Id = templateId,
+            TenantId = tenantId,
+            Name = "Template D0",
+            Channel = CollectionChannel.Email,
+            Subject = "Assunto",
+            Body = "Body",
+            Type = TemplateType.Collection,
+            Active = true,
+        });
+
+        db.CollectionRules.Add(new CollectionRule
+        {
+            Id = ruleId,
+            TenantId = tenantId,
+            Name = "Regra D0",
+            Active = true,
+        });
+
+        db.Triggers.Add(new Trigger
+        {
+            Id = triggerId,
+            CollectionRuleId = ruleId,
+            TemplateId = templateId,
+            Channel = CollectionChannel.Email,
+            DaysOffset = 0,
+            Reference = TriggerReference.DueDate,
+            Order = 1,
+            Active = true,
+        });
+
+        await db.SaveChangesAsync();
+
+        var tomorrow = DateTime.UtcNow.Date.AddDays(1).ToString("yyyy-MM-dd");
+        var csv = string.Join('\n',
+            "nome_cliente;cnpj;codigo_titulo;valor;status;data_vencimento;email",
+            $"Cliente D0;99.999.999/0001-99;TIT-D0-002;100.00;aberto;{tomorrow};d0@cliente.com");
+
+        await service.UploadAsync(tenantId, BuildFormFile("import-1.csv", csv, "text/csv"));
+        await service.UploadAsync(tenantId, BuildFormFile("import-2.csv", csv, "text/csv"));
+
+        var title = db.Titles.Single(t => t.UniqueCode == "TIT-D0-002");
+        var dispatchCount = db.Dispatches.Count(d => d.TitleId == title.Id);
+
+        Assert.Equal(1, dispatchCount);
+    }
+
     private static IFormFile BuildFormFile(string fileName, string content, string contentType)
     {
         var bytes = Encoding.UTF8.GetBytes(content);

@@ -23,6 +23,7 @@ public class SyncService : ISyncService
     private readonly IConfiguration _configuration;
     private readonly IDataProtector _protector;
     private readonly IDispatchDeliveryService? _dispatchDeliveryService;
+    private readonly IDispatchExecutionGuard _dispatchExecutionGuard;
 
     private static readonly Regex TemplateRegex = new("\\{\\{\\s*([a-zA-Z0-9_]+)\\s*\\}\\}", RegexOptions.Compiled);
 
@@ -37,18 +38,22 @@ public class SyncService : ISyncService
         IDataProtectionProvider dataProtectionProvider,
         IConfiguration configuration,
         ILogger<SyncService> logger,
-        IDispatchDeliveryService? dispatchDeliveryService = null)
+        IDispatchDeliveryService? dispatchDeliveryService = null,
+        IDispatchExecutionGuard? dispatchExecutionGuard = null)
     {
         _db = db;
         _httpClientFactory = httpClientFactory;
         _protector = dataProtectionProvider.CreateProtector("SmartCollect.ExternalApiCredentials.v1");
         _configuration = configuration;
         _logger = logger;
+        _dispatchExecutionGuard = dispatchExecutionGuard ?? new InMemoryDispatchExecutionGuard();
         _dispatchDeliveryService = dispatchDeliveryService;
     }
 
     public async Task<int> SyncPendingTitlesAsync(Guid tenantId)
     {
+        using var _ = _dispatchExecutionGuard.BlockTenant(tenantId);
+
         var (http, settings) = await CreateTenantApiClientAsync(tenantId);
 
         using var response = await http.GetAsync(settings.PendingTitlesPath);
@@ -85,6 +90,9 @@ public class SyncService : ISyncService
         var titlesByUniqueCode = await _db.Titles
             .Where(t => t.TenantId == tenantId)
             .ToDictionaryAsync(t => t.UniqueCode, StringComparer.OrdinalIgnoreCase);
+
+        var titlesEligibleForAutomaticDispatch = new HashSet<Guid>();
+        var terminalTitles = new HashSet<Guid>();
 
         var processed = 0;
         foreach (var item in externalTitles)
@@ -152,6 +160,16 @@ public class SyncService : ISyncService
                     existing.IssueDate = item.IssueDate;
                     existing.BoletoUrl = item.BoletoUrl;
                     existing.Status = mappedStatus;
+
+                    if (mappedStatus is TitleStatus.Paid or TitleStatus.Cancelled)
+                    {
+                        terminalTitles.Add(existing.Id);
+                        titlesEligibleForAutomaticDispatch.Remove(existing.Id);
+                    }
+                    else if (mappedStatus is TitleStatus.Open or TitleStatus.Overdue)
+                    {
+                        titlesEligibleForAutomaticDispatch.Add(existing.Id);
+                    }
                 }
                 else
                 {
@@ -170,6 +188,9 @@ public class SyncService : ISyncService
 
                     await _db.Titles.AddAsync(title);
                     titlesByUniqueCode[item.UniqueCode] = title;
+
+                    if (mappedStatus is TitleStatus.Open or TitleStatus.Overdue)
+                        titlesEligibleForAutomaticDispatch.Add(title.Id);
                 }
 
                 processed++;
@@ -184,12 +205,23 @@ public class SyncService : ISyncService
             }
         }
 
+        // Persist synced titles first so new rows are visible in scheduling queries.
+        await _db.SaveChangesAsync();
+
+        if (terminalTitles.Count > 0)
+            await AutomaticDispatchScheduler.CancelPendingForTitlesAsync(_db, terminalTitles);
+
+        if (titlesEligibleForAutomaticDispatch.Count > 0)
+            await AutomaticDispatchScheduler.EnsureDispatchesForTitlesAsync(_db, tenantId, titlesEligibleForAutomaticDispatch);
+
         await _db.SaveChangesAsync();
         return processed;
     }
 
     public async Task<int> SyncOccurrencesAsync(Guid tenantId)
     {
+        using var _ = _dispatchExecutionGuard.BlockTenant(tenantId);
+
         var (http, settings) = await CreateTenantApiClientAsync(tenantId);
         var processed = 0;
         var referenceDates = new[] { DateTime.UtcNow.Date.AddDays(-1), DateTime.UtcNow.Date };

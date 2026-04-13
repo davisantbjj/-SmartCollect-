@@ -31,13 +31,13 @@ public class PendingDispatchBackgroundService : BackgroundService
             try
             {
                 using var scope = _scopeFactory.CreateScope();
+                await ExecuteAutomaticSyncsAsync(scope.ServiceProvider, stoppingToken);
+
                 var deliveryService = scope.ServiceProvider.GetRequiredService<IDispatchDeliveryService>();
                 var processed = await deliveryService.ProcessPendingDispatchesAsync(null, stoppingToken);
 
                 if (processed > 0)
                     _logger.LogInformation("Dispatch engine processed {Count} pending sends.", processed);
-
-                await ExecuteAutomaticSyncsAsync(scope.ServiceProvider, stoppingToken);
             }
             catch (OperationCanceledException)
             {

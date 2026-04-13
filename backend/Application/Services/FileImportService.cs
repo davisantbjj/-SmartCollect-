@@ -17,6 +17,8 @@ public class FileImportService : IFileImportService
 {
     private readonly IAppDbContext _db;
     private readonly ILogger<FileImportService> _logger;
+    private readonly IDispatchExecutionGuard _dispatchExecutionGuard;
+    private readonly IDispatchDeliveryService? _dispatchDeliveryService;
 
     private static readonly HashSet<string> RequiredColumns = new(
         ["nome_cliente", "cnpj", "codigo_titulo", "valor", "status", "data_vencimento"],
@@ -40,10 +42,16 @@ public class FileImportService : IFileImportService
         new CultureInfo("pt-BR")
     ];
 
-    public FileImportService(IAppDbContext db, ILogger<FileImportService> logger)
+    public FileImportService(
+        IAppDbContext db,
+        ILogger<FileImportService> logger,
+        IDispatchExecutionGuard? dispatchExecutionGuard = null,
+        IDispatchDeliveryService? dispatchDeliveryService = null)
     {
         _db = db;
         _logger = logger;
+        _dispatchExecutionGuard = dispatchExecutionGuard ?? new InMemoryDispatchExecutionGuard();
+        _dispatchDeliveryService = dispatchDeliveryService;
     }
 
     public async Task<ImportResultResponse> UploadAsync(Guid tenantId, IFormFile file)
@@ -51,6 +59,8 @@ public class FileImportService : IFileImportService
         var tenantExists = await _db.Tenants.AnyAsync(t => t.Id == tenantId);
         if (!tenantExists)
             throw new InvalidOperationException("Tenant não encontrado para esta sessão. Faça login novamente.");
+
+        using var _ = _dispatchExecutionGuard.BlockTenant(tenantId);
 
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
         var type = extension switch
@@ -70,6 +80,9 @@ public class FileImportService : IFileImportService
         };
 
         await _db.FileImports.AddAsync(fileImport);
+
+        var titlesEligibleForAutomaticDispatch = new HashSet<Guid>();
+        var terminalTitles = new HashSet<Guid>();
 
         try
         {
@@ -216,6 +229,16 @@ public class FileImportService : IFileImportService
 
                         existingTitle.Status = finalStatus;
 
+                        if (finalStatus is TitleStatus.Paid or TitleStatus.Cancelled)
+                        {
+                            terminalTitles.Add(existingTitle.Id);
+                            titlesEligibleForAutomaticDispatch.Remove(existingTitle.Id);
+                        }
+                        else if (finalStatus is TitleStatus.Open or TitleStatus.Overdue)
+                        {
+                            titlesEligibleForAutomaticDispatch.Add(existingTitle.Id);
+                        }
+
                         var updateDescription = BuildImportUpdateDescription(
                             previousStatus,
                             existingTitle.Status,
@@ -264,7 +287,11 @@ public class FileImportService : IFileImportService
                             Description = $"Titulo criado com status {finalStatus}"
                         });
                         titlesByUniqueCode[uniqueCode] = title;
+
+                        if (finalStatus is TitleStatus.Open or TitleStatus.Overdue)
+                            titlesEligibleForAutomaticDispatch.Add(title.Id);
                     }
+
 
                     successRows++;
                 }
@@ -284,6 +311,15 @@ public class FileImportService : IFileImportService
             fileImport.SuccessRows = successRows;
             fileImport.ErrorRows = errorRows;
             fileImport.Status = errorRows == totalRows ? ImportStatus.Error : ImportStatus.Completed;
+
+            // Persist imported rows first so newly created titles are visible to scheduling queries.
+            await _db.SaveChangesAsync();
+
+            if (terminalTitles.Count > 0)
+                await AutomaticDispatchScheduler.CancelPendingForTitlesAsync(_db, terminalTitles);
+
+            if (titlesEligibleForAutomaticDispatch.Count > 0)
+                await AutomaticDispatchScheduler.EnsureDispatchesForTitlesAsync(_db, tenantId, titlesEligibleForAutomaticDispatch);
         }
         catch (Exception ex)
         {
@@ -297,6 +333,10 @@ public class FileImportService : IFileImportService
         }
 
         await _db.SaveChangesAsync();
+
+        if (fileImport.Status == ImportStatus.Completed && fileImport.SuccessRows > 0 && _dispatchDeliveryService is not null)
+            await _dispatchDeliveryService.ProcessPendingDispatchesAsync(tenantId);
+
         return ToResponse(fileImport);
     }
 

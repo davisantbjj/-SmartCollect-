@@ -10,6 +10,8 @@ import {
   getExternalApiConfig,
   saveExternalApiConfig,
   testExternalApiConfig,
+  getDispatchWindowConfig,
+  saveDispatchWindowConfig,
   type SmtpConfigResponse, type StoredSession, type SyncHealthResponse,
   type WhatsAppProvider,
 } from "../services/api";
@@ -39,6 +41,14 @@ const normalizeTwilioAccountSid = (raw: string) => {
   if (match?.[1]) return match[1];
 
   return text;
+};
+
+const getBrowserTimeZone = () => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
 };
 
 export const PageIntegration = ({
@@ -79,6 +89,12 @@ export const PageIntegration = ({
   const [apiToken, setApiToken] = useState("");
   const [clearApiToken, setClearApiToken] = useState(false);
 
+  const [windowLoading, setWindowLoading] = useState(true);
+  const [windowSaving, setWindowSaving] = useState(false);
+  const [dispatchWindowEnabled, setDispatchWindowEnabled] = useState(false);
+  const [dispatchWindowStartTime, setDispatchWindowStartTime] = useState("09:00");
+  const [dispatchWindowEndTime, setDispatchWindowEndTime] = useState("18:00");
+
   // Form state
   const [host, setHost] = useState("");
   const [port, setPort] = useState("587");
@@ -90,6 +106,7 @@ export const PageIntegration = ({
   const [senderName, setSenderName] = useState("");
 
   const canEdit = session.role === "Admin" || session.role === "Master";
+  const canEditDispatchWindow = session.role === "Admin";
 
   useEffect(() => {
     const load = async () => {
@@ -183,6 +200,32 @@ export const PageIntegration = ({
 
   useEffect(() => {
     void loadApiConfig();
+  }, [showToast]);
+
+  const loadDispatchWindowConfig = async () => {
+    try {
+      setWindowLoading(true);
+      const data = await getDispatchWindowConfig();
+      setDispatchWindowEnabled(data.enabled);
+      setDispatchWindowStartTime(data.startTime || "09:00");
+      setDispatchWindowEndTime(data.endTime || "18:00");
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        // Backend antigo ou rota ainda não publicada: mantém defaults locais sem exibir erro.
+        setDispatchWindowEnabled(false);
+        setDispatchWindowStartTime("09:00");
+        setDispatchWindowEndTime("18:00");
+      } else {
+        const msg = err instanceof ApiError ? err.message : "Falha ao carregar janela de envio.";
+        showToast(`${ICONS.cross} ${msg}`, "error");
+      }
+    } finally {
+      setWindowLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadDispatchWindowConfig();
   }, [showToast]);
 
   const handleSave = async () => {
@@ -362,13 +405,33 @@ export const PageIntegration = ({
     }
   };
 
+  const handleSaveDispatchWindow = async () => {
+    if (!dispatchWindowStartTime.trim() || !dispatchWindowEndTime.trim()) {
+      showToast(`${ICONS.warning} Informe horario inicial e horario final.`, "warn");
+      return;
+    }
+
+    try {
+      setWindowSaving(true);
+      const response = await saveDispatchWindowConfig({
+        enabled: dispatchWindowEnabled,
+        timeZone: getBrowserTimeZone(),
+        startTime: dispatchWindowStartTime.trim(),
+        endTime: dispatchWindowEndTime.trim(),
+        pauseAutomaticDispatchDuringProcessing: true,
+      });
+      showToast(`${ICONS.checkmark} ${response.message}`, "success");
+      await loadDispatchWindowConfig();
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Falha ao salvar janela de envio.";
+      showToast(`${ICONS.cross} ${msg}`, "error");
+    } finally {
+      setWindowSaving(false);
+    }
+  };
+
   return (
     <div className="animate-fade-up">
-      <div className="mb-4 bg-accent/[0.08] border border-accent/25 rounded-xl px-4 py-3 text-[12.5px] text-text-secondary">
-        <strong className="text-text-primary">Tela de Integracao = configuracao.</strong> Configure SMTP, WhatsApp e API externa aqui.
-        A tela de Importacao e para operacao (upload e sincronizacao manual).
-      </div>
-
       <div className="grid grid-cols-2 gap-4 mb-4">
         {/* SMTP */}
         <div className="bg-surface border border-border-subtle rounded-[14px] overflow-hidden">
@@ -705,6 +768,104 @@ export const PageIntegration = ({
               {apiTesting ? "Testando..." : <>{ICONS.testTube} {t("integration.testEndpoint")}</>}
             </Button>
           </div>
+        </div>
+      </div>
+
+      <div className="bg-surface border border-border-subtle rounded-[14px] overflow-hidden mt-4">
+        <CardHeader
+          title={<>{ICONS.timer} Janela de envio automatico</>}
+          subtitle="Somente Admin pode configurar. Fora da janela, apenas envio manual e permitido."
+          right={
+            <span className={`${dispatchWindowEnabled ? "bg-success/[0.12] text-success" : "bg-warn/[0.12] text-warn"} text-[11px] font-bold px-[9px] py-[3px] rounded-full`}>
+              {dispatchWindowEnabled ? "Ativa" : "Desativada"}
+            </span>
+          }
+        />
+        <div className="p-5">
+          {windowLoading ? (
+            <div className="text-sm text-text-muted py-4">Carregando configuracao...</div>
+          ) : (
+            <>
+              <div className="mb-4 rounded-xl border border-border-subtle bg-surface-2 px-4 py-3 flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-text-primary">Ativar janela de envio automatico</div>
+                  <div className="text-xs text-text-muted mt-0.5">Fuso detectado automaticamente do navegador: {getBrowserTimeZone()}</div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={dispatchWindowEnabled}
+                  disabled={!canEditDispatchWindow}
+                  onClick={() => setDispatchWindowEnabled(prev => !prev)}
+                  className={`inline-flex items-center gap-2 rounded-full border px-2 py-1 text-xs font-semibold transition-colors ${dispatchWindowEnabled ? "border-success/30 bg-success/12 text-success" : "border-border-subtle-2 bg-surface text-text-muted"} ${!canEditDispatchWindow ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
+                >
+                  <span className={`h-4 w-7 rounded-full p-[2px] transition-colors ${dispatchWindowEnabled ? "bg-success/75" : "bg-text-muted/40"}`}>
+                    <span className={`block h-3 w-3 rounded-full bg-white transition-transform ${dispatchWindowEnabled ? "translate-x-3" : "translate-x-0"}`} />
+                  </span>
+                  <span>{dispatchWindowEnabled ? "Ativo" : "Inativo"}</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3.5 mb-4">
+                <div>
+                  <label className="text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted mb-[5px] block">Inicio</label>
+                  <input
+                    type="time"
+                    step={300}
+                    value={dispatchWindowStartTime}
+                    onChange={e => setDispatchWindowStartTime(e.target.value)}
+                    disabled={!canEditDispatchWindow}
+                    className="bg-surface-2 border border-border-subtle-2 rounded-lg px-[13px] py-[9px] text-[15px] text-text-primary outline-none w-full focus:border-accent disabled:opacity-70"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted mb-[5px] block">Fim</label>
+                  <input
+                    type="time"
+                    step={300}
+                    value={dispatchWindowEndTime}
+                    onChange={e => setDispatchWindowEndTime(e.target.value)}
+                    disabled={!canEditDispatchWindow}
+                    className="bg-surface-2 border border-border-subtle-2 rounded-lg px-[13px] py-[9px] text-[15px] text-text-primary outline-none w-full focus:border-accent disabled:opacity-70"
+                  />
+                </div>
+
+                <div className="col-span-2 flex flex-wrap gap-2">
+                  {[
+                    ["08:00", "18:00", "Comercial"],
+                    ["09:00", "18:00", "Padrao"],
+                    ["10:00", "19:00", "Tarde"],
+                  ].map(([start, end, label]) => (
+                    <button
+                      key={label}
+                      type="button"
+                      disabled={!canEditDispatchWindow}
+                      onClick={() => {
+                        setDispatchWindowStartTime(start);
+                        setDispatchWindowEndTime(end);
+                      }}
+                      className="text-xs px-3 py-1.5 rounded-full border border-border-subtle bg-surface-2 text-text-secondary hover:border-accent/50 hover:text-text-primary disabled:opacity-60"
+                    >
+                      {label}: {start} - {end}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="text-[12px] text-text-muted mb-4">
+                Regras: automatico respeita a janela configurada. Envio manual rapido pode ocorrer fora da janela. Pausa durante upload/sincronizacao e automatica.
+              </div>
+
+              {canEditDispatchWindow ? (
+                <Button size="sm" variant="primary" onClick={handleSaveDispatchWindow}>
+                  {windowSaving ? "Salvando..." : t("common.save")}
+                </Button>
+              ) : (
+                <div className="text-xs text-text-muted">Apenas Admin pode alterar essa configuracao.</div>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>

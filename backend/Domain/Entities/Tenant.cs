@@ -19,6 +19,11 @@ public class Tenant : Entity
     public string? ExternalApiAuthScheme { get; set; }
     public string? ExternalApiTokenEncrypted { get; set; }
     public string? WhatsAppApiToken { get; set; }
+    public bool DispatchWindowEnabled { get; set; }
+    public int DispatchWindowStartMinutes { get; set; } = 540;
+    public int DispatchWindowEndMinutes { get; set; } = 1080;
+    public string DispatchWindowTimeZone { get; set; } = "UTC";
+    public bool PauseAutomaticDispatchDuringProcessing { get; set; } = true;
     public TenantPlan Plan { get; set; } = TenantPlan.Basic;
     public bool Active { get; set; } = true;
 

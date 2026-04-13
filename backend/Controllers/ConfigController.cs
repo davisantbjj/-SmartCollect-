@@ -14,15 +14,18 @@ public class ConfigController : ControllerBase
     private readonly ISmtpConfigService _smtpService;
     private readonly IWhatsAppConfigService _whatsAppService;
     private readonly ISyncService _syncService;
+    private readonly IDispatchWindowConfigService _dispatchWindowService;
 
     public ConfigController(
         ISmtpConfigService smtpService,
         IWhatsAppConfigService whatsAppService,
-        ISyncService syncService)
+        ISyncService syncService,
+        IDispatchWindowConfigService dispatchWindowService)
     {
         _smtpService = smtpService;
         _whatsAppService = whatsAppService;
         _syncService = syncService;
+        _dispatchWindowService = dispatchWindowService;
     }
 
     private Guid GetTenantId() => TenantContextResolver.GetTenantIdOrThrow(User);
@@ -108,5 +111,26 @@ public class ConfigController : ControllerBase
         return connected
             ? Ok(new { message = "Conexão com API externa validada com sucesso." })
             : StatusCode(502, new { message = "Não foi possível conectar na API externa com a configuração atual." });
+    }
+
+    [HttpGet("dispatch-window")]
+    public async Task<IActionResult> GetDispatchWindow(CancellationToken cancellationToken)
+    {
+        var result = await _dispatchWindowService.GetAsync(GetTenantId(), cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("dispatch-window")]
+    public async Task<IActionResult> SaveDispatchWindow([FromBody] DispatchWindowConfigRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _dispatchWindowService.SaveAsync(GetTenantId(), request, cancellationToken);
+            return Ok(new { message = "Janela de envio salva com sucesso." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 }

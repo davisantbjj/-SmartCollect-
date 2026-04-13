@@ -246,20 +246,9 @@ export const PageSequence = ({
 
   return (
     <div className="animate-fade-up">
-      <div className="flex justify-between items-center mb-[22px]">
-        <div>
-          {activeRules.length > 0
-            ? <span className="text-sm text-success font-semibold">{ICONS.checkmark} {activeRules.length} régua(s) ativa(s)</span>
-            : <span className="text-sm text-warn font-semibold">{ICONS.warning} Nenhuma régua ativa</span>
-          }
-        </div>
+      <div className="flex justify-end items-center mb-[22px]">
         {canEdit && (
           <div className="flex gap-2">
-            {selectedRule && (
-              <Button variant="secondary" onClick={() => openEdit(selectedRule)}>
-                {ICONS.pencil} Editar Selecionada
-              </Button>
-            )}
             <Button variant="primary" onClick={openNew}>
               {ICONS.plus} Nova Régua
             </Button>

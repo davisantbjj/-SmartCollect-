@@ -264,6 +264,22 @@ export interface ExternalApiConfigRequest {
   clearToken?: boolean;
 }
 
+export interface DispatchWindowConfigResponse {
+  enabled: boolean;
+  timeZone: string;
+  startTime: string;
+  endTime: string;
+  pauseAutomaticDispatchDuringProcessing: boolean;
+}
+
+export interface DispatchWindowConfigRequest {
+  enabled: boolean;
+  timeZone: string;
+  startTime: string;
+  endTime: string;
+  pauseAutomaticDispatchDuringProcessing: boolean;
+}
+
 export interface MessageTemplateResponse {
   id: string;
   name: string;
@@ -856,6 +872,17 @@ export async function saveExternalApiConfig(payload: ExternalApiConfigRequest) {
 
 export async function testExternalApiConfig() {
   return request<{ message: string }>("/api/config/external-api/test", { method: "POST" });
+}
+
+export async function getDispatchWindowConfig() {
+  return request<DispatchWindowConfigResponse>("/api/config/dispatch-window");
+}
+
+export async function saveDispatchWindowConfig(payload: DispatchWindowConfigRequest) {
+  return request<{ message: string }>("/api/config/dispatch-window", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 // ── Workers (Admin only) ──────────────────────────────────────────────────

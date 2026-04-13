@@ -264,6 +264,99 @@ public class SyncServiceTests
         var occurrences = await db.Occurrences.ToListAsync();
         Assert.Empty(occurrences);
     }
+
+    [Fact]
+    public async Task SyncPendingTitles_OpenTitle_CreatesAutomaticPendingDispatch()
+    {
+        var db = TestDbContextFactory.Create();
+
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var contactId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+        var ruleId = Guid.NewGuid();
+        var triggerId = Guid.NewGuid();
+
+        db.Tenants.Add(new Tenant
+        {
+            Id = tenantId,
+            CompanyName = "Tenant Sync",
+            TaxId = "123",
+            ExternalApiBaseUrl = "http://localhost/",
+            ExternalApiPendingTitlesPath = "titulos-pendentes",
+            ExternalApiOccurrencesPath = "ocorrencias?data={date}",
+            ExternalApiAuthScheme = "None",
+            Active = true
+        });
+
+        db.Users.Add(new User { Id = userId, TenantId = tenantId, Name = "U", Email = "u@test.com", PasswordHash = "x" });
+        db.Clients.Add(new Client { Id = clientId, TenantId = tenantId, UserId = userId, LegalName = "Cliente", TaxId = "999" });
+        db.Contacts.Add(new Contact { Id = contactId, ClientId = clientId, Name = "Contato", Email = "contato@test.com", IsPrimary = true });
+
+        db.MessageTemplates.Add(new MessageTemplate
+        {
+            Id = templateId,
+            TenantId = tenantId,
+            Name = "Template Sync",
+            Channel = CollectionChannel.Email,
+            Subject = "Assunto",
+            Body = "Body",
+            Type = TemplateType.Collection,
+            Active = true
+        });
+
+        db.CollectionRules.Add(new CollectionRule
+        {
+            Id = ruleId,
+            TenantId = tenantId,
+            Name = "Regra Sync",
+            Active = true
+        });
+
+        db.Triggers.Add(new Trigger
+        {
+            Id = triggerId,
+            CollectionRuleId = ruleId,
+            TemplateId = templateId,
+            Channel = CollectionChannel.Email,
+            DaysOffset = 0,
+            Reference = TriggerReference.DueDate,
+            Order = 1,
+            Active = true
+        });
+
+        await db.SaveChangesAsync();
+
+        var payload = "[{\"nome_cliente\":\"Cliente\",\"cnpj\":\"999\",\"email\":\"contato@test.com\",\"telefone\":\"\",\"codigo_unico\":\"T-SYNC-001\",\"valor\":100.0,\"data_vencimento\":\"2099-12-31T00:00:00Z\",\"data_emissao\":\"2099-12-01T00:00:00Z\",\"link_boleto\":null,\"status\":\"open\"}]";
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ExternalApi:BaseUrl"] = "http://localhost/",
+                ["ExternalApi:DocsUrl"] = "http://localhost/docs"
+            })
+            .Build();
+
+        var dataProtectionProvider = DataProtectionProvider.Create("SmartCollect.Tests");
+
+        var sync = new SyncService(
+            db,
+            new StaticHttpClientFactory(payload),
+            dataProtectionProvider,
+            configuration,
+            NullLogger<SyncService>.Instance);
+
+        var processed = await sync.SyncPendingTitlesAsync(tenantId);
+
+        Assert.Equal(1, processed);
+
+        var title = await db.Titles.SingleAsync(t => t.UniqueCode == "T-SYNC-001");
+        var dispatches = await db.Dispatches.Where(d => d.TitleId == title.Id).ToListAsync();
+
+        Assert.Single(dispatches);
+        Assert.Equal(DispatchStatus.Pending, dispatches[0].Status);
+    }
 }
 
 internal sealed class FakeDispatchDeliveryService : IDispatchDeliveryService
@@ -317,6 +410,35 @@ internal sealed class TestHttpClientFactory : IHttpClientFactory
             => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent("[]")
+            });
+    }
+}
+
+internal sealed class StaticHttpClientFactory : IHttpClientFactory
+{
+    private readonly string _payload;
+
+    public StaticHttpClientFactory(string payload)
+    {
+        _payload = payload;
+    }
+
+    public HttpClient CreateClient(string name)
+        => new(new StaticPayloadResponseHandler(_payload)) { BaseAddress = new Uri("http://localhost") };
+
+    private sealed class StaticPayloadResponseHandler : HttpMessageHandler
+    {
+        private readonly string _payload;
+
+        public StaticPayloadResponseHandler(string payload)
+        {
+            _payload = payload;
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(_payload)
             });
     }
 }

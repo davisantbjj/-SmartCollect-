@@ -23,18 +23,21 @@ public class DispatchDeliveryService : IDispatchDeliveryService
     private readonly IDataProtector _whatsAppProtector;
     private readonly IHttpClientFactory? _httpClientFactory;
     private readonly ILogger<DispatchDeliveryService> _logger;
+    private readonly IDispatchExecutionGuard _dispatchExecutionGuard;
 
     public DispatchDeliveryService(
         IAppDbContext db,
         IDataProtectionProvider dataProtectionProvider,
         ILogger<DispatchDeliveryService> logger,
-        IHttpClientFactory? httpClientFactory = null)
+        IHttpClientFactory? httpClientFactory = null,
+        IDispatchExecutionGuard? dispatchExecutionGuard = null)
     {
         _db = db;
         _smtpProtector = dataProtectionProvider.CreateProtector("SmartCollect.SmtpCredentials.v1");
         _whatsAppProtector = dataProtectionProvider.CreateProtector("SmartCollect.WhatsAppCredentials.v1");
         _logger = logger;
         _httpClientFactory = httpClientFactory;
+        _dispatchExecutionGuard = dispatchExecutionGuard ?? new InMemoryDispatchExecutionGuard();
     }
 
     public async Task<QuickSendResult> SendQuickEmailAsync(
@@ -141,6 +144,15 @@ public class DispatchDeliveryService : IDispatchDeliveryService
             .Where(t => tenantIds.Contains(t.Id))
             .ToDictionaryAsync(t => t.Id, cancellationToken);
 
+        var tenantIdsWithProcessingImport = await _db.FileImports
+            .Where(i => i.Status == ImportStatus.Processing)
+            .Where(i => tenantIds.Contains(i.TenantId))
+            .Select(i => i.TenantId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        var processingImportSet = tenantIdsWithProcessingImport.ToHashSet();
+
         var processed = 0;
 
         foreach (var dispatch in pending)
@@ -156,6 +168,24 @@ public class DispatchDeliveryService : IDispatchDeliveryService
             if (!tenants.TryGetValue(dispatch.Title.TenantId, out var tenant) || !tenant.Active)
             {
                 MarkError(dispatch, "Tenant inativo ou não encontrado.");
+                continue;
+            }
+
+            if (tenant.PauseAutomaticDispatchDuringProcessing)
+            {
+                if (processingImportSet.Contains(dispatch.Title.TenantId))
+                    continue;
+
+                if (_dispatchExecutionGuard.IsTenantBlocked(dispatch.Title.TenantId))
+                    continue;
+            }
+
+            if (tenant.DispatchWindowEnabled
+                && !IsWithinDispatchWindowUtc(tenant, now, out var nextAllowedUtc))
+            {
+                if (dispatch.ScheduledFor < nextAllowedUtc)
+                    dispatch.ScheduledFor = nextAllowedUtc;
+
                 continue;
             }
 
@@ -265,6 +295,55 @@ public class DispatchDeliveryService : IDispatchDeliveryService
             return values.TryGetValue(key, out var value) ? value : match.Value;
         });
     }
+
+    private static bool IsWithinDispatchWindowUtc(Domain.Entities.Tenant tenant, DateTime nowUtc, out DateTime nextAllowedUtc)
+    {
+        nextAllowedUtc = nowUtc;
+
+        if (!DispatchWindowTimeZoneResolver.TryResolve(tenant.DispatchWindowTimeZone, out var timeZone))
+            return true;
+
+        var startMinutes = NormalizeWindowMinutes(tenant.DispatchWindowStartMinutes, 9 * 60);
+        var endMinutes = NormalizeWindowMinutes(tenant.DispatchWindowEndMinutes, 18 * 60);
+
+        if (startMinutes == endMinutes)
+            return true;
+
+        var localNow = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, timeZone);
+        var minutesNow = localNow.Hour * 60 + localNow.Minute;
+
+        var wrapsMidnight = startMinutes > endMinutes;
+        var insideWindow = wrapsMidnight
+            ? minutesNow >= startMinutes || minutesNow < endMinutes
+            : minutesNow >= startMinutes && minutesNow < endMinutes;
+
+        if (insideWindow)
+            return true;
+
+        var nextStartDate = ResolveNextWindowStartDate(localNow.Date, minutesNow, startMinutes, wrapsMidnight);
+        var nextStartLocal = nextStartDate.AddMinutes(startMinutes);
+        nextAllowedUtc = TimeZoneInfo.ConvertTimeToUtc(nextStartLocal, timeZone);
+
+        return false;
+    }
+
+    private static DateTime ResolveNextWindowStartDate(
+        DateTime localDate,
+        int minutesNow,
+        int startMinutes,
+        bool wrapsMidnight)
+    {
+        if (wrapsMidnight)
+        {
+            // Outside interval for overnight windows is always between end and start.
+            return minutesNow < startMinutes ? localDate : localDate.AddDays(1);
+        }
+
+        return minutesNow < startMinutes ? localDate : localDate.AddDays(1);
+    }
+
+    private static int NormalizeWindowMinutes(int value, int fallback)
+        => value is < 0 or >= 1440 ? fallback : value;
 
     private async Task<ChannelSendResult> SendEmailAsync(
         Domain.Entities.Tenant tenant,

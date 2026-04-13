@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { t } from "../i18n";
 import { ICONS } from "../utils/icons";
-import { formatBRLFull } from "../utils/formatters";
+import { formatBRLFull, formatIsoDateBR } from "../utils/formatters";
 import { Badge, ChannelPills, Button, Modal, FormInput } from "../components/UI";
 import {
   ApiError, getTitles, getClients, createTitle, sendCollection, getTitleHistory, updateTitleStatus,
@@ -297,7 +297,7 @@ export const PageTitles = ({
                   <div className="text-[11px] text-text-muted mt-0.5">{title.clientTaxId}</div>
                 </td>
                 <td className="px-4 py-[13px] text-[13px]">
-                  <div>{new Date(title.dueDate).toLocaleDateString("pt-BR")}</div>
+                  <div>{formatIsoDateBR(title.dueDate)}</div>
                   {title.isBoletoOverdue && (
                     <div className="text-[11px] font-semibold text-danger mt-0.5">Boleto vencido</div>
                   )}
@@ -419,7 +419,7 @@ export const PageTitles = ({
             )}
             <div>
               <div className="text-[11px] text-text-muted mb-1 uppercase font-bold tracking-wider">Vencimento</div>
-              <div className="text-sm font-medium">{new Date(selected.dueDate).toLocaleDateString("pt-BR")}</div>
+              <div className="text-sm font-medium">{formatIsoDateBR(selected.dueDate)}</div>
             </div>
             <div>
               <div className="text-[11px] text-text-muted mb-1 uppercase font-bold tracking-wider">Valor</div>

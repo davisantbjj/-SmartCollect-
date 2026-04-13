@@ -100,4 +100,106 @@ public class DashboardServiceTests
         Assert.Equal(8000, result.Items[0].TotalAmount);
         Assert.Equal(2, result.Items[0].TitleCount);
     }
+
+    [Fact]
+    public async Task SendsPerDay_IncludesQuickManualHistory()
+    {
+        var db = TestDbContextFactory.Create();
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var titleId = Guid.NewGuid();
+        var createdAt = DateTime.UtcNow.Date.AddDays(-1).AddHours(10);
+
+        db.Tenants.Add(new Tenant { Id = tenantId, CompanyName = "Test", TaxId = "123" });
+        db.Users.Add(new User { Id = userId, TenantId = tenantId, Name = "Op", Email = "op@t.com", PasswordHash = "x" });
+        db.Clients.Add(new Client { Id = clientId, TenantId = tenantId, UserId = userId, LegalName = "Client A", TaxId = "456" });
+        db.Titles.Add(new Title
+        {
+            Id = titleId,
+            TenantId = tenantId,
+            ClientId = clientId,
+            UniqueCode = "T-MANUAL-001",
+            Amount = 100,
+            DueDate = DateTime.UtcNow.AddDays(5),
+            IssueDate = DateTime.UtcNow,
+            Status = TitleStatus.Open
+        });
+        db.TitleHistories.Add(new TitleHistory
+        {
+            Id = Guid.NewGuid(),
+            TitleId = titleId,
+            TenantId = tenantId,
+            Action = "Cobranca manual rapida",
+            Description = "E-mail enviado para teste@empresa.com. WhatsApp enviado para +5511999999999",
+            CreatedAt = createdAt,
+            UpdatedAt = createdAt,
+        });
+        await db.SaveChangesAsync();
+
+        var svc = new DashboardService(db);
+        var response = await svc.GetSendsPerDayAsync(tenantId);
+
+        var day = createdAt.ToString("yyyy-MM-dd");
+        var item = response.Items.Single(i => i.Day == day);
+        Assert.Equal(1, item.EmailCount);
+        Assert.Equal(1, item.WhatsAppCount);
+    }
+
+    [Fact]
+    public async Task ChannelMetrics_IncludesQuickManualHistoryInSentCounts()
+    {
+        var db = TestDbContextFactory.Create();
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var titleId = Guid.NewGuid();
+        var createdAt = DateTime.UtcNow.Date.AddDays(-2).AddHours(9);
+
+        db.Tenants.Add(new Tenant { Id = tenantId, CompanyName = "Test", TaxId = "123" });
+        db.Users.Add(new User { Id = userId, TenantId = tenantId, Name = "Op", Email = "op@t.com", PasswordHash = "x" });
+        db.Clients.Add(new Client { Id = clientId, TenantId = tenantId, UserId = userId, LegalName = "Client A", TaxId = "456" });
+        db.Titles.Add(new Title
+        {
+            Id = titleId,
+            TenantId = tenantId,
+            ClientId = clientId,
+            UniqueCode = "T-MANUAL-002",
+            Amount = 100,
+            DueDate = DateTime.UtcNow.AddDays(5),
+            IssueDate = DateTime.UtcNow,
+            Status = TitleStatus.Open
+        });
+        db.TitleHistories.Add(new TitleHistory
+        {
+            Id = Guid.NewGuid(),
+            TitleId = titleId,
+            TenantId = tenantId,
+            Action = "Cobranca manual rapida",
+            Description = "E-mail enviado para teste@empresa.com",
+            CreatedAt = createdAt,
+            UpdatedAt = createdAt,
+        });
+        db.TitleHistories.Add(new TitleHistory
+        {
+            Id = Guid.NewGuid(),
+            TitleId = titleId,
+            TenantId = tenantId,
+            Action = "Cobranca manual rapida",
+            Description = "WhatsApp enviado para +5511999999999",
+            CreatedAt = createdAt.AddMinutes(1),
+            UpdatedAt = createdAt.AddMinutes(1),
+        });
+        await db.SaveChangesAsync();
+
+        var svc = new DashboardService(db);
+        var metrics = await svc.GetChannelMetricsAsync(tenantId, createdAt.AddDays(-1), createdAt.AddDays(1));
+
+        Assert.Equal(1, metrics.EmailSent);
+        Assert.Equal(0, metrics.EmailDelivered);
+        Assert.Equal(0, metrics.EmailViewed);
+        Assert.Equal(1, metrics.WhatsAppSent);
+        Assert.Equal(0, metrics.WhatsAppDelivered);
+        Assert.Equal(0, metrics.WhatsAppViewed);
+    }
 }

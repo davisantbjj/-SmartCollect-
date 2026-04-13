@@ -1,5 +1,7 @@
 namespace SmartCollect.Application.Services;
 
+using System.Globalization;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using SmartCollect.Application.DTOs.Dashboard;
 using SmartCollect.Application.Interfaces;
@@ -21,6 +23,11 @@ public class DashboardService : IDashboardService
             ? _db.Dispatches.Include(d => d.Title).Where(d => d.Title.TenantId == tenantId.Value)
             : _db.Dispatches.Include(d => d.Title);
 
+    private IQueryable<Domain.Entities.TitleHistory> TitleHistoriesFor(Guid? tenantId)
+        => tenantId.HasValue
+            ? _db.TitleHistories.Where(h => h.TenantId == tenantId.Value)
+            : _db.TitleHistories;
+
     private static (DateTime Start, DateTime End) ResolveRange(DateTime? startDate, DateTime? endDate)
     {
         var end = endDate?.ToUniversalTime() ?? DateTime.UtcNow;
@@ -30,6 +37,42 @@ public class DashboardService : IDashboardService
             (start, end) = (end, start);
 
         return (start, end);
+    }
+
+    private static string NormalizeText(string value)
+    {
+        var normalized = value.Normalize(NormalizationForm.FormD);
+        var builder = new StringBuilder(normalized.Length);
+
+        foreach (var ch in normalized)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(ch) != UnicodeCategory.NonSpacingMark)
+                builder.Append(char.ToLowerInvariant(ch));
+        }
+
+        return builder
+            .ToString()
+            .Normalize(NormalizationForm.FormC);
+    }
+
+    private static bool IsQuickManualAction(string? action)
+    {
+        if (string.IsNullOrWhiteSpace(action))
+            return false;
+
+        return NormalizeText(action.Trim()) == "cobranca manual rapida";
+    }
+
+    private static (int EmailCount, int WhatsAppCount) ParseQuickManualChannels(string? description)
+    {
+        if (string.IsNullOrWhiteSpace(description))
+            return (0, 0);
+
+        var normalized = NormalizeText(description);
+        var emailSent = normalized.Contains("e-mail enviado") || normalized.Contains("email enviado");
+        var whatsAppSent = normalized.Contains("whatsapp enviado");
+
+        return (emailSent ? 1 : 0, whatsAppSent ? 1 : 0);
     }
 
     public async Task<DashboardSummaryResponse> GetSummaryAsync(Guid? tenantId)
@@ -158,6 +201,36 @@ public class DashboardService : IDashboardService
                     WhatsApp = g.Count(d => d.Channel == CollectionChannel.WhatsApp || d.Channel == CollectionChannel.Both)
                 });
 
+        var quickManualHistories = (await TitleHistoriesFor(tenantId)
+            .Where(h => h.CreatedAt >= start && h.CreatedAt <= end)
+            .ToListAsync())
+            .Where(h => IsQuickManualAction(h.Action));
+
+        foreach (var history in quickManualHistories)
+        {
+            var parsed = ParseQuickManualChannels(history.Description);
+            if (parsed.EmailCount == 0 && parsed.WhatsAppCount == 0)
+                continue;
+
+            var day = history.CreatedAt.Date;
+            if (grouped.TryGetValue(day, out var existing))
+            {
+                grouped[day] = new
+                {
+                    Email = existing.Email + parsed.EmailCount,
+                    WhatsApp = existing.WhatsApp + parsed.WhatsAppCount,
+                };
+            }
+            else
+            {
+                grouped[day] = new
+                {
+                    Email = parsed.EmailCount,
+                    WhatsApp = parsed.WhatsAppCount,
+                };
+            }
+        }
+
         var items = new List<SendsDayItem>();
         for (var day = start.Date; day <= end.Date; day = day.AddDays(1))
         {
@@ -186,11 +259,26 @@ public class DashboardService : IDashboardService
         var wa = dispatches.Where(d => d.Channel == CollectionChannel.WhatsApp).ToList();
         var both = dispatches.Where(d => d.Channel == CollectionChannel.Both).ToList();
 
+        var quickManualHistories = (await TitleHistoriesFor(tenantId)
+            .Where(h => h.CreatedAt >= start && h.CreatedAt <= end)
+            .ToListAsync())
+            .Where(h => IsQuickManualAction(h.Action));
+
+        var quickEmailSent = 0;
+        var quickWhatsAppSent = 0;
+
+        foreach (var history in quickManualHistories)
+        {
+            var parsed = ParseQuickManualChannels(history.Description);
+            quickEmailSent += parsed.EmailCount;
+            quickWhatsAppSent += parsed.WhatsAppCount;
+        }
+
         return new ChannelMetricsResponse(
-            email.Count(d => sentStatuses.Contains(d.Status)) + both.Count(d => sentStatuses.Contains(d.Status)),
+            email.Count(d => sentStatuses.Contains(d.Status)) + both.Count(d => sentStatuses.Contains(d.Status)) + quickEmailSent,
             email.Count(d => deliveredStatuses.Contains(d.Status)) + both.Count(d => deliveredStatuses.Contains(d.Status)),
             email.Count(d => viewedStatuses.Contains(d.Status)) + both.Count(d => viewedStatuses.Contains(d.Status)),
-            wa.Count(d => sentStatuses.Contains(d.Status)) + both.Count(d => sentStatuses.Contains(d.Status)),
+            wa.Count(d => sentStatuses.Contains(d.Status)) + both.Count(d => sentStatuses.Contains(d.Status)) + quickWhatsAppSent,
             wa.Count(d => deliveredStatuses.Contains(d.Status)) + both.Count(d => deliveredStatuses.Contains(d.Status)),
             wa.Count(d => viewedStatuses.Contains(d.Status)) + both.Count(d => viewedStatuses.Contains(d.Status)));
     }

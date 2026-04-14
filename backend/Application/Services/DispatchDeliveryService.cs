@@ -123,6 +123,8 @@ public class DispatchDeliveryService : IDispatchDeliveryService
             .Include(d => d.Contact)
             .Include(d => d.Trigger)
                 .ThenInclude(tr => tr.Template)
+            .Include(d => d.Trigger)
+                .ThenInclude(tr => tr.CollectionRule)
             .Include(d => d.Title)
                 .ThenInclude(t => t.Client)
             .Where(d => d.Status == DispatchStatus.Pending)
@@ -160,6 +162,12 @@ public class DispatchDeliveryService : IDispatchDeliveryService
             cancellationToken.ThrowIfCancellationRequested();
 
             if (dispatch.Title.Status is TitleStatus.Paid or TitleStatus.Cancelled)
+            {
+                dispatch.Status = DispatchStatus.Cancelled;
+                continue;
+            }
+
+            if (!dispatch.Trigger.Active || !dispatch.Trigger.CollectionRule.Active)
             {
                 dispatch.Status = DispatchStatus.Cancelled;
                 continue;

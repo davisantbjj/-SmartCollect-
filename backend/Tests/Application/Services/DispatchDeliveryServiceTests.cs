@@ -191,6 +191,94 @@ public class DispatchDeliveryServiceTests
     }
 
     [Fact]
+    public async Task ProcessPendingDispatches_WhenRuleInactive_CancelsDispatch()
+    {
+        var db = TestDbContextFactory.Create();
+
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var contactId = Guid.NewGuid();
+        var titleId = Guid.NewGuid();
+        var ruleId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+        var triggerId = Guid.NewGuid();
+        var dispatchId = Guid.NewGuid();
+
+        db.Tenants.Add(new Tenant
+        {
+            Id = tenantId,
+            CompanyName = "Tenant Rule Inactive",
+            TaxId = "123",
+            Active = true,
+        });
+
+        db.Users.Add(new User { Id = userId, TenantId = tenantId, Name = "U", Email = "u@test.com", PasswordHash = "x" });
+        db.Clients.Add(new Client { Id = clientId, TenantId = tenantId, UserId = userId, LegalName = "Cliente", TaxId = "999" });
+        db.Contacts.Add(new Contact { Id = contactId, ClientId = clientId, Name = "Contato", Email = "contato@test.com", IsPrimary = true });
+
+        db.Titles.Add(new Title
+        {
+            Id = titleId,
+            TenantId = tenantId,
+            ClientId = clientId,
+            UniqueCode = "TIT-RULE-INACTIVE-001",
+            Amount = 99.90m,
+            DueDate = DateTime.UtcNow,
+            IssueDate = DateTime.UtcNow,
+            Status = TitleStatus.Open
+        });
+
+        db.CollectionRules.Add(new CollectionRule { Id = ruleId, TenantId = tenantId, Name = "Regra", Active = false });
+        db.MessageTemplates.Add(new MessageTemplate
+        {
+            Id = templateId,
+            TenantId = tenantId,
+            Name = "Template",
+            Channel = CollectionChannel.Email,
+            Subject = "Assunto",
+            Body = "Body",
+            Type = TemplateType.Collection,
+            Active = true
+        });
+
+        db.Triggers.Add(new Trigger
+        {
+            Id = triggerId,
+            CollectionRuleId = ruleId,
+            TemplateId = templateId,
+            Channel = CollectionChannel.Email,
+            DaysOffset = 0,
+            Reference = TriggerReference.DueDate,
+            Order = 1,
+            Active = true
+        });
+
+        db.Dispatches.Add(new Dispatch
+        {
+            Id = dispatchId,
+            TitleId = titleId,
+            ContactId = contactId,
+            TriggerId = triggerId,
+            Channel = CollectionChannel.Email,
+            Status = DispatchStatus.Pending,
+            ScheduledFor = DateTime.UtcNow.AddMinutes(-1)
+        });
+
+        await db.SaveChangesAsync();
+
+        using var keyDir = new TempKeyDirectory();
+        var dataProtection = DataProtectionProvider.Create(keyDir.Path);
+        var service = new DispatchDeliveryService(db, dataProtection, NullLogger<DispatchDeliveryService>.Instance);
+
+        var processed = await service.ProcessPendingDispatchesAsync(tenantId);
+
+        Assert.Equal(0, processed);
+        var dispatch = db.Dispatches.Single(d => d.Id == dispatchId);
+        Assert.Equal(DispatchStatus.Cancelled, dispatch.Status);
+    }
+
+    [Fact]
     public async Task ProcessPendingDispatches_OutsideDispatchWindow_KeepsDispatchPending()
     {
         var db = TestDbContextFactory.Create();

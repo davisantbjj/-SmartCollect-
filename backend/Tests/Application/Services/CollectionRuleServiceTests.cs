@@ -137,6 +137,59 @@ public class CollectionRuleServiceTests
     }
 
     [Fact]
+    public async Task UpdateRule_DeactivatingRule_CancelsPendingDispatches()
+    {
+        var (svc, db, tenantId, templateId) = await SetupAsync();
+
+        var created = await svc.CreateAsync(tenantId, new CreateCollectionRuleRequest(
+            "Rule Disable", "Teste", true,
+            new List<CreateTriggerDto> { new(templateId, "Email", 0, "DueDate", 1, true) }));
+
+        var trigger = await db.Triggers
+            .SingleAsync(t => t.CollectionRuleId == created.Id && t.Order == 1);
+
+        var userId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var contactId = Guid.NewGuid();
+        var titleId = Guid.NewGuid();
+
+        db.Users.Add(new User { Id = userId, TenantId = tenantId, Name = "U", Email = "u@test.com", PasswordHash = "x", Role = UserRole.Admin, Active = true });
+        db.Clients.Add(new Client { Id = clientId, TenantId = tenantId, UserId = userId, LegalName = "Cliente", TaxId = "999" });
+        db.Contacts.Add(new Contact { Id = contactId, ClientId = clientId, Name = "Contato", Email = "contato@test.com", IsPrimary = true });
+        db.Titles.Add(new Title
+        {
+            Id = titleId,
+            TenantId = tenantId,
+            ClientId = clientId,
+            UniqueCode = "T-DISABLE-001",
+            Amount = 100,
+            DueDate = DateTime.UtcNow.AddDays(1),
+            IssueDate = DateTime.UtcNow,
+            Status = TitleStatus.Open
+        });
+        db.Dispatches.Add(new Dispatch
+        {
+            Id = Guid.NewGuid(),
+            TitleId = titleId,
+            ContactId = contactId,
+            TriggerId = trigger.Id,
+            Channel = CollectionChannel.Email,
+            Status = DispatchStatus.Pending,
+            ScheduledFor = DateTime.UtcNow.AddMinutes(-1)
+        });
+        await db.SaveChangesAsync();
+
+        var updated = await svc.UpdateAsync(tenantId, created.Id, new CreateCollectionRuleRequest(
+            "Rule Disable", "Teste", false,
+            new List<CreateTriggerDto> { new(templateId, "Email", 0, "DueDate", 1, true) }));
+
+        Assert.NotNull(updated);
+
+        var dispatch = await db.Dispatches.SingleAsync(d => d.TitleId == titleId);
+        Assert.Equal(DispatchStatus.Cancelled, dispatch.Status);
+    }
+
+    [Fact]
     public async Task List_WhenCreatingDefaultRules_UsesBothChannelInCombinedTriggers()
     {
         var db = TestDbContextFactory.Create();

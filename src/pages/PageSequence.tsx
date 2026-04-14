@@ -23,7 +23,6 @@ interface TriggerFormItem {
   daysOffset: number;
   reference: string;
   order: number;
-  active: boolean;
 }
 
 const newTrigger = (): TriggerFormItem => ({
@@ -32,7 +31,6 @@ const newTrigger = (): TriggerFormItem => ({
   daysOffset: 0,
   reference: "DueDate",
   order: 1,
-  active: true,
 });
 
 export const PageSequence = ({
@@ -133,7 +131,6 @@ export const PageSequence = ({
               daysOffset: tr.daysOffset,
               reference: tr.reference,
               order: tr.order,
-              active: tr.active,
             }))
         : [{ ...newTrigger(), templateId: templates[0]?.id ?? "" }]
     );
@@ -186,7 +183,7 @@ export const PageSequence = ({
         daysOffset: Number(tr.daysOffset),
         reference: tr.reference,
         order: idx + 1,
-        active: tr.active,
+        active: true,
       })),
     };
 
@@ -367,9 +364,19 @@ export const PageSequence = ({
       >
         <div className="grid grid-cols-2 gap-3.5 mb-4">
           <FormInput label="Nome" value={ruleName} onChange={e => setRuleName(e.target.value)} />
-          <div className="flex items-center gap-2 mt-6">
-            <input id="rule-active" type="checkbox" checked={ruleActive} onChange={e => setRuleActive(e.target.checked)} className="accent-accent" />
-            <label htmlFor="rule-active" className="text-sm text-text-secondary">Régua ativa</label>
+          <div className="flex items-center justify-start mt-6">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={ruleActive}
+              onClick={() => setRuleActive(prev => !prev)}
+              className={`inline-flex items-center gap-2 rounded-full border px-2 py-1 text-xs font-semibold transition-colors ${ruleActive ? "border-success/30 bg-success/12 text-success" : "border-border-subtle-2 bg-surface-2 text-text-muted"}`}
+            >
+              <span className={`h-4 w-7 rounded-full p-[2px] transition-colors ${ruleActive ? "bg-success/75" : "bg-text-muted/40"}`}>
+                <span className={`block h-3 w-3 rounded-full bg-white transition-transform ${ruleActive ? "translate-x-3" : "translate-x-0"}`} />
+              </span>
+              <span>Régua ativa</span>
+            </button>
           </div>
           <div className="col-span-2">
             <FormInput label="Descrição" value={ruleDescription} onChange={e => setRuleDescription(e.target.value)} />
@@ -384,7 +391,6 @@ export const PageSequence = ({
                 <th className="px-3 py-2 text-left text-xs font-bold uppercase text-text-muted">Canal</th>
                 <th className="px-3 py-2 text-left text-xs font-bold uppercase text-text-muted">Referência</th>
                 <th className="px-3 py-2 text-left text-xs font-bold uppercase text-text-muted">Offset</th>
-                <th className="px-3 py-2 text-left text-xs font-bold uppercase text-text-muted">Ativo</th>
                 <th className="px-3 py-2 text-left text-xs font-bold uppercase text-text-muted">Ações</th>
               </tr>
             </thead>
@@ -422,9 +428,6 @@ export const PageSequence = ({
                   </td>
                   <td className="px-3 py-2">
                     <FormInput type="number" value={String(tr.daysOffset)} onChange={e => setTriggerAt(idx, old => ({ ...old, daysOffset: Number(e.target.value || 0) }))} />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input type="checkbox" checked={tr.active} onChange={e => setTriggerAt(idx, old => ({ ...old, active: e.target.checked }))} className="accent-accent" />
                   </td>
                   <td className="px-3 py-2">
                     <Button size="sm" variant="danger" onClick={() => removeTrigger(idx)} disabled={triggers.length === 1}>Remover</Button>

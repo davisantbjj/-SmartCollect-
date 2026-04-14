@@ -32,6 +32,19 @@ public class CollectionRuleService : ICollectionRuleService
             : CollectionChannel.Email;
     }
 
+    private async Task CancelPendingDispatchesByTriggerIdsAsync(IReadOnlyCollection<Guid> triggerIds)
+    {
+        if (triggerIds.Count == 0)
+            return;
+
+        var pending = await _db.Dispatches
+            .Where(d => triggerIds.Contains(d.TriggerId) && d.Status == DispatchStatus.Pending)
+            .ToListAsync();
+
+        foreach (var dispatch in pending)
+            dispatch.Status = DispatchStatus.Cancelled;
+    }
+
     private async Task EnsureDefaultRuleAsync(Guid tenantId)
     {
         var existingRuleNames = await _db.CollectionRules
@@ -205,7 +218,7 @@ public class CollectionRuleService : ICollectionRuleService
                     DaysOffset = t.DaysOffset,
                     Reference = refr,
                     Order = t.Order,
-                    Active = t.Active
+                    Active = true
                 };
             }).ToList()
         };
@@ -235,14 +248,20 @@ public class CollectionRuleService : ICollectionRuleService
             .Where(t => t.CollectionRuleId == rule.Id)
             .ToListAsync();
 
+        var existingTriggerIds = existingTriggers.Select(t => t.Id).ToList();
+
+        if (!request.Active)
+            await CancelPendingDispatchesByTriggerIdsAsync(existingTriggerIds);
+
         if (existingTriggers.Count > 0)
         {
-            var existingTriggerIds = existingTriggers.Select(t => t.Id).ToList();
             var referencedTriggerIds = await _db.Dispatches
                 .Where(d => existingTriggerIds.Contains(d.TriggerId))
                 .Select(d => d.TriggerId)
                 .Distinct()
                 .ToListAsync();
+
+            await CancelPendingDispatchesByTriggerIdsAsync(referencedTriggerIds);
 
             foreach (var trigger in existingTriggers.Where(t => referencedTriggerIds.Contains(t.Id)))
                 trigger.Active = false;
@@ -269,7 +288,7 @@ public class CollectionRuleService : ICollectionRuleService
                 DaysOffset = t.DaysOffset,
                 Reference = refr,
                 Order = t.Order,
-                Active = t.Active
+                Active = true
             };
         }).ToList();
 
@@ -302,6 +321,8 @@ public class CollectionRuleService : ICollectionRuleService
 
                 foreach (var trigger in rule.Triggers)
                     trigger.Active = false;
+
+                await CancelPendingDispatchesByTriggerIdsAsync(triggerIds);
 
                 await _db.SaveChangesAsync();
                 return true;

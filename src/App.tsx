@@ -225,15 +225,18 @@ export default function SmartCollect() {
   useEffect(() => {
     if (!session) return;
 
+    const masterBasePages: PageId[] = ["dashboard", "analytics", "tenants"];
+    const adminOperationalPages: PageId[] = ["titles", "import", "contacts", "sequence", "templates", "integration", "workers"];
+
     const allowedByRole: Record<string, PageId[]> = {
-      Master: ["dashboard", "analytics", "titles", "tenants"],
+      Master: selectedTenantId ? [...masterBasePages, ...adminOperationalPages] : masterBasePages,
       Admin: ["dashboard", "analytics", "titles", "import", "contacts", "sequence", "templates", "integration", "workers"],
       Worker: ["dashboard", "analytics", "titles", "import", "contacts", "sequence", "templates"],
     };
 
     const allowed = allowedByRole[session.role] ?? ["dashboard"];
     if (!allowed.includes(page)) setPage("dashboard");
-  }, [session, page]);
+  }, [session, page, selectedTenantId]);
 
   // ── Login screen ─────────────────────────────────────────────────────────
   if (!session) {
@@ -397,6 +400,7 @@ export default function SmartCollect() {
         isDark={isDark}
         toggleTheme={toggleTheme}
         session={session}
+        selectedTenantId={selectedTenantId}
         showToast={showToast}
         onSessionUpdate={setSessionState}
         onLogout={handleLogout}

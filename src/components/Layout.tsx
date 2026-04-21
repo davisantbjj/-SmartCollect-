@@ -87,8 +87,26 @@ const PAGE_META: Record<string, [string, string]> = {
   tenants: [t("pageMeta.tenants.title"), t("pageMeta.tenants.subtitle")],
 };
 
-function navByRole(role: string) {
+function navByRole(role: string, hasOperationalTenantScope = false) {
   if (role === "Master") {
+    if (!hasOperationalTenantScope) {
+      return [
+        {
+          section: t("nav.overview"),
+          items: [
+            { id: "dashboard", icon: "dashboard", label: t("nav.dashboard") },
+            { id: "analytics", icon: "analytics", label: t("nav.analytics") },
+          ],
+        },
+        {
+          section: t("nav.configuration"),
+          items: [
+            { id: "tenants", icon: "users", label: t("nav.tenants") },
+          ],
+        },
+      ];
+    }
+
     return [
       {
         section: t("nav.overview"),
@@ -98,8 +116,20 @@ function navByRole(role: string) {
         ],
       },
       {
+        section: t("nav.collection"),
+        items: [
+          { id: "titles", icon: "document", label: t("nav.titles") },
+          { id: "import", icon: "upload", label: t("nav.importData") },
+          { id: "contacts", icon: "users", label: t("nav.contactsCRM") },
+          { id: "workers", icon: "users", label: t("nav.workers") },
+        ],
+      },
+      {
         section: t("nav.configuration"),
         items: [
+          { id: "sequence", icon: "settings", label: t("nav.collectionSequence") },
+          { id: "templates", icon: "mail", label: t("nav.templates") },
+          { id: "integration", icon: "link", label: t("nav.integrationSMTP") },
           { id: "tenants", icon: "users", label: t("nav.tenants") },
         ],
       },
@@ -168,6 +198,7 @@ export const Sidebar = ({
   isDark,
   toggleTheme,
   session,
+  selectedTenantId,
   showToast,
   onSessionUpdate,
   onLogout,
@@ -177,11 +208,12 @@ export const Sidebar = ({
   isDark: boolean;
   toggleTheme: () => void;
   session: StoredSession;
+  selectedTenantId?: string;
   showToast: ShowToast;
   onSessionUpdate: (session: StoredSession) => void;
   onLogout: () => void;
 }) => {
-  const nav = navByRole(session.role);
+  const nav = navByRole(session.role, session.role === "Master" && Boolean(selectedTenantId));
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileName, setProfileName] = useState(session.userName);
@@ -872,7 +904,7 @@ export const Topbar = ({
         )}
 
         {/* Only show Import button for Admin/Worker on operational pages */}
-        {!isMaster && page !== "workers" && (
+        {(session.role === "Admin" || session.role === "Worker" || (session.role === "Master" && Boolean(selectedTenantId))) && page !== "workers" && (
           <Button variant="primary" onClick={onImport}>
             {ICONS.upload} {t("common.import")}
           </Button>

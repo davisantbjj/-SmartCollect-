@@ -9,6 +9,7 @@ import {
   getTemplates,
   createCollectionRule,
   updateCollectionRule,
+  deleteCollectionRule,
   type CollectionRuleResponse,
   type MessageTemplateResponse,
   type StoredSession,
@@ -22,7 +23,6 @@ interface TriggerFormItem {
   daysOffset: number;
   reference: string;
   order: number;
-  active: boolean;
 }
 
 const newTrigger = (): TriggerFormItem => ({
@@ -31,7 +31,6 @@ const newTrigger = (): TriggerFormItem => ({
   daysOffset: 0,
   reference: "DueDate",
   order: 1,
-  active: true,
 });
 
 export const PageSequence = ({
@@ -45,6 +44,7 @@ export const PageSequence = ({
   const [templates, setTemplates] = useState<MessageTemplateResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null);
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
@@ -52,9 +52,11 @@ export const PageSequence = ({
   const [ruleDescription, setRuleDescription] = useState("");
   const [ruleActive, setRuleActive] = useState(true);
   const [triggers, setTriggers] = useState<TriggerFormItem[]>([newTrigger()]);
+  const [selectedRuleId, setSelectedRuleId] = useState<string>("");
 
-  const canEdit = session.role === "Admin";
-  const activeRule = rules.find(r => r.active);
+  const canEdit = session.role === "Admin" || session.role === "Worker";
+  const activeRules = rules.filter(r => r.active);
+  const selectedRule = rules.find(r => r.id === selectedRuleId) ?? activeRules[0] ?? rules[0];
 
   const templatesById = useMemo(() => {
     const map = new Map<string, MessageTemplateResponse>();
@@ -87,11 +89,24 @@ export const PageSequence = ({
     void load();
   }, []);
 
+  useEffect(() => {
+    if (rules.length === 0) {
+      setSelectedRuleId("");
+      return;
+    }
+
+    if (rules.some(r => r.id === selectedRuleId))
+      return;
+
+    const preferred = rules.find(r => r.active) ?? rules[0];
+    setSelectedRuleId(preferred.id);
+  }, [rules, selectedRuleId]);
+
   const openNew = () => {
     setEditingRuleId(null);
     setRuleName("Nova Régua");
     setRuleDescription("");
-    setRuleActive(true);
+    setRuleActive(false);
     setTriggers([
       {
         ...newTrigger(),
@@ -116,7 +131,6 @@ export const PageSequence = ({
               daysOffset: tr.daysOffset,
               reference: tr.reference,
               order: tr.order,
-              active: tr.active,
             }))
         : [{ ...newTrigger(), templateId: templates[0]?.id ?? "" }]
     );
@@ -169,7 +183,7 @@ export const PageSequence = ({
         daysOffset: Number(tr.daysOffset),
         reference: tr.reference,
         order: idx + 1,
-        active: tr.active,
+        active: true,
       })),
     };
 
@@ -192,6 +206,32 @@ export const PageSequence = ({
     }
   };
 
+  const handleDeleteRule = async (rule: CollectionRuleResponse) => {
+    if (!canEdit)
+      return;
+
+    if (rule.isDefault) {
+      showToast(`${ICONS.info} Esta é uma régua padrão e não pode ser excluída.`, "info");
+      return;
+    }
+
+    const confirmed = window.confirm(`Excluir a régua \"${rule.name}\"? Esta ação não pode ser desfeita.`);
+    if (!confirmed)
+      return;
+
+    try {
+      setDeletingRuleId(rule.id);
+      await deleteCollectionRule(rule.id);
+      showToast(`${ICONS.checkmark} Régua excluída com sucesso!`, "success");
+      await load();
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Erro ao excluir régua.";
+      showToast(`${ICONS.cross} ${msg}`, "error");
+    } finally {
+      setDeletingRuleId(null);
+    }
+  };
+
   const stopRules = [
     { color: colors.success, bg: `${colors.success}0d`, border: `${colors.success}30`, icon: ICONS.checkmark, title: t("sequence.rule.paidTitle"), desc: t("sequence.rule.paidDesc") },
     { color: colors.text3, bg: `${colors.text3}0d`, border: `${colors.text3}30`, icon: ICONS.cross, title: t("sequence.rule.cancelledTitle"), desc: t("sequence.rule.cancelledDesc") },
@@ -203,20 +243,9 @@ export const PageSequence = ({
 
   return (
     <div className="animate-fade-up">
-      <div className="flex justify-between items-center mb-[22px]">
-        <div>
-          {activeRule
-            ? <span className="text-sm text-success font-semibold">{ICONS.checkmark} Régua ativa: <strong>{activeRule.name}</strong></span>
-            : <span className="text-sm text-warn font-semibold">{ICONS.warning} Nenhuma régua ativa</span>
-          }
-        </div>
+      <div className="flex justify-end items-center mb-[22px]">
         {canEdit && (
           <div className="flex gap-2">
-            {activeRule && (
-              <Button variant="secondary" onClick={() => openEdit(activeRule)}>
-                {ICONS.pencil} Editar Ativa
-              </Button>
-            )}
             <Button variant="primary" onClick={openNew}>
               {ICONS.plus} Nova Régua
             </Button>
@@ -228,14 +257,14 @@ export const PageSequence = ({
         <div className="bg-surface border border-border-subtle rounded-[14px] overflow-hidden">
           <CardHeader title={<>{ICONS.timer} {t("sequence.sendTriggers")}</>} subtitle={t("sequence.triggerSubtitle")} />
           <div className="p-5 relative">
-            {activeRule && activeRule.triggers.length > 0 ? (
+            {selectedRule && selectedRule.triggers.length > 0 ? (
               <>
                 <div
                   className="absolute left-[40px] top-[40px] bottom-[40px] w-[2px] z-0"
                   style={{ background: `linear-gradient(to bottom, ${colors.accent}, ${colors.accent})` }}
                 />
                 <div className="flex flex-col gap-0">
-                  {activeRule.triggers.map((tr, i) => (
+                  {selectedRule.triggers.map((tr, i) => (
                     <div key={tr.id ?? i} className="flex items-center gap-3.5 py-2.5 relative">
                       <div
                         className="w-[42px] h-[42px] rounded-full shrink-0 z-[1] flex items-center justify-center font-extrabold text-xs"
@@ -281,17 +310,38 @@ export const PageSequence = ({
               <div className="text-[11px] font-bold uppercase text-text-muted mb-2 tracking-wider">Todas as Réguas</div>
               <div className="flex flex-col gap-2">
                 {rules.map(rule => (
-                  <div key={rule.id} className={`flex items-center justify-between px-3 py-2 rounded-lg border ${rule.active ? "border-accent/30 bg-accent/5" : "border-border-subtle bg-surface-2"}`}>
+                  <div
+                    key={rule.id}
+                    onClick={() => setSelectedRuleId(rule.id)}
+                    className={`flex items-center justify-between px-3 py-2 rounded-lg border cursor-pointer ${selectedRule?.id === rule.id ? "border-accent bg-accent/10" : rule.active ? "border-accent/30 bg-accent/5" : "border-border-subtle bg-surface-2"}`}
+                  >
                     <div>
-                      <div className="text-sm font-semibold">{rule.name}</div>
+                      <div className="text-sm font-semibold flex items-center gap-2">
+                        <span>{rule.name}</span>
+                        {rule.isDefault && (
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-accent bg-accent/10 px-1.5 py-0.5 rounded-full">
+                            Régua padrão
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-text-muted">{rule.triggers.length} gatilhos</div>
                     </div>
                     <div className="flex items-center gap-2">
                       {rule.active && <span className="text-[11px] font-bold text-success bg-success/10 px-2 py-0.5 rounded-full">Ativa</span>}
                       {canEdit && (
-                        <Button size="sm" variant="secondary" onClick={() => openEdit(rule)}>
-                          {ICONS.pencil} Editar
-                        </Button>
+                        <>
+                          <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openEdit(rule); }}>
+                            {ICONS.pencil} Editar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={(e) => { e.stopPropagation(); void handleDeleteRule(rule); }}
+                            disabled={deletingRuleId === rule.id || rule.isDefault}
+                          >
+                            {rule.isDefault ? "Padrão" : deletingRuleId === rule.id ? "Excluindo..." : "Excluir"}
+                          </Button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -314,9 +364,19 @@ export const PageSequence = ({
       >
         <div className="grid grid-cols-2 gap-3.5 mb-4">
           <FormInput label="Nome" value={ruleName} onChange={e => setRuleName(e.target.value)} />
-          <div className="flex items-center gap-2 mt-6">
-            <input id="rule-active" type="checkbox" checked={ruleActive} onChange={e => setRuleActive(e.target.checked)} className="accent-accent" />
-            <label htmlFor="rule-active" className="text-sm text-text-secondary">Régua ativa</label>
+          <div className="flex items-center justify-start mt-6">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={ruleActive}
+              onClick={() => setRuleActive(prev => !prev)}
+              className={`inline-flex items-center gap-2 rounded-full border px-2 py-1 text-xs font-semibold transition-colors ${ruleActive ? "border-success/30 bg-success/12 text-success" : "border-border-subtle-2 bg-surface-2 text-text-muted"}`}
+            >
+              <span className={`h-4 w-7 rounded-full p-[2px] transition-colors ${ruleActive ? "bg-success/75" : "bg-text-muted/40"}`}>
+                <span className={`block h-3 w-3 rounded-full bg-white transition-transform ${ruleActive ? "translate-x-3" : "translate-x-0"}`} />
+              </span>
+              <span>Régua ativa</span>
+            </button>
           </div>
           <div className="col-span-2">
             <FormInput label="Descrição" value={ruleDescription} onChange={e => setRuleDescription(e.target.value)} />
@@ -331,7 +391,6 @@ export const PageSequence = ({
                 <th className="px-3 py-2 text-left text-xs font-bold uppercase text-text-muted">Canal</th>
                 <th className="px-3 py-2 text-left text-xs font-bold uppercase text-text-muted">Referência</th>
                 <th className="px-3 py-2 text-left text-xs font-bold uppercase text-text-muted">Offset</th>
-                <th className="px-3 py-2 text-left text-xs font-bold uppercase text-text-muted">Ativo</th>
                 <th className="px-3 py-2 text-left text-xs font-bold uppercase text-text-muted">Ações</th>
               </tr>
             </thead>
@@ -369,9 +428,6 @@ export const PageSequence = ({
                   </td>
                   <td className="px-3 py-2">
                     <FormInput type="number" value={String(tr.daysOffset)} onChange={e => setTriggerAt(idx, old => ({ ...old, daysOffset: Number(e.target.value || 0) }))} />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input type="checkbox" checked={tr.active} onChange={e => setTriggerAt(idx, old => ({ ...old, active: e.target.checked }))} className="accent-accent" />
                   </td>
                   <td className="px-3 py-2">
                     <Button size="sm" variant="danger" onClick={() => removeTrigger(idx)} disabled={triggers.length === 1}>Remover</Button>

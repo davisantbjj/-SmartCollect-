@@ -41,4 +41,19 @@ public class ContactsController : ControllerBase
         var result = await _contactService.UpdateAsync(GetTenantId(), clientId, contactId, request);
         return result is null ? NotFound() : Ok(result);
     }
+
+    [HttpDelete("{contactId:guid}")]
+    [Authorize(Roles = "Admin,Worker")]
+    public async Task<IActionResult> Delete(Guid clientId, Guid contactId)
+    {
+        try
+        {
+            var removed = await _contactService.DeleteAsync(GetTenantId(), clientId, contactId);
+            return removed ? NoContent() : NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 }

@@ -337,6 +337,7 @@
     "selectProvider": "Selecionar provedor...",
     "numberId": "ID do número",
     "accessToken": "Token de acesso",
+    "apiBaseUrlOptional": "Base URL API (opcional)",
     "webhookUrl": "Webhook URL",
     "apiMockTitle": "API Externa – Atos Capital",
     "baseUrl": "Base URL:",

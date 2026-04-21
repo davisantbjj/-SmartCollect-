@@ -239,6 +239,7 @@ export const ChartTooltip = ({ active, payload, label }: any) => {
 export const ActivityLog = ({ logs = [] }: { logs?: ActivityLogEntry[] }) => {
   const getChannelIcon = (channel: string) => {
     const icons: Record<string, { symbol: string; label: string; color: string }> = {
+      both:      { symbol: ICONS.link, label: "E-mail + WhatsApp", color: colors.accent },
       wa:        { symbol: ICONS.chat, label: "WhatsApp",  color: colors.wa },
       instagram: { symbol: ICONS.camera, label: "Instagram", color: "#E4405F" },
       email:     { symbol: ICONS.mail, label: "E-mail",    color: colors.accent },

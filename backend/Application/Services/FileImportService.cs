@@ -17,6 +17,8 @@ public class FileImportService : IFileImportService
 {
     private readonly IAppDbContext _db;
     private readonly ILogger<FileImportService> _logger;
+    private readonly IDispatchExecutionGuard _dispatchExecutionGuard;
+    private readonly IDispatchDeliveryService? _dispatchDeliveryService;
 
     private static readonly HashSet<string> RequiredColumns = new(
         ["nome_cliente", "cnpj", "codigo_titulo", "valor", "status", "data_vencimento"],
@@ -40,10 +42,16 @@ public class FileImportService : IFileImportService
         new CultureInfo("pt-BR")
     ];
 
-    public FileImportService(IAppDbContext db, ILogger<FileImportService> logger)
+    public FileImportService(
+        IAppDbContext db,
+        ILogger<FileImportService> logger,
+        IDispatchExecutionGuard? dispatchExecutionGuard = null,
+        IDispatchDeliveryService? dispatchDeliveryService = null)
     {
         _db = db;
         _logger = logger;
+        _dispatchExecutionGuard = dispatchExecutionGuard ?? new InMemoryDispatchExecutionGuard();
+        _dispatchDeliveryService = dispatchDeliveryService;
     }
 
     public async Task<ImportResultResponse> UploadAsync(Guid tenantId, IFormFile file)
@@ -51,6 +59,8 @@ public class FileImportService : IFileImportService
         var tenantExists = await _db.Tenants.AnyAsync(t => t.Id == tenantId);
         if (!tenantExists)
             throw new InvalidOperationException("Tenant não encontrado para esta sessão. Faça login novamente.");
+
+        using var _ = _dispatchExecutionGuard.BlockTenant(tenantId);
 
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
         var type = extension switch
@@ -70,6 +80,9 @@ public class FileImportService : IFileImportService
         };
 
         await _db.FileImports.AddAsync(fileImport);
+
+        var titlesEligibleForAutomaticDispatch = new HashSet<Guid>();
+        var terminalTitles = new HashSet<Guid>();
 
         try
         {
@@ -148,7 +161,7 @@ public class FileImportService : IFileImportService
                             throw new InvalidOperationException($"Invalid issue date: '{rawIssueDate}'");
                     }
 
-                    var email = GetOptionalValue(row.Values, "email");
+                    var email = NormalizeEmail(GetOptionalValue(row.Values, "email"));
                     var phone = NormalizePhone(GetOptionalValue(row.Values, "telefone_whatsapp"));
                     var boletoUrl = GetOptionalValue(row.Values, "link_boleto");
                     var hasContactInfo = !string.IsNullOrWhiteSpace(email) || !string.IsNullOrWhiteSpace(phone);
@@ -216,6 +229,16 @@ public class FileImportService : IFileImportService
 
                         existingTitle.Status = finalStatus;
 
+                        if (finalStatus is TitleStatus.Paid or TitleStatus.Cancelled)
+                        {
+                            terminalTitles.Add(existingTitle.Id);
+                            titlesEligibleForAutomaticDispatch.Remove(existingTitle.Id);
+                        }
+                        else if (finalStatus is TitleStatus.Open or TitleStatus.Overdue)
+                        {
+                            titlesEligibleForAutomaticDispatch.Add(existingTitle.Id);
+                        }
+
                         var updateDescription = BuildImportUpdateDescription(
                             previousStatus,
                             existingTitle.Status,
@@ -264,7 +287,11 @@ public class FileImportService : IFileImportService
                             Description = $"Titulo criado com status {finalStatus}"
                         });
                         titlesByUniqueCode[uniqueCode] = title;
+
+                        if (finalStatus is TitleStatus.Open or TitleStatus.Overdue)
+                            titlesEligibleForAutomaticDispatch.Add(title.Id);
                     }
+
 
                     successRows++;
                 }
@@ -284,6 +311,15 @@ public class FileImportService : IFileImportService
             fileImport.SuccessRows = successRows;
             fileImport.ErrorRows = errorRows;
             fileImport.Status = errorRows == totalRows ? ImportStatus.Error : ImportStatus.Completed;
+
+            // Persist imported rows first so newly created titles are visible to scheduling queries.
+            await _db.SaveChangesAsync();
+
+            if (terminalTitles.Count > 0)
+                await AutomaticDispatchScheduler.CancelPendingForTitlesAsync(_db, terminalTitles);
+
+            if (titlesEligibleForAutomaticDispatch.Count > 0)
+                await AutomaticDispatchScheduler.EnsureDispatchesForTitlesAsync(_db, tenantId, titlesEligibleForAutomaticDispatch);
         }
         catch (Exception ex)
         {
@@ -297,6 +333,10 @@ public class FileImportService : IFileImportService
         }
 
         await _db.SaveChangesAsync();
+
+        if (fileImport.Status == ImportStatus.Completed && fileImport.SuccessRows > 0 && _dispatchDeliveryService is not null)
+            await _dispatchDeliveryService.ProcessPendingDispatchesAsync(tenantId);
+
         return ToResponse(fileImport);
     }
 
@@ -523,7 +563,7 @@ public class FileImportService : IFileImportService
             "open" or "aberto" or "em_aberto" => TitleStatus.Open,
             "pending_data" or "pendingdata" or "pendente_de_dados" or "pendente_dados" or "pendente" => TitleStatus.PendingData,
             "paid" or "pago" or "liquidado" or "recebido" => TitleStatus.Paid,
-            "overdue" or "em_atraso" or "vencido" or "atrasado" => TitleStatus.Overdue,
+            "overdue" or "em_atraso" => TitleStatus.Overdue,
             "cancelled" or "canceled" or "cancelado" => TitleStatus.Cancelled,
             _ => status
         };
@@ -531,7 +571,7 @@ public class FileImportService : IFileImportService
         return normalized is "open" or "aberto" or "em_aberto"
             or "pending_data" or "pendingdata" or "pendente_de_dados" or "pendente_dados" or "pendente"
             or "paid" or "pago" or "liquidado" or "recebido"
-            or "overdue" or "em_atraso" or "vencido" or "atrasado"
+            or "overdue" or "em_atraso"
             or "cancelled" or "canceled" or "cancelado";
     }
 
@@ -553,16 +593,41 @@ public class FileImportService : IFileImportService
         if (string.IsNullOrWhiteSpace(rawPhone))
             return null;
 
-        var digits = Regex.Replace(rawPhone, "\\D", string.Empty);
+        var value = rawPhone.Trim();
+        var hasExplicitCountryCode = value.StartsWith('+');
+        var lowered = value.ToLowerInvariant();
+        if (lowered is "-" or "n/a" or "na" or "null" or "nenhum" or "sem_telefone" or "sem_telefone_whatsapp")
+            return null;
 
-        // Accept common BR formats with or without +55 and persist as numeric canonical value.
+        var digits = Regex.Replace(value, "\\D", string.Empty);
+        if (digits.Length == 0)
+            return null;
+
+        // Accept common BR formats with or without +55 and persist in E.164 canonical format.
         if (digits.StartsWith("00", StringComparison.Ordinal))
             digits = digits[2..];
 
+        // Incomplete phone should not invalidate the whole row: treat as missing contact data.
         if (digits.Length is < 10 or > 13)
-            throw new InvalidOperationException($"Invalid phone number: '{rawPhone}'");
+            return null;
 
-        return digits;
+        if (!hasExplicitCountryCode && (digits.Length == 10 || digits.Length == 11))
+            digits = $"55{digits}";
+
+        return $"+{digits}";
+    }
+
+    private static string? NormalizeEmail(string? rawEmail)
+    {
+        if (string.IsNullOrWhiteSpace(rawEmail))
+            return null;
+
+        var value = rawEmail.Trim();
+        var normalized = value.ToLowerInvariant();
+        if (normalized is "-" or "n/a" or "na" or "null" or "nenhum" or "sem_email")
+            return null;
+
+        return value;
     }
 
     private static string BuildImportUpdateDescription(

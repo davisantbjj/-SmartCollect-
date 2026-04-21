@@ -28,6 +28,7 @@ TestResults/
 
 # Docs (optional)
 documentos/
+docs/
 
 # OS
 .DS_Store

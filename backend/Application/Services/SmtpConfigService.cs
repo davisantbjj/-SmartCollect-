@@ -51,7 +51,14 @@ public class SmtpConfigService : ISmtpConfigService
         tenant.SmtpUser = request.User;
 
         // RN20: protect secrets with authenticated encryption via ASP.NET Data Protection.
-        tenant.SmtpPasswordEncrypted = _protector.Protect(request.Password);
+        if (!string.IsNullOrWhiteSpace(request.Password))
+        {
+            tenant.SmtpPasswordEncrypted = _protector.Protect(request.Password);
+        }
+        else if (string.IsNullOrWhiteSpace(tenant.SmtpPasswordEncrypted))
+        {
+            throw new InvalidOperationException("Informe a senha SMTP para configuração inicial.");
+        }
 
         if (!string.IsNullOrWhiteSpace(request.SenderFrom) && request.SenderFrom.Contains('@'))
         {
@@ -76,9 +83,10 @@ public class SmtpConfigService : ISmtpConfigService
         try
         {
             var password = _protector.Unprotect(tenant.SmtpPasswordEncrypted);
+            var security = ResolveSmtpSecurity(tenant.SmtpPort.Value);
 
             using var smtp = new SmtpClient();
-            await smtp.ConnectAsync(tenant.SmtpHost, tenant.SmtpPort.Value, SecureSocketOptions.StartTlsWhenAvailable);
+            await smtp.ConnectAsync(tenant.SmtpHost, tenant.SmtpPort.Value, security);
             await smtp.AuthenticateAsync(tenant.SmtpUser, password);
             await smtp.DisconnectAsync(true);
 
@@ -90,4 +98,7 @@ public class SmtpConfigService : ISmtpConfigService
             return false;
         }
     }
+
+    private static SecureSocketOptions ResolveSmtpSecurity(int port)
+        => port == 465 ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTlsWhenAvailable;
 }

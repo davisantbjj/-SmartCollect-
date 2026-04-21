@@ -1,6 +1,7 @@
 using System.Text;
 using DotNetEnv;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
@@ -38,7 +39,15 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 });
-builder.Services.AddDataProtection();
+var dataProtectionBuilder = builder.Services.AddDataProtection()
+    .SetApplicationName("SmartCollect");
+
+var dataProtectionKeysPath = Environment.GetEnvironmentVariable("DATA_PROTECTION_KEYS_PATH");
+if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
+{
+    Directory.CreateDirectory(dataProtectionKeysPath);
+    dataProtectionBuilder.PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
+}
 
 var currentDir = Directory.GetCurrentDirectory();
 var currentEnvPath = Path.GetFullPath(Path.Combine(currentDir, ".env"));
@@ -142,6 +151,10 @@ if (applyMigrationsOnStartup)
     var db = scope.ServiceProvider.GetRequiredService<SmartCollect.Infrastructure.Data.AppDbContext>();
     db.Database.Migrate();
 
+    var configuredAdminEmail = (Environment.GetEnvironmentVariable("ADMIN_EMAIL") ?? "admin@atoscapital.com.br")
+        .ToLowerInvariant();
+    var configuredAdminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "Admin@2026!";
+
     // Normalize legacy data: Master users must be cross-tenant (TenantId = null)
     var legacyMasters = db.Set<SmartCollect.Domain.Entities.User>()
         .Where(u => u.Role == SmartCollect.Domain.Enums.UserRole.Master && u.TenantId != null)
@@ -186,21 +199,46 @@ if (applyMigrationsOnStartup)
             EmailDomain = "atoscapital.com.br"
         });
 
-        var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "Admin@2026!";
-        var adminEmail = Environment.GetEnvironmentVariable("ADMIN_EMAIL") ?? "admin@atoscapital.com.br";
-
         db.Set<SmartCollect.Domain.Entities.User>().Add(new SmartCollect.Domain.Entities.User
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
             Name = "Administrador",
-            Email = adminEmail.ToLowerInvariant(),
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword),
+            Email = configuredAdminEmail,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(configuredAdminPassword),
             Role = SmartCollect.Domain.Enums.UserRole.Admin,
             Active = true
         });
 
         db.SaveChanges();
+    }
+
+    var firstTenantId = db.Set<SmartCollect.Domain.Entities.Tenant>()
+        .OrderBy(t => t.CreatedAt)
+        .Select(t => t.Id)
+        .FirstOrDefault();
+
+    if (firstTenantId != Guid.Empty)
+    {
+        var hasConfiguredAdmin = db.Set<SmartCollect.Domain.Entities.User>().Any(u =>
+            u.TenantId == firstTenantId &&
+            u.Email == configuredAdminEmail);
+
+        if (!hasConfiguredAdmin)
+        {
+            db.Set<SmartCollect.Domain.Entities.User>().Add(new SmartCollect.Domain.Entities.User
+            {
+                Id = Guid.NewGuid(),
+                TenantId = firstTenantId,
+                Name = "Administrador",
+                Email = configuredAdminEmail,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(configuredAdminPassword),
+                Role = SmartCollect.Domain.Enums.UserRole.Admin,
+                Active = true
+            });
+
+            db.SaveChanges();
+        }
     }
 }
 

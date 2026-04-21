@@ -164,6 +164,7 @@ export interface SendCollectionRequest {
   channel?: string;
   subject?: string;
   body?: string;
+  contactIds?: string[];
 }
 
 export interface UpdateTitleStatusRequest {
@@ -177,6 +178,15 @@ export interface ClientResponse {
   tradeName?: string | null;
   contactCount: number;
   titleCount: number;
+  sendToAllContacts: boolean;
+  dispatchMode: "Primary" | "All" | "Selected";
+  selectedContactIds: string[];
+}
+
+export interface UpdateClientDispatchPreferenceRequest {
+  sendToAllContacts?: boolean;
+  dispatchMode?: "Primary" | "All" | "Selected";
+  selectedContactIds?: string[];
 }
 
 export interface CreateClientRequest {
@@ -254,6 +264,22 @@ export interface ExternalApiConfigRequest {
   clearToken?: boolean;
 }
 
+export interface DispatchWindowConfigResponse {
+  enabled: boolean;
+  timeZone: string;
+  startTime: string;
+  endTime: string;
+  pauseAutomaticDispatchDuringProcessing: boolean;
+}
+
+export interface DispatchWindowConfigRequest {
+  enabled: boolean;
+  timeZone: string;
+  startTime: string;
+  endTime: string;
+  pauseAutomaticDispatchDuringProcessing: boolean;
+}
+
 export interface MessageTemplateResponse {
   id: string;
   name: string;
@@ -307,6 +333,7 @@ export interface CollectionRuleResponse {
   description?: string | null;
   active: boolean;
   triggers: TriggerResponse[];
+  isDefault: boolean;
 }
 
 export interface CreateCollectionRuleRequest {
@@ -331,6 +358,24 @@ export interface SmtpConfigRequest {
   password?: string;
   senderFrom: string;
   senderName: string;
+}
+
+export type WhatsAppProvider = "Twilio" | "Z-API" | "Evolution API" | "360dialog";
+
+export interface WhatsAppConfigResponse {
+  provider: WhatsAppProvider;
+  numberId: string;
+  apiBaseUrl?: string | null;
+  hasAccessToken: boolean;
+  webhookUrl: string;
+}
+
+export interface WhatsAppConfigRequest {
+  provider: WhatsAppProvider;
+  numberId: string;
+  accessToken?: string;
+  apiBaseUrl?: string;
+  clearToken?: boolean;
 }
 
 export interface TenantResponse {
@@ -674,6 +719,13 @@ export async function createClient(payload: CreateClientRequest) {
   });
 }
 
+export async function updateClientDispatchPreference(clientId: string, payload: UpdateClientDispatchPreferenceRequest) {
+  return request<ClientResponse>(`/api/clients/${clientId}/dispatch-preference`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
 // ── Contacts ──────────────────────────────────────────────────────────────
 
 export async function getContactsByClient(clientId: string) {
@@ -695,6 +747,12 @@ export async function updateContact(
   return request<ContactResponse>(`/api/clients/${clientId}/contacts/${contactId}`, {
     method: "PUT",
     body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteContact(clientId: string, contactId: string) {
+  return request<void>(`/api/clients/${clientId}/contacts/${contactId}`, {
+    method: "DELETE",
   });
 }
 
@@ -763,6 +821,12 @@ export async function updateCollectionRule(id: string, payload: CreateCollection
   });
 }
 
+export async function deleteCollectionRule(id: string) {
+  return request<void>(`/api/collection-rules/${id}`, {
+    method: "DELETE",
+  });
+}
+
 // ── SMTP Config ───────────────────────────────────────────────────────────
 
 export async function getSmtpConfig() {
@@ -780,6 +844,21 @@ export async function testSmtpConfig() {
   return request<{ message: string }>("/api/config/smtp/test", { method: "POST" });
 }
 
+export async function getWhatsAppConfig() {
+  return request<WhatsAppConfigResponse>("/api/config/whatsapp");
+}
+
+export async function saveWhatsAppConfig(payload: WhatsAppConfigRequest) {
+  return request<{ message: string }>("/api/config/whatsapp", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function testWhatsAppConfig() {
+  return request<{ message: string }>("/api/config/whatsapp/test", { method: "POST" });
+}
+
 export async function getExternalApiConfig() {
   return request<ExternalApiConfigResponse>("/api/config/external-api");
 }
@@ -793,6 +872,17 @@ export async function saveExternalApiConfig(payload: ExternalApiConfigRequest) {
 
 export async function testExternalApiConfig() {
   return request<{ message: string }>("/api/config/external-api/test", { method: "POST" });
+}
+
+export async function getDispatchWindowConfig() {
+  return request<DispatchWindowConfigResponse>("/api/config/dispatch-window");
+}
+
+export async function saveDispatchWindowConfig(payload: DispatchWindowConfigRequest) {
+  return request<{ message: string }>("/api/config/dispatch-window", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 // ── Workers (Admin only) ──────────────────────────────────────────────────

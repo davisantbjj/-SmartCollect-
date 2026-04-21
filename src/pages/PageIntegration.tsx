@@ -5,13 +5,51 @@ import { colors } from "../utils/colors";
 import { t } from "../i18n";
 import {
   ApiError, getSmtpConfig, saveSmtpConfig, testSmtpConfig,
+  getWhatsAppConfig, saveWhatsAppConfig, testWhatsAppConfig,
   getSyncHealth,
   getExternalApiConfig,
   saveExternalApiConfig,
   testExternalApiConfig,
+  getDispatchWindowConfig,
+  saveDispatchWindowConfig,
   type SmtpConfigResponse, type StoredSession, type SyncHealthResponse,
+  type WhatsAppProvider,
 } from "../services/api";
 import type { ShowToast } from "../types";
+
+const normalizeTwilioSender = (raw: string) => {
+  const text = raw.trim().replace(/^whatsapp:/i, "");
+  if (!text) return "";
+
+  const hasPlus = text.startsWith("+");
+  let digits = text.replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("00")) digits = digits.slice(2);
+
+  if (hasPlus) return `+${digits}`;
+  if (digits.length === 10 || digits.length === 11) return `+55${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  return `+${digits}`;
+};
+
+const normalizeTwilioAccountSid = (raw: string) => {
+  const text = raw.trim();
+  if (!text) return "";
+  if (text.toUpperCase().startsWith("AC")) return text;
+
+  const match = text.match(/\/Accounts\/(AC[a-zA-Z0-9]+)/i);
+  if (match?.[1]) return match[1];
+
+  return text;
+};
+
+const getBrowserTimeZone = () => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+};
 
 export const PageIntegration = ({
   showToast,
@@ -28,6 +66,17 @@ export const PageIntegration = ({
   const [syncHealth, setSyncHealth] = useState<SyncHealthResponse | null>(null);
   const [syncHealthLoading, setSyncHealthLoading] = useState(true);
 
+  const [waLoading, setWaLoading] = useState(true);
+  const [waSaving, setWaSaving] = useState(false);
+  const [waTesting, setWaTesting] = useState(false);
+  const [waConfigured, setWaConfigured] = useState(false);
+  const [waProvider, setWaProvider] = useState<WhatsAppProvider>("Twilio");
+  const [waNumberId, setWaNumberId] = useState("");
+  const [waToken, setWaToken] = useState("");
+  const [waApiBaseUrl, setWaApiBaseUrl] = useState("");
+  const [waWebhookUrl, setWaWebhookUrl] = useState("https://smartcollect.app/webhook/whatsapp");
+  const [waClearToken, setWaClearToken] = useState(false);
+
   const [apiLoading, setApiLoading] = useState(true);
   const [apiSaving, setApiSaving] = useState(false);
   const [apiTesting, setApiTesting] = useState(false);
@@ -40,15 +89,24 @@ export const PageIntegration = ({
   const [apiToken, setApiToken] = useState("");
   const [clearApiToken, setClearApiToken] = useState(false);
 
+  const [windowLoading, setWindowLoading] = useState(true);
+  const [windowSaving, setWindowSaving] = useState(false);
+  const [dispatchWindowEnabled, setDispatchWindowEnabled] = useState(false);
+  const [dispatchWindowStartTime, setDispatchWindowStartTime] = useState("09:00");
+  const [dispatchWindowEndTime, setDispatchWindowEndTime] = useState("18:00");
+
   // Form state
   const [host, setHost] = useState("");
   const [port, setPort] = useState("587");
   const [user, setUser] = useState("");
   const [password, setPassword] = useState("");
+  const [showSmtpPassword, setShowSmtpPassword] = useState(false);
+  const [smtpSecurity, setSmtpSecurity] = useState<"TLS" | "SSL">("TLS");
   const [senderFrom, setSenderFrom] = useState("");
   const [senderName, setSenderName] = useState("");
 
   const canEdit = session.role === "Admin" || session.role === "Master";
+  const canEditDispatchWindow = session.role === "Admin";
 
   useEffect(() => {
     const load = async () => {
@@ -57,6 +115,7 @@ export const PageIntegration = ({
         setSmtp(data);
         setHost(data.host);
         setPort(String(data.port));
+        setSmtpSecurity(data.port === 465 ? "SSL" : "TLS");
         setUser(data.user);
         setSenderFrom(data.senderFrom);
         setSenderName(data.senderName);
@@ -72,6 +131,32 @@ export const PageIntegration = ({
       }
     };
     void load();
+  }, [showToast]);
+
+  const loadWhatsAppConfig = async () => {
+    try {
+      setWaLoading(true);
+      const data = await getWhatsAppConfig();
+      setWaProvider(data.provider);
+      setWaNumberId(data.numberId);
+      setWaApiBaseUrl(data.apiBaseUrl ?? "");
+      setWaWebhookUrl(data.webhookUrl);
+      setWaConfigured(data.hasAccessToken);
+      setWaToken("");
+      setWaClearToken(false);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        setWaConfigured(false);
+      } else {
+        showToast(`${ICONS.cross} Erro ao carregar config WhatsApp.`, "error");
+      }
+    } finally {
+      setWaLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadWhatsAppConfig();
   }, [showToast]);
 
   const loadSyncHealth = async () => {
@@ -117,6 +202,32 @@ export const PageIntegration = ({
     void loadApiConfig();
   }, [showToast]);
 
+  const loadDispatchWindowConfig = async () => {
+    try {
+      setWindowLoading(true);
+      const data = await getDispatchWindowConfig();
+      setDispatchWindowEnabled(data.enabled);
+      setDispatchWindowStartTime(data.startTime || "09:00");
+      setDispatchWindowEndTime(data.endTime || "18:00");
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        // Backend antigo ou rota ainda não publicada: mantém defaults locais sem exibir erro.
+        setDispatchWindowEnabled(false);
+        setDispatchWindowStartTime("09:00");
+        setDispatchWindowEndTime("18:00");
+      } else {
+        const msg = err instanceof ApiError ? err.message : "Falha ao carregar janela de envio.";
+        showToast(`${ICONS.cross} ${msg}`, "error");
+      }
+    } finally {
+      setWindowLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadDispatchWindowConfig();
+  }, [showToast]);
+
   const handleSave = async () => {
     if (!host || !port || !user) {
       showToast(`${ICONS.warning} Host, porta e usuário são obrigatórios.`, "warn");
@@ -137,6 +248,97 @@ export const PageIntegration = ({
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const getWaNumberLabel = () => {
+    if (waProvider === "Twilio") return "Número remetente (E.164)";
+    if (waProvider === "Z-API") return "ID da instância";
+    if (waProvider === "Evolution API") return "Nome da instância";
+    return "Phone Number ID";
+  };
+
+  const getWaBaseLabel = () => {
+    if (waProvider === "Twilio") return "Account SID (Twilio)";
+    if (waProvider === "Evolution API") return "Base URL API (Evolution)";
+    return t("integration.apiBaseUrlOptional");
+  };
+
+  const getWaBasePlaceholder = () => {
+    if (waProvider === "Twilio") return "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+    if (waProvider === "Evolution API") return "https://evolution.seudominio.com";
+    return "https://api.provedor.com";
+  };
+
+  const getWaTokenLabel = () => {
+    if (waProvider === "Twilio") return waConfigured ? "Auth Token (deixe vazio para manter)" : "Auth Token (Twilio)";
+    if (waProvider === "360dialog") return waConfigured ? "API Key (deixe vazio para manter)" : "API Key (360dialog)";
+    return waConfigured ? "Token de acesso (deixe vazio para manter)" : "Token de acesso";
+  };
+
+  const getWaNumberPlaceholder = () => {
+    if (waProvider === "Twilio") return "+14155238886 (sandbox) ou +55DDDNÚMERO";
+    if (waProvider === "Z-API") return "instance-id";
+    if (waProvider === "Evolution API") return "instance-name";
+    return "Phone Number ID";
+  };
+
+  const handleSaveWhatsApp = async () => {
+    const normalizedNumberId = waProvider === "Twilio"
+      ? normalizeTwilioSender(waNumberId)
+      : waNumberId.trim();
+
+    const normalizedApiBaseUrl = waProvider === "Twilio"
+      ? normalizeTwilioAccountSid(waApiBaseUrl)
+      : waApiBaseUrl.trim();
+
+    if (!normalizedNumberId) {
+      showToast(`${ICONS.warning} ${getWaNumberLabel()} é obrigatório.`, "warn");
+      return;
+    }
+
+    if (waProvider === "Twilio" && !normalizedApiBaseUrl) {
+      showToast(`${ICONS.warning} Account SID (Twilio) é obrigatório.`, "warn");
+      return;
+    }
+
+    if (waProvider === "Evolution API" && !normalizedApiBaseUrl) {
+      showToast(`${ICONS.warning} Base URL da Evolution API é obrigatória.`, "warn");
+      return;
+    }
+
+    try {
+      setWaSaving(true);
+      await saveWhatsAppConfig({
+        provider: waProvider,
+        numberId: normalizedNumberId,
+        accessToken: waToken.trim() || undefined,
+        apiBaseUrl: normalizedApiBaseUrl || undefined,
+        clearToken: waClearToken,
+      });
+      setWaConfigured(waClearToken ? false : (waToken.trim() ? true : waConfigured));
+      setWaToken("");
+      setWaClearToken(false);
+      showToast(`${ICONS.checkmark} Configuração WhatsApp salva com sucesso.`, "success");
+      await loadWhatsAppConfig();
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Erro ao salvar configuração WhatsApp.";
+      showToast(`${ICONS.cross} ${msg}`, "error");
+    } finally {
+      setWaSaving(false);
+    }
+  };
+
+  const handleTestWhatsApp = async () => {
+    try {
+      setWaTesting(true);
+      const res = await testWhatsAppConfig();
+      showToast(`${ICONS.checkmark} ${res.message}`, "success");
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Falha ao validar configuração WhatsApp.";
+      showToast(`${ICONS.cross} ${msg}`, "error");
+    } finally {
+      setWaTesting(false);
     }
   };
 
@@ -203,13 +405,33 @@ export const PageIntegration = ({
     }
   };
 
+  const handleSaveDispatchWindow = async () => {
+    if (!dispatchWindowStartTime.trim() || !dispatchWindowEndTime.trim()) {
+      showToast(`${ICONS.warning} Informe horario inicial e horario final.`, "warn");
+      return;
+    }
+
+    try {
+      setWindowSaving(true);
+      const response = await saveDispatchWindowConfig({
+        enabled: dispatchWindowEnabled,
+        timeZone: getBrowserTimeZone(),
+        startTime: dispatchWindowStartTime.trim(),
+        endTime: dispatchWindowEndTime.trim(),
+        pauseAutomaticDispatchDuringProcessing: true,
+      });
+      showToast(`${ICONS.checkmark} ${response.message}`, "success");
+      await loadDispatchWindowConfig();
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Falha ao salvar janela de envio.";
+      showToast(`${ICONS.cross} ${msg}`, "error");
+    } finally {
+      setWindowSaving(false);
+    }
+  };
+
   return (
     <div className="animate-fade-up">
-      <div className="mb-4 bg-accent/[0.08] border border-accent/25 rounded-xl px-4 py-3 text-[12.5px] text-text-secondary">
-        <strong className="text-text-primary">Tela de Integracao = configuracao.</strong> Configure SMTP, WhatsApp e API externa aqui.
-        A tela de Importacao e para operacao (upload e sincronizacao manual).
-      </div>
-
       <div className="grid grid-cols-2 gap-4 mb-4">
         {/* SMTP */}
         <div className="bg-surface border border-border-subtle rounded-[14px] overflow-hidden">
@@ -233,9 +455,57 @@ export const PageIntegration = ({
               <>
                 <div className="grid grid-cols-2 gap-3.5">
                   <FormInput label={t("integration.smtpHost")} value={host} onChange={e => setHost(e.target.value)} disabled={!canEdit} placeholder="mail.empresa.com.br" />
-                  <FormInput label={t("integration.port")} value={port} onChange={e => setPort(e.target.value)} disabled={!canEdit} placeholder="587" type="number" />
+                  <div>
+                    <label className="text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted mb-[5px] block">Segurança SMTP</label>
+                    <select
+                      value={smtpSecurity}
+                      disabled={!canEdit}
+                      onChange={e => {
+                        const mode = e.target.value as "TLS" | "SSL";
+                        setSmtpSecurity(mode);
+                        setPort(mode === "SSL" ? "465" : "587");
+                      }}
+                      className="bg-surface-2 border border-border-subtle-2 rounded-lg px-[13px] py-[9px] text-[13px] text-text-primary outline-none w-full focus:border-accent disabled:opacity-70"
+                    >
+                      <option value="TLS">TLS (STARTTLS)</option>
+                      <option value="SSL">SSL/TLS</option>
+                    </select>
+                  </div>
+                  <FormInput label={t("integration.port")} value={port} onChange={e => setPort(e.target.value)} disabled={!canEdit} placeholder={smtpSecurity === "SSL" ? "465" : "587"} type="number" />
                   <FormInput label={t("integration.user")} value={user} onChange={e => setUser(e.target.value)} disabled={!canEdit} placeholder="financeiro@empresa.com.br" />
-                  <FormInput label={t("integration.password")} type="password" value={password} onChange={e => setPassword(e.target.value)} disabled={!canEdit} placeholder={isConfigured ? "••••••••" : "Senha SMTP"} />
+                  <div>
+                    <label className="text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted mb-[5px] block">{t("integration.password")}</label>
+                    <div className="relative">
+                      <input
+                        type={showSmtpPassword ? "text" : "password"}
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        disabled={!canEdit}
+                        placeholder={isConfigured ? "••••••••" : "Senha SMTP"}
+                        className="bg-surface-2 border border-border-subtle-2 rounded-lg px-[13px] py-[9px] text-[13px] text-text-primary outline-none w-full focus:border-accent disabled:opacity-70 pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSmtpPassword(v => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted"
+                        aria-label={showSmtpPassword ? "Ocultar senha SMTP" : "Exibir senha SMTP"}
+                      >
+                        {showSmtpPassword ? (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <path d="M3 3L21 21" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                            <path d="M10.58 10.58C10.21 10.95 10 11.46 10 12C10 13.1 10.9 14 12 14C12.54 14 13.05 13.79 13.42 13.42" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                            <path d="M9.88 5.09C10.56 4.92 11.27 4.83 12 4.83C16.58 4.83 20.41 8.18 21.17 12C20.9 13.38 20.2 14.64 19.17 15.6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                            <path d="M6.22 6.23C4.51 7.46 3.28 9.57 2.83 12C3.59 15.82 7.42 19.17 12 19.17C13.57 19.17 15.03 18.78 16.3 18.1" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                          </svg>
+                        ) : (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <path d="M2.83 12C3.59 8.18 7.42 4.83 12 4.83C16.58 4.83 20.41 8.18 21.17 12C20.41 15.82 16.58 19.17 12 19.17C7.42 19.17 3.59 15.82 2.83 12Z" stroke="currentColor" strokeWidth="1.8" />
+                            <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
                   <FormInput label={t("integration.senderFrom")} value={senderFrom} onChange={e => setSenderFrom(e.target.value)} disabled={!canEdit} placeholder="financeiro@empresa.com.br" />
                   <FormInput label={t("integration.senderName")} value={senderName} onChange={e => setSenderName(e.target.value)} disabled={!canEdit} placeholder="Financeiro – Empresa" />
                 </div>
@@ -266,33 +536,88 @@ export const PageIntegration = ({
           <CardHeader
             title={<>{ICONS.chat} {t("integration.whatsappTitle")}</>}
             subtitle={t("integration.whatsappSubtitle")}
-            right={<span className="bg-warn/[0.12] text-warn text-[11px] font-bold px-[9px] py-[3px] rounded-full">{t("common.pending")}</span>}
+            right={
+              waLoading ? null : (
+                <span className={`text-[11px] font-bold px-[9px] py-[3px] rounded-full ${
+                  waConfigured ? "bg-success/[0.12] text-success" : "bg-warn/[0.12] text-warn"
+                }`}>
+                  {waConfigured ? t("common.configured") : t("common.pending")}
+                </span>
+              )
+            }
           />
           <div className="p-5">
-            <div className="grid grid-cols-2 gap-3.5">
-              <div className="col-span-2">
-                <FormSelect label={t("integration.selectProvider")} disabled={!canEdit}>
-                  <option>{t("integration.selectProvider")}</option>
-                  <option>Twilio</option>
-                  <option>Z-API</option>
-                  <option>Evolution API</option>
-                  <option>360dialog</option>
-                </FormSelect>
-              </div>
-              <FormInput label={t("integration.numberId")} placeholder={t("integration.numberId")} disabled={!canEdit} />
-              <FormInput label={t("integration.accessToken")} type="password" placeholder={t("integration.accessToken")} disabled={!canEdit} />
-              <div className="col-span-2">
-                <label className="text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted mb-[5px] block">{t("integration.webhookUrl")}</label>
-                <input readOnly value="https://smartcollect.app/webhook/whatsapp"
-                  className="bg-surface-2 border border-white/[0.11] rounded-lg px-[13px] py-[9px] text-[13px] text-text-muted outline-none w-full" />
-              </div>
-            </div>
-            {canEdit && (
-              <div className="mt-4">
-                <Button size="sm" variant="primary" onClick={() => showToast(`${ICONS.checkmark} ${t("toast.configSaved")}`, "success")}>
-                  {t("common.save")}
-                </Button>
-              </div>
+            {waLoading ? (
+              <div className="text-sm text-text-muted py-4">Carregando...</div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div className="col-span-2">
+                    <FormSelect
+                      label={t("integration.selectProvider")}
+                      value={waProvider}
+                      onChange={e => setWaProvider(e.target.value as WhatsAppProvider)}
+                      disabled={!canEdit}
+                    >
+                      <option value="Twilio">Twilio</option>
+                      <option value="Z-API">Z-API</option>
+                      <option value="Evolution API">Evolution API</option>
+                      <option value="360dialog">360dialog</option>
+                    </FormSelect>
+                  </div>
+                  <FormInput
+                    label={getWaNumberLabel()}
+                    value={waNumberId}
+                    onChange={e => setWaNumberId(e.target.value)}
+                    placeholder={getWaNumberPlaceholder()}
+                    disabled={!canEdit}
+                  />
+                  <FormInput
+                    label={getWaTokenLabel()}
+                    type="password"
+                    value={waToken}
+                    onChange={e => setWaToken(e.target.value)}
+                    placeholder={waConfigured ? "••••••••" : t("integration.accessToken")}
+                    disabled={!canEdit}
+                  />
+                  <FormInput
+                    label={getWaBaseLabel()}
+                    value={waApiBaseUrl}
+                    onChange={e => setWaApiBaseUrl(e.target.value)}
+                    placeholder={getWaBasePlaceholder()}
+                    disabled={!canEdit}
+                  />
+                  <div className="col-span-2">
+                    <label className="text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted mb-[5px] block">{t("integration.webhookUrl")}</label>
+                    <input
+                      readOnly
+                      value={waWebhookUrl}
+                      className="bg-surface-2 border border-white/[0.11] rounded-lg px-[13px] py-[9px] text-[13px] text-text-muted outline-none w-full"
+                    />
+                  </div>
+                  {waConfigured && canEdit && (
+                    <label className="col-span-2 flex items-center gap-2 text-xs text-text-muted">
+                      <input
+                        type="checkbox"
+                        checked={waClearToken}
+                        onChange={e => setWaClearToken(e.target.checked)}
+                        className="accent-accent"
+                      />
+                      Limpar token salvo
+                    </label>
+                  )}
+                </div>
+                {canEdit && (
+                  <div className="mt-4 flex gap-2.5">
+                    <Button size="sm" variant="secondary" onClick={handleTestWhatsApp}>
+                      {waTesting ? "Validando..." : <>{ICONS.checkmark} Validar</>}
+                    </Button>
+                    <Button size="sm" variant="primary" onClick={handleSaveWhatsApp}>
+                      {waSaving ? "Salvando..." : t("common.save")}
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -443,6 +768,104 @@ export const PageIntegration = ({
               {apiTesting ? "Testando..." : <>{ICONS.testTube} {t("integration.testEndpoint")}</>}
             </Button>
           </div>
+        </div>
+      </div>
+
+      <div className="bg-surface border border-border-subtle rounded-[14px] overflow-hidden mt-4">
+        <CardHeader
+          title={<>{ICONS.timer} Janela de envio automatico</>}
+          subtitle="Somente Admin pode configurar. Fora da janela, apenas envio manual e permitido."
+          right={
+            <span className={`${dispatchWindowEnabled ? "bg-success/[0.12] text-success" : "bg-warn/[0.12] text-warn"} text-[11px] font-bold px-[9px] py-[3px] rounded-full`}>
+              {dispatchWindowEnabled ? "Ativa" : "Desativada"}
+            </span>
+          }
+        />
+        <div className="p-5">
+          {windowLoading ? (
+            <div className="text-sm text-text-muted py-4">Carregando configuracao...</div>
+          ) : (
+            <>
+              <div className="mb-4 rounded-xl border border-border-subtle bg-surface-2 px-4 py-3 flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-text-primary">Ativar janela de envio automatico</div>
+                  <div className="text-xs text-text-muted mt-0.5">Fuso detectado automaticamente do navegador: {getBrowserTimeZone()}</div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={dispatchWindowEnabled}
+                  disabled={!canEditDispatchWindow}
+                  onClick={() => setDispatchWindowEnabled(prev => !prev)}
+                  className={`inline-flex items-center gap-2 rounded-full border px-2 py-1 text-xs font-semibold transition-colors ${dispatchWindowEnabled ? "border-success/30 bg-success/12 text-success" : "border-border-subtle-2 bg-surface text-text-muted"} ${!canEditDispatchWindow ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
+                >
+                  <span className={`h-4 w-7 rounded-full p-[2px] transition-colors ${dispatchWindowEnabled ? "bg-success/75" : "bg-text-muted/40"}`}>
+                    <span className={`block h-3 w-3 rounded-full bg-white transition-transform ${dispatchWindowEnabled ? "translate-x-3" : "translate-x-0"}`} />
+                  </span>
+                  <span>{dispatchWindowEnabled ? "Ativo" : "Inativo"}</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3.5 mb-4">
+                <div>
+                  <label className="text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted mb-[5px] block">Inicio</label>
+                  <input
+                    type="time"
+                    step={300}
+                    value={dispatchWindowStartTime}
+                    onChange={e => setDispatchWindowStartTime(e.target.value)}
+                    disabled={!canEditDispatchWindow}
+                    className="bg-surface-2 border border-border-subtle-2 rounded-lg px-[13px] py-[9px] text-[15px] text-text-primary outline-none w-full focus:border-accent disabled:opacity-70"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted mb-[5px] block">Fim</label>
+                  <input
+                    type="time"
+                    step={300}
+                    value={dispatchWindowEndTime}
+                    onChange={e => setDispatchWindowEndTime(e.target.value)}
+                    disabled={!canEditDispatchWindow}
+                    className="bg-surface-2 border border-border-subtle-2 rounded-lg px-[13px] py-[9px] text-[15px] text-text-primary outline-none w-full focus:border-accent disabled:opacity-70"
+                  />
+                </div>
+
+                <div className="col-span-2 flex flex-wrap gap-2">
+                  {[
+                    ["08:00", "18:00", "Comercial"],
+                    ["09:00", "18:00", "Padrao"],
+                    ["10:00", "19:00", "Tarde"],
+                  ].map(([start, end, label]) => (
+                    <button
+                      key={label}
+                      type="button"
+                      disabled={!canEditDispatchWindow}
+                      onClick={() => {
+                        setDispatchWindowStartTime(start);
+                        setDispatchWindowEndTime(end);
+                      }}
+                      className="text-xs px-3 py-1.5 rounded-full border border-border-subtle bg-surface-2 text-text-secondary hover:border-accent/50 hover:text-text-primary disabled:opacity-60"
+                    >
+                      {label}: {start} - {end}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="text-[12px] text-text-muted mb-4">
+                Regras: automatico respeita a janela configurada. Envio manual rapido pode ocorrer fora da janela. Pausa durante upload/sincronizacao e automatica.
+              </div>
+
+              {canEditDispatchWindow ? (
+                <Button size="sm" variant="primary" onClick={handleSaveDispatchWindow}>
+                  {windowSaving ? "Salvando..." : t("common.save")}
+                </Button>
+              ) : (
+                <div className="text-xs text-text-muted">Apenas Admin pode alterar essa configuracao.</div>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>

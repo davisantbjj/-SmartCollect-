@@ -12,12 +12,20 @@ using SmartCollect.Api.Security;
 public class ConfigController : ControllerBase
 {
     private readonly ISmtpConfigService _smtpService;
+    private readonly IWhatsAppConfigService _whatsAppService;
     private readonly ISyncService _syncService;
+    private readonly IDispatchWindowConfigService _dispatchWindowService;
 
-    public ConfigController(ISmtpConfigService smtpService, ISyncService syncService)
+    public ConfigController(
+        ISmtpConfigService smtpService,
+        IWhatsAppConfigService whatsAppService,
+        ISyncService syncService,
+        IDispatchWindowConfigService dispatchWindowService)
     {
         _smtpService = smtpService;
+        _whatsAppService = whatsAppService;
         _syncService = syncService;
+        _dispatchWindowService = dispatchWindowService;
     }
 
     private Guid GetTenantId() => TenantContextResolver.GetTenantIdOrThrow(User);
@@ -32,8 +40,15 @@ public class ConfigController : ControllerBase
     [HttpPost("smtp")]
     public async Task<IActionResult> SaveSmtp([FromBody] SmtpConfigRequest request)
     {
-        await _smtpService.SaveAsync(GetTenantId(), request);
-        return Ok(new { message = "Configuração SMTP salva com sucesso." });
+        try
+        {
+            await _smtpService.SaveAsync(GetTenantId(), request);
+            return Ok(new { message = "Configuração SMTP salva com sucesso." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpPost("smtp/test")]
@@ -43,6 +58,36 @@ public class ConfigController : ControllerBase
         return success
             ? Ok(new { message = "Conexão SMTP testada com sucesso." })
             : BadRequest(new { message = "Falha no teste SMTP. Verifique host, porta e credenciais." });
+    }
+
+    [HttpGet("whatsapp")]
+    public async Task<IActionResult> GetWhatsApp()
+    {
+        var result = await _whatsAppService.GetAsync(GetTenantId());
+        return result is null ? NotFound() : Ok(result);
+    }
+
+    [HttpPost("whatsapp")]
+    public async Task<IActionResult> SaveWhatsApp([FromBody] WhatsAppConfigRequest request)
+    {
+        try
+        {
+            await _whatsAppService.SaveAsync(GetTenantId(), request);
+            return Ok(new { message = "Configuração WhatsApp salva com sucesso." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("whatsapp/test")]
+    public async Task<IActionResult> TestWhatsApp()
+    {
+        var success = await _whatsAppService.TestAsync(GetTenantId());
+        return success
+            ? Ok(new { message = "Configuração WhatsApp validada com sucesso." })
+            : BadRequest(new { message = "Falha na validação WhatsApp. Verifique provedor, ID e token." });
     }
 
     [HttpGet("external-api")]
@@ -66,5 +111,26 @@ public class ConfigController : ControllerBase
         return connected
             ? Ok(new { message = "Conexão com API externa validada com sucesso." })
             : StatusCode(502, new { message = "Não foi possível conectar na API externa com a configuração atual." });
+    }
+
+    [HttpGet("dispatch-window")]
+    public async Task<IActionResult> GetDispatchWindow(CancellationToken cancellationToken)
+    {
+        var result = await _dispatchWindowService.GetAsync(GetTenantId(), cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("dispatch-window")]
+    public async Task<IActionResult> SaveDispatchWindow([FromBody] DispatchWindowConfigRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _dispatchWindowService.SaveAsync(GetTenantId(), request, cancellationToken);
+            return Ok(new { message = "Janela de envio salva com sucesso." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 }

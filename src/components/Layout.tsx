@@ -3,7 +3,7 @@ import { t } from "../i18n";
 import { ICONS, type IconKey } from "../utils/icons";
 import { colors } from "../utils/colors";
 import { Button, FormInput, Modal } from "./UI";
-import type { NavItem as NavItemType, ShowToast } from "../types";
+import type { NavItem as NavItemType, ShowToast, ToastLogEntry } from "../types";
 import { ApiError, getTemplates, getTitles, updateMyProfile, type StoredSession, type TenantResponse } from "../services/api";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5013";
@@ -14,6 +14,20 @@ interface NotificationItem {
   title: string;
   subtitle?: string;
   dismissible?: boolean;
+}
+
+function formatToastKind(kind: ToastLogEntry["type"]) {
+  if (kind === "error") return "ERRO";
+  if (kind === "warn") return "ALERTA";
+  if (kind === "success") return "SUCESSO";
+  return "INFO";
+}
+
+function toastKindClass(kind: ToastLogEntry["type"]) {
+  if (kind === "error") return "bg-danger/12 text-danger";
+  if (kind === "warn") return "bg-warn/12 text-warn";
+  if (kind === "success") return "bg-success/12 text-success";
+  return "bg-accent/12 text-accent";
 }
 
 function shortText(value: string, max = 88) {
@@ -431,6 +445,10 @@ export const Topbar = ({
   tenants,
   selectedTenantId,
   onSelectTenant,
+  toastLogs,
+  unreadToastCount,
+  onMarkToastLogsRead,
+  onClearToastLogs,
 }: {
   page: string;
   onImport: () => void;
@@ -439,6 +457,10 @@ export const Topbar = ({
   tenants: TenantResponse[];
   selectedTenantId?: string;
   onSelectTenant?: (tenantId: string) => void;
+  toastLogs: ToastLogEntry[];
+  unreadToastCount: number;
+  onMarkToastLogsRead: () => void;
+  onClearToastLogs: () => void;
 }) => {
   const [title, subtitle] = PAGE_META[page] || ["SmartCollect", ""];
   const showTenantSelector = session.role === "Master" && (page === "dashboard" || page === "analytics");
@@ -447,8 +469,10 @@ export const Topbar = ({
   const [isApiConnected, setIsApiConnected] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notificationsLoading, setNotificationsLoading] = useState(true);
+  const [notificationsInitialized, setNotificationsInitialized] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [dismissedNotificationIds, setDismissedNotificationIds] = useState<string[]>([]);
+  const [expandedToastLogIds, setExpandedToastLogIds] = useState<string[]>([]);
   const [titlesSubtitle, setTitlesSubtitle] = useState("");
   const [templatesSubtitle, setTemplatesSubtitle] = useState("");
 
@@ -463,24 +487,49 @@ export const Topbar = ({
     setDismissedNotificationIds(prev => (prev.includes(id) ? prev : [...prev, id]));
   };
 
+  const toggleToastLog = (id: string) => {
+    setExpandedToastLogIds(previous => (
+      previous.includes(id)
+        ? previous.filter(itemId => itemId !== id)
+        : [...previous, id]
+    ));
+  };
+
   const clearAllNotifications = () => {
     setDismissedNotificationIds(prev => {
       const all = new Set(prev);
       notifications.forEach(item => all.add(item.id));
       return [...all];
     });
+
+    onClearToastLogs();
+    setExpandedToastLogIds([]);
   };
+
+  const hasBellNotifications = unreadToastCount > 0 || (!notificationsLoading && visibleNotifications.length > 0);
 
   useEffect(() => {
     if (isMaster) return;
 
     let cancelled = false;
 
+    const fetchWithTimeout = async (url: string, init: RequestInit, timeoutMs = 10000) => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+      try {
+        return await fetch(url, { ...init, signal: controller.signal });
+      } finally {
+        clearTimeout(timeout);
+      }
+    };
+
     const loadStatusAndNotifications = async () => {
       try {
-        setNotificationsLoading(true);
+        if (!notificationsInitialized)
+          setNotificationsLoading(true);
 
-        const healthResp = await fetch(`${API_BASE_URL}/api/sync/health`, {
+        const healthResp = await fetchWithTimeout(`${API_BASE_URL}/api/sync/health`, {
           headers: {
             Accept: "application/json",
             Authorization: `Bearer ${session.token}`,
@@ -527,13 +576,13 @@ export const Topbar = ({
         setIsApiConnected(true);
 
         const [pendingResp, activityResp] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/titles?status=PendingData&page=1&pageSize=1`, {
+          fetchWithTimeout(`${API_BASE_URL}/api/titles?status=PendingData&page=1&pageSize=1`, {
             headers: {
               Accept: "application/json",
               Authorization: `Bearer ${session.token}`,
             },
           }),
-          fetch(`${API_BASE_URL}/api/dashboard/activity-log`, {
+          fetchWithTimeout(`${API_BASE_URL}/api/dashboard/activity-log`, {
             headers: {
               Accept: "application/json",
               Authorization: `Bearer ${session.token}`,
@@ -583,7 +632,11 @@ export const Topbar = ({
           ]);
         }
       } finally {
-        if (!cancelled) setNotificationsLoading(false);
+        if (!cancelled)
+        {
+          setNotificationsLoading(false);
+          setNotificationsInitialized(true);
+        }
       }
     };
 
@@ -594,7 +647,7 @@ export const Topbar = ({
       cancelled = true;
       clearInterval(timer);
     };
-  }, [isMaster, session.token, page]);
+  }, [isMaster, session.token, notificationsInitialized]);
 
   useEffect(() => {
     if (!notificationsOpen) return;
@@ -692,12 +745,18 @@ export const Topbar = ({
 
             <div className="relative" ref={notifRef}>
               <button
-                onClick={() => setNotificationsOpen(v => !v)}
+                onClick={() => {
+                  setNotificationsOpen(previous => {
+                    const next = !previous;
+                    if (next) onMarkToastLogsRead();
+                    return next;
+                  });
+                }}
                 className="w-9 h-9 bg-surface-2 border border-border-subtle rounded-[9px] flex items-center justify-center cursor-pointer text-[15px] relative"
                 title="Notificações"
               >
                 {ICONS.bell}
-                {!notificationsLoading && visibleNotifications.length > 0 && (
+                {hasBellNotifications && (
                   <span className="absolute top-[7px] right-[7px] w-[7px] h-[7px] bg-danger rounded-full border-2 border-surface" />
                 )}
               </button>
@@ -714,10 +773,56 @@ export const Topbar = ({
                     </button>
                   </div>
                   <div className="max-h-[320px] overflow-y-auto">
+                    {toastLogs.length > 0 && (
+                      <>
+                        <div className="px-4 py-2 border-b border-border-subtle text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted">
+                          Alertas de envio
+                        </div>
+                        {toastLogs.map(item => {
+                          const expanded = expandedToastLogIds.includes(item.id);
+                          return (
+                            <div key={item.id} className="px-4 py-3 border-b border-border-subtle last:border-b-0">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 mb-1.5">
+                                    <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${toastKindClass(item.type)}`}>
+                                      {formatToastKind(item.type)}
+                                    </span>
+                                    {!item.read && <span className="text-[10px] text-danger font-bold">nova</span>}
+                                  </div>
+                                  <div className="text-sm text-text-primary">{item.summary}</div>
+                                  <div className="text-[11px] text-text-muted mt-1">
+                                    {new Date(item.createdAt).toLocaleString("pt-BR")}
+                                  </div>
+                                  {expanded && (
+                                    <div className="text-xs text-text-secondary mt-2 bg-surface-2 border border-border-subtle rounded-md px-2.5 py-2 whitespace-normal break-words">
+                                      {item.fullMessage}
+                                    </div>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={() => toggleToastLog(item.id)}
+                                  className="text-[11px] text-accent hover:text-[#B91C1C] transition-colors whitespace-nowrap"
+                                >
+                                  {expanded ? "Ocultar" : "Ver completo"}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
+
+                    <div className="px-4 py-2 border-b border-border-subtle text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted">
+                      Status do sistema
+                    </div>
+
                     {notificationsLoading ? (
                       <div className="px-4 py-4 text-sm text-text-muted">Carregando notificacoes...</div>
                     ) : visibleNotifications.length === 0 ? (
-                      <div className="px-4 py-4 text-sm text-text-muted">Nenhuma notificacao no momento.</div>
+                      toastLogs.length === 0
+                        ? <div className="px-4 py-4 text-sm text-text-muted">Nenhuma notificacao no momento.</div>
+                        : null
                     ) : (
                       visibleNotifications.map(item => (
                         <div key={item.id} className="px-4 py-3 border-b border-border-subtle last:border-b-0">

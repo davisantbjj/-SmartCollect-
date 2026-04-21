@@ -2,6 +2,7 @@ namespace SmartCollect.Api.Controllers;
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SmartCollect.Application.DTOs.Clients;
 using SmartCollect.Application.Interfaces;
 using SmartCollect.Api.Security;
 
@@ -25,7 +26,7 @@ public class ClientsController : ControllerBase
 
     [HttpPost]
     [Authorize(Roles = "Admin,Worker")]
-    public async Task<IActionResult> Create([FromBody] SmartCollect.Application.DTOs.Clients.CreateClientRequest request)
+    public async Task<IActionResult> Create([FromBody] CreateClientRequest request)
     {
         try
         {
@@ -34,6 +35,21 @@ public class ClientsController : ControllerBase
         catch (InvalidOperationException ex)
         {
             return Conflict(new { message = ex.Message });
+        }
+    }
+
+    [HttpPatch("{clientId:guid}/dispatch-preference")]
+    [Authorize(Roles = "Admin,Worker")]
+    public async Task<IActionResult> UpdateDispatchPreference(Guid clientId, [FromBody] UpdateClientDispatchPreferenceRequest request)
+    {
+        try
+        {
+            var updated = await _clientService.UpdateDispatchPreferenceAsync(GetTenantId(), clientId, request);
+            return updated is null ? NotFound() : Ok(updated);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
         }
     }
 }

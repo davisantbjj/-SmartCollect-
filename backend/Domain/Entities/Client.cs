@@ -9,6 +9,9 @@ public class Client : Entity, ITenantScoped
     public string LegalName { get; set; } = string.Empty;
     public string TaxId { get; set; } = string.Empty;
     public string? TradeName { get; set; }
+    public bool SendToAllContacts { get; set; } = false;
+    public string DispatchMode { get; set; } = "Primary";
+    public string? SelectedDispatchContactIdsJson { get; set; }
 
     public User User { get; set; } = null!;
     public Tenant Tenant { get; set; } = null!;

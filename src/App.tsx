@@ -29,13 +29,49 @@ const PageTenants    = lazy(() => import("./pages/PageTenants").then(m => ({ def
 
 const LOGIN_RECENT_EMAILS_KEY = "smartcollect.login.recentEmails";
 const LOGIN_RECENT_EMAILS_MAX = 6;
+const LAST_PAGE_KEY = "smartcollect.lastPage";
+const ALL_PAGE_IDS: PageId[] = [
+  "dashboard",
+  "analytics",
+  "titles",
+  "import",
+  "contacts",
+  "sequence",
+  "templates",
+  "integration",
+  "workers",
+  "tenants",
+];
+
+function isPageId(value: string): value is PageId {
+  return ALL_PAGE_IDS.includes(value as PageId);
+}
+
+function getInitialPage(): PageId {
+  try {
+    const raw = localStorage.getItem(LAST_PAGE_KEY);
+    if (raw && isPageId(raw))
+      return raw;
+  } catch {
+    // Ignore storage read issues and keep default page.
+  }
+
+  return "dashboard";
+}
 
 export default function SmartCollect() {
-  const [page, setPage] = useState<PageId>("dashboard");
+  const [page, setPage] = useState<PageId>(() => getInitialPage());
   const [session, setSessionState] = useState<StoredSession | null>(() => getSession());
   const [tenants, setTenants] = useState<TenantResponse[]>([]);
   const [selectedTenantId, setSelectedTenantId] = useState("");
-  const { toast, show: showToast } = useToast();
+  const {
+    toast,
+    show: showToast,
+    logs: toastLogs,
+    unreadCount: unreadToastCount,
+    markAllRead: markAllToastRead,
+    clearLogs: clearToastLogs,
+  } = useToast();
 
   // Theme toggle
   const [isDark, setIsDark] = useState(() => {
@@ -119,11 +155,16 @@ export default function SmartCollect() {
     setSessionState(null);
     setTenants([]);
     setSelectedTenantId("");
+    localStorage.removeItem(LAST_PAGE_KEY);
     setPage("dashboard");
     setEmail("");
     setPassword("");
     showToast(`${ICONS.info} Sessão encerrada.`, "info");
   };
+
+  useEffect(() => {
+    localStorage.setItem(LAST_PAGE_KEY, page);
+  }, [page]);
 
   useEffect(() => {
     if (!session || session.role !== "Master") return;
@@ -162,22 +203,21 @@ export default function SmartCollect() {
       <div className="min-h-screen bg-surface flex items-center justify-center p-6">
         <div className="w-full max-w-[440px]">
           {/* Card */}
-          <div className="bg-white dark:bg-surface-2 rounded-2xl border border-border-subtle p-8 shadow-[0_20px_60px_rgba(0,0,0,0.10)]">
+          <div className="bg-white dark:bg-surface-2 rounded-2xl border border-border-subtle px-8 py-10 shadow-[0_20px_60px_rgba(0,0,0,0.10)]">
 
             {/* Logo + brand */}
             <div className="flex flex-col items-center mb-8">
               <img
                 src="/atos-logo.png"
                 alt="Atos Capital"
-                className="h-14 w-auto object-contain mb-4"
+                className="h-14 w-auto object-contain"
+                style={isDark
+                  ? {
+                      filter: "brightness(0) saturate(100%) invert(20%) sepia(90%) saturate(4020%) hue-rotate(353deg) brightness(92%) contrast(91%)",
+                    }
+                  : undefined}
                 onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
               />
-              <h1 className="text-[22px] font-extrabold tracking-[-0.5px] text-[#7A1414]">
-                SmartCollect
-              </h1>
-              <p className="text-sm text-text-muted mt-1">
-                Plataforma de Cobrança Multicanal
-              </p>
             </div>
 
             <form onSubmit={handleLogin} autoComplete="off" data-form-type="other">
@@ -333,6 +373,10 @@ export default function SmartCollect() {
           tenants={tenants}
           selectedTenantId={selectedTenantId}
           onSelectTenant={setSelectedTenantId}
+          toastLogs={toastLogs}
+          unreadToastCount={unreadToastCount}
+          onMarkToastLogsRead={markAllToastRead}
+          onClearToastLogs={clearToastLogs}
         />
 
         <div className="p-7 pt-3 flex-1 text-text-primary">

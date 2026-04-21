@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -46,6 +46,8 @@ export const PageDashboard = ({
   const [sends, setSends] = useState<{ day: string; email: number; wa: number }[]>([]);
   const [channelMetrics, setChannelMetrics] = useState({ emailSent: 0, emailDelivered: 0, emailViewed: 0, whatsAppSent: 0, whatsAppDelivered: 0, whatsAppViewed: 0 });
   const [activityLogs, setActivityLogs] = useState<ActivityLogEntry[]>([]);
+  const partialFailureWarnedRef = useRef(false);
+  const fullFailureWarnedRef = useRef(false);
 
   const isMaster = session.role === "Master";
 
@@ -57,7 +59,7 @@ export const PageDashboard = ({
       try {
         const tid = isMaster ? undefined : session.tenantId || undefined;
         const effectiveTenantId = isMaster ? (selectedTenantId || undefined) : tid;
-        const [s, sb, f, a, top, snds, ch, act] = await Promise.all([
+        const results = await Promise.allSettled([
           getDashboardSummary(effectiveTenantId),
           getDashboardStatusBreakdown(effectiveTenantId),
           getDashboardFunnel(effectiveTenantId),
@@ -69,29 +71,82 @@ export const PageDashboard = ({
         ]);
         if (cancelled) return;
 
-        setSummary(s);
-        setStatusBreakdown(sb);
-        setFunnel(f.items.map(i => ({ month: i.month, receivable: i.receivable, overdue: i.overdue, recovered: i.recovered })));
-        setAging(a.items.map(i => ({ label: i.range, value: i.value, color: i.color })));
-        setTopDefaulters(top.items.map((i, idx) => ({ rank: idx + 1, name: i.clientName, cnpj: i.taxId, value: i.totalAmount })));
-        setSends(snds.items.map(i => ({ day: toBrDayLabel(i.day), email: i.emailCount, wa: i.whatsAppCount })));
-        setChannelMetrics(ch);
-        setActivityLogs(act.items.map((i, idx) => ({
-          id: idx + 1,
-          timestamp: new Date(i.timestamp).toLocaleTimeString("pt-BR", { hour12: false }),
-          channel: i.channel.toLowerCase().includes("whatsapp")
-            ? "wa"
-            : i.channel.toLowerCase().includes("email")
-              ? "email"
-              : "system",
-          status: i.status.toLowerCase().includes("error")
-            ? "error"
-            : i.status.toLowerCase().includes("info")
-              ? "info"
-              : "sent",
-          recipient: i.recipient,
-          summary: i.summary,
-        })));
+        const [s, sb, f, a, top, snds, ch, act] = results;
+        const failed = results.filter(r => r.status === "rejected").length;
+
+        setSummary(s.status === "fulfilled"
+          ? s.value
+          : { totalReceivable: 0, totalOverdue: 0, totalPaid: 0, recoveryRate: 0 });
+
+        setStatusBreakdown(sb.status === "fulfilled"
+          ? sb.value
+          : { open: 0, pendingData: 0, overdue: 0, paid: 0, cancelled: 0 });
+
+        setFunnel(f.status === "fulfilled"
+          ? f.value.items.map(i => ({ month: i.month, receivable: i.receivable, overdue: i.overdue, recovered: i.recovered }))
+          : []);
+
+        setAging(a.status === "fulfilled"
+          ? a.value.items.map(i => ({ label: i.range, value: i.value, color: i.color }))
+          : []);
+
+        setTopDefaulters(top.status === "fulfilled"
+          ? top.value.items.map((i, idx) => ({ rank: idx + 1, name: i.clientName, cnpj: i.taxId, value: i.totalAmount }))
+          : []);
+
+        setSends(snds.status === "fulfilled"
+          ? snds.value.items.map(i => ({ day: toBrDayLabel(i.day), email: i.emailCount, wa: i.whatsAppCount }))
+          : []);
+
+        setChannelMetrics(ch.status === "fulfilled"
+          ? ch.value
+          : { emailSent: 0, emailDelivered: 0, emailViewed: 0, whatsAppSent: 0, whatsAppDelivered: 0, whatsAppViewed: 0 });
+
+        setActivityLogs(act.status === "fulfilled"
+          ? act.value.items.map((i, idx) => {
+              const normalizedChannel = i.channel.toLowerCase();
+
+              return {
+                id: idx + 1,
+                timestamp: new Date(i.timestamp).toLocaleTimeString("pt-BR", { hour12: false }),
+                channel: normalizedChannel.includes("both") || normalizedChannel.includes("ambos")
+                  ? "both"
+                  : normalizedChannel.includes("whatsapp")
+                    ? "wa"
+                    : normalizedChannel.includes("email")
+                      ? "email"
+                      : "system",
+                status: i.status.toLowerCase().includes("error")
+                  ? "error"
+                  : i.status.toLowerCase().includes("info")
+                    ? "info"
+                    : "sent",
+                recipient: i.recipient,
+                summary: i.summary,
+              };
+            })
+          : []);
+
+        if (failed === results.length)
+        {
+          if (!fullFailureWarnedRef.current)
+          {
+            showToast(`${ICONS.cross} Falha ao carregar o dashboard.`, "error");
+            fullFailureWarnedRef.current = true;
+          }
+        }
+        else
+        {
+          fullFailureWarnedRef.current = false;
+          if (failed > 0 && !partialFailureWarnedRef.current)
+          {
+            showToast(`${ICONS.warning} Parte dos dados do dashboard não pôde ser carregada.`, "warn");
+            partialFailureWarnedRef.current = true;
+          }
+
+          if (failed === 0)
+            partialFailureWarnedRef.current = false;
+        }
       } catch {
         if (!cancelled) showToast(`${ICONS.cross} Falha ao carregar o dashboard.`, "error");
       } finally {
@@ -100,7 +155,12 @@ export const PageDashboard = ({
     }
 
     void load();
-    return () => { cancelled = true; };
+    const refresh = window.setInterval(() => { void load(); }, 30000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(refresh);
+    };
   }, [showToast, isMaster, session.tenantId, selectedTenantId]);
 
   const maxAging = useMemo(() => Math.max(...aging.map(i => i.value), 1), [aging]);

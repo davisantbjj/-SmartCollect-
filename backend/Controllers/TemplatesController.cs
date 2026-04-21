@@ -21,7 +21,7 @@ public class TemplatesController : ControllerBase
         => Ok(await _service.ListAsync(GetTenantId()));
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Worker")]
     public async Task<IActionResult> Create([FromBody] CreateTemplateRequest request)
     {
         try
@@ -35,7 +35,7 @@ public class TemplatesController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Worker")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateTemplateRequest request)
     {
         try

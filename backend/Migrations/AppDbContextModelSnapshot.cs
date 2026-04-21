@@ -31,9 +31,19 @@ namespace SmartCollect.Api.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("DispatchMode")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("LegalName")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<string>("SelectedDispatchContactIdsJson")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("SendToAllContacts")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("TaxId")
                         .IsRequired()
@@ -326,6 +336,19 @@ namespace SmartCollect.Api.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("DispatchWindowEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("DispatchWindowEndMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DispatchWindowStartMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("DispatchWindowTimeZone")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("EmailDomain")
                         .IsRequired()
                         .HasColumnType("text");
@@ -347,6 +370,9 @@ namespace SmartCollect.Api.Migrations
 
                     b.Property<string>("ExternalApiTokenEncrypted")
                         .HasColumnType("text");
+
+                    b.Property<bool>("PauseAutomaticDispatchDuringProcessing")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Plan")
                         .IsRequired()

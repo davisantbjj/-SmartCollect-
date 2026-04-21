@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Badge, Button, FormInput, Modal } from "../components/UI";
 import { ICONS } from "../utils/icons";
@@ -35,7 +36,7 @@ export const PageWorkers = ({
   const [newRole, setNewRole] = useState<TenantUserRole>("Worker");
 
   const [editName, setEditName] = useState("");
-  const [editActive, setEditActive] = useState(true);
+  // Removido editActive do modal de edição
   const [editPassword, setEditPassword] = useState("");
 
   const tenantId = session.role === "Master" ? selectedTenantId : undefined;
@@ -66,7 +67,6 @@ export const PageWorkers = ({
   const openEdit = (worker: WorkerResponse) => {
     setSelected(worker);
     setEditName(worker.name);
-    setEditActive(worker.active);
     setEditPassword("");
     setEditOpen(true);
   };
@@ -116,7 +116,7 @@ export const PageWorkers = ({
       setSaving(true);
       await updateWorker(selected.id, {
         name: editName.trim(),
-        active: editActive,
+        active: selected.active, // sempre enviar o valor atual
         password: editPassword.trim() || undefined,
       }, tenantId);
       showToast(`${ICONS.checkmark} Usuário atualizado com sucesso.`, "success");
@@ -124,6 +124,32 @@ export const PageWorkers = ({
       await load();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Erro ao atualizar usuário.";
+      showToast(`${ICONS.cross} ${msg}`, "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Função para excluir usuário (inativar)
+  const handleDelete = async () => {
+    if (!selected) return;
+    if (requiresTenantSelection) {
+      showToast(`${ICONS.warning} Selecione uma empresa para excluir usuários.`, "warn");
+      return;
+    }
+    const confirmed = window.confirm(`Tem certeza que deseja excluir o usuário \"${selected.name}\"? Esta ação não pode ser desfeita.`);
+    if (!confirmed) return;
+    try {
+      setSaving(true);
+      await updateWorker(selected.id, {
+        name: selected.name,
+        active: false,
+      }, tenantId);
+      showToast(`${ICONS.checkmark} Usuário excluído com sucesso.`, "success");
+      setEditOpen(false);
+      await load();
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Erro ao excluir usuário.";
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setSaving(false);
@@ -168,7 +194,6 @@ export const PageWorkers = ({
           variant="primary"
           onClick={() => setCreateOpen(true)}
           disabled={requiresTenantSelection}
-          title={requiresTenantSelection ? "Selecione uma empresa para cadastrar usuários" : undefined}
         >
           {ICONS.plus} Novo Usuário
         </Button>
@@ -278,16 +303,7 @@ export const PageWorkers = ({
       >
         <div className="grid gap-3">
           <FormInput label="Nome" value={editName} onChange={e => setEditName(e.target.value)} />
-          <div className="flex items-center gap-2">
-            <input
-              id="worker-active"
-              type="checkbox"
-              checked={editActive}
-              onChange={e => setEditActive(e.target.checked)}
-              className="accent-accent"
-            />
-            <label htmlFor="worker-active" className="text-sm text-text-secondary">Usuário ativo</label>
-          </div>
+          {/* Opção de ativo/inativo removida do modal de edição */}
           <FormInput
             label="Nova senha (opcional)"
             type="password"

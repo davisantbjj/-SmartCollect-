@@ -30,6 +30,7 @@ const PageTenants    = lazy(() => import("./pages/PageTenants").then(m => ({ def
 const LOGIN_RECENT_EMAILS_KEY = "smartcollect.login.recentEmails";
 const LOGIN_RECENT_EMAILS_MAX = 6;
 const LAST_PAGE_KEY = "smartcollect.lastPage";
+const MASTER_SELECTED_TENANT_KEY = "smartcollect.master.selectedTenantId";
 const ALL_PAGE_IDS: PageId[] = [
   "dashboard",
   "analytics",
@@ -63,7 +64,13 @@ export default function SmartCollect() {
   const [page, setPage] = useState<PageId>(() => getInitialPage());
   const [session, setSessionState] = useState<StoredSession | null>(() => getSession());
   const [tenants, setTenants] = useState<TenantResponse[]>([]);
-  const [selectedTenantId, setSelectedTenantId] = useState("");
+  const [selectedTenantId, setSelectedTenantId] = useState(() => {
+    try {
+      return localStorage.getItem(MASTER_SELECTED_TENANT_KEY) ?? "";
+    } catch {
+      return "";
+    }
+  });
   const [titlesPreset, setTitlesPreset] = useState<{ status: string; token: number } | null>(null);
   const {
     toast,
@@ -168,6 +175,7 @@ export default function SmartCollect() {
     setTenants([]);
     setSelectedTenantId("");
     localStorage.removeItem(LAST_PAGE_KEY);
+    localStorage.removeItem(MASTER_SELECTED_TENANT_KEY);
     setPage("dashboard");
     setEmail("");
     setPassword("");
@@ -177,6 +185,11 @@ export default function SmartCollect() {
   useEffect(() => {
     localStorage.setItem(LAST_PAGE_KEY, page);
   }, [page]);
+
+  useEffect(() => {
+    if (session?.role === "Master")
+      localStorage.setItem(MASTER_SELECTED_TENANT_KEY, selectedTenantId);
+  }, [session?.role, selectedTenantId]);
 
   useEffect(() => {
     if (!session || session.role !== "Master") return;
@@ -195,6 +208,19 @@ export default function SmartCollect() {
     void loadTenants();
     return () => { cancelled = true; };
   }, [session, showToast]);
+
+  useEffect(() => {
+    if (session?.role !== "Master") {
+      setSelectedTenantId("");
+      localStorage.removeItem(MASTER_SELECTED_TENANT_KEY);
+      return;
+    }
+
+    if (!selectedTenantId) return;
+    if (tenants.some(tenant => tenant.id === selectedTenantId)) return;
+
+    setSelectedTenantId("");
+  }, [session?.role, selectedTenantId, tenants]);
 
   useEffect(() => {
     if (!session) return;

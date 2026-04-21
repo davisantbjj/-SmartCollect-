@@ -463,7 +463,7 @@ export const Topbar = ({
   onClearToastLogs: () => void;
 }) => {
   const [title, subtitle] = PAGE_META[page] || ["SmartCollect", ""];
-  const showTenantSelector = session.role === "Master" && (page === "dashboard" || page === "analytics");
+  const showTenantSelector = session.role === "Master";
   const isMaster = session.role === "Master";
 
   const [isApiConnected, setIsApiConnected] = useState(false);
@@ -671,8 +671,17 @@ export const Topbar = ({
 
     if (page === "titles") {
       const loadTitleCount = async () => {
+        if (isMaster && !selectedTenantId) {
+          if (!cancelled) setTitlesSubtitle("Selecione uma empresa");
+          return;
+        }
+
         try {
-          const response = await getTitles({ page: 1, pageSize: 1 });
+          const response = await getTitles({
+            tenantId: isMaster ? selectedTenantId || undefined : undefined,
+            page: 1,
+            pageSize: 1,
+          });
           if (!cancelled) {
             setTitlesSubtitle(`${response.totalCount} titulos`);
           }
@@ -703,7 +712,7 @@ export const Topbar = ({
     return () => {
       cancelled = true;
     };
-  }, [page, session.token]);
+  }, [isMaster, page, selectedTenantId, session.token]);
 
   const displayTitle = page === "titles" ? t("nav.titles") : page === "templates" ? t("nav.templates") : title;
   const displaySubtitle = page === "titles"
@@ -727,7 +736,7 @@ export const Topbar = ({
             className="bg-surface-2 border border-border-subtle-2 rounded-lg px-[10px] py-[8px] text-[12px] text-text-primary outline-none min-w-[220px]"
             title="Selecionar empresa"
           >
-            <option value="">Todas as empresas</option>
+            <option value="">Todas as empresas (visao global)</option>
             {tenants.map(tenant => (
               <option key={tenant.id} value={tenant.id}>
                 {tenant.companyName}

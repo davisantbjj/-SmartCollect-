@@ -384,7 +384,7 @@ export default function SmartCollect() {
     analytics:   <PageAnalytics showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} />,
     titles:      <PageTitles showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} presetStatusFilter={titlesPreset?.status} presetFilterToken={titlesPreset?.token} />,
     import:      <PageImport showToast={showToast} session={session} />,
-    contacts:    <PageContacts showToast={showToast} />,
+    contacts:    <PageContacts showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} />,
     sequence:    <PageSequence showToast={showToast} session={session} />,
     templates:   <PageTemplates showToast={showToast} session={session} />,
     integration: <PageIntegration showToast={showToast} session={session} />,

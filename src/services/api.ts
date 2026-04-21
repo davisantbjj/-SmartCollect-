@@ -724,19 +724,19 @@ export async function sendCollection(titleId: string, payload?: SendCollectionRe
 
 // ── Clients ───────────────────────────────────────────────────────────────
 
-export async function getClients() {
-  return request<ClientResponse[]>("/api/clients");
+export async function getClients(tenantId?: string) {
+  return request<ClientResponse[]>(`/api/clients${tenantParam(tenantId)}`);
 }
 
-export async function createClient(payload: CreateClientRequest) {
-  return request<ClientResponse>("/api/clients", {
+export async function createClient(payload: CreateClientRequest, tenantId?: string) {
+  return request<ClientResponse>(`/api/clients${tenantParam(tenantId)}`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
-export async function updateClientDispatchPreference(clientId: string, payload: UpdateClientDispatchPreferenceRequest) {
-  return request<ClientResponse>(`/api/clients/${clientId}/dispatch-preference`, {
+export async function updateClientDispatchPreference(clientId: string, payload: UpdateClientDispatchPreferenceRequest, tenantId?: string) {
+  return request<ClientResponse>(`/api/clients/${clientId}/dispatch-preference${tenantParam(tenantId)}`, {
     method: "PATCH",
     body: JSON.stringify(payload),
   });
@@ -744,12 +744,12 @@ export async function updateClientDispatchPreference(clientId: string, payload: 
 
 // ── Contacts ──────────────────────────────────────────────────────────────
 
-export async function getContactsByClient(clientId: string) {
-  return request<ContactResponse[]>(`/api/clients/${clientId}/contacts`);
+export async function getContactsByClient(clientId: string, tenantId?: string) {
+  return request<ContactResponse[]>(`/api/clients/${clientId}/contacts${tenantParam(tenantId)}`);
 }
 
-export async function createContact(clientId: string, payload: UpsertContactRequest) {
-  return request<ContactResponse>(`/api/clients/${clientId}/contacts`, {
+export async function createContact(clientId: string, payload: UpsertContactRequest, tenantId?: string) {
+  return request<ContactResponse>(`/api/clients/${clientId}/contacts${tenantParam(tenantId)}`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -758,16 +758,17 @@ export async function createContact(clientId: string, payload: UpsertContactRequ
 export async function updateContact(
   clientId: string,
   contactId: string,
-  payload: UpsertContactRequest
+  payload: UpsertContactRequest,
+  tenantId?: string,
 ) {
-  return request<ContactResponse>(`/api/clients/${clientId}/contacts/${contactId}`, {
+  return request<ContactResponse>(`/api/clients/${clientId}/contacts/${contactId}${tenantParam(tenantId)}`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });
 }
 
-export async function deleteContact(clientId: string, contactId: string) {
-  return request<void>(`/api/clients/${clientId}/contacts/${contactId}`, {
+export async function deleteContact(clientId: string, contactId: string, tenantId?: string) {
+  return request<void>(`/api/clients/${clientId}/contacts/${contactId}${tenantParam(tenantId)}`, {
     method: "DELETE",
   });
 }

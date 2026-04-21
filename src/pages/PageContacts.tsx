@@ -13,6 +13,7 @@ import {
   updateContact,
   type ClientResponse,
   type ContactResponse,
+  type StoredSession,
   type UpdateClientDispatchPreferenceRequest,
   type UpsertContactRequest,
 } from "../services/api";
@@ -116,7 +117,15 @@ const getDepartmentLabel = (department: string) => {
   return department;
 };
 
-export const PageContacts = ({ showToast }: { showToast: ShowToast }) => {
+export const PageContacts = ({
+  showToast,
+  session,
+  selectedTenantId,
+}: {
+  showToast: ShowToast;
+  session: StoredSession;
+  selectedTenantId?: string;
+}) => {
   const [clients, setClients] = useState<ClientResponse[]>([]);
   const [contacts, setContacts] = useState<ContactResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -136,13 +145,23 @@ export const PageContacts = ({ showToast }: { showToast: ShowToast }) => {
   const [newClientName, setNewClientName] = useState("");
   const [newClientCnpj, setNewClientCnpj] = useState("");
 
+  const tenantId = session.role === "Master" ? selectedTenantId : undefined;
+  const requiresTenantSelection = session.role === "Master" && !tenantId;
+
   const loadAll = async () => {
+    if (requiresTenantSelection) {
+      setClients([]);
+      setContacts([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const companyList = await getClients();
+      const companyList = await getClients(tenantId);
       setClients(companyList);
 
-      const batches = await Promise.all(companyList.map(c => getContactsByClient(c.id).catch(() => [])));
+      const batches = await Promise.all(companyList.map(c => getContactsByClient(c.id, tenantId).catch(() => [])));
       setContacts(batches.flat());
     } catch {
       showToast(`${ICONS.cross} Erro ao carregar contatos.`, "error");
@@ -153,7 +172,7 @@ export const PageContacts = ({ showToast }: { showToast: ShowToast }) => {
 
   useEffect(() => {
     void loadAll();
-  }, []);
+  }, [tenantId, requiresTenantSelection]);
 
   const companyRows = useMemo<CompanyRow[]>(() => {
     const s = search.trim().toLowerCase();
@@ -253,6 +272,11 @@ export const PageContacts = ({ showToast }: { showToast: ShowToast }) => {
   };
 
   const handleSetDispatchPreference = async (clientId: string, mode: DispatchMode, selectedContactIds: string[]) => {
+    if (requiresTenantSelection) {
+      showToast(`${ICONS.warning} Selecione uma empresa para atualizar as preferencias de envio.`, "warn");
+      return;
+    }
+
     if (mode === "Selected" && selectedContactIds.length === 0) {
       showToast(`${ICONS.warning} Selecione ao menos um contato para o envio personalizado.`, "warn");
       return;
@@ -266,7 +290,7 @@ export const PageContacts = ({ showToast }: { showToast: ShowToast }) => {
 
     try {
       setUpdatingDispatchClientId(clientId);
-      const updated = await updateClientDispatchPreference(clientId, payload);
+      const updated = await updateClientDispatchPreference(clientId, payload, tenantId);
       setClients(prev => prev.map(c => c.id === updated.id ? updated : c));
       showToast(
         `${ICONS.checkmark} Regra de envio atualizada para ${updated.dispatchMode === "All" ? "todos os contatos" : updated.dispatchMode === "Selected" ? "contatos selecionados" : "contato principal"}.`,
@@ -281,6 +305,11 @@ export const PageContacts = ({ showToast }: { showToast: ShowToast }) => {
   };
 
   const handleSetPrimaryContact = async (contact: ContactResponse) => {
+    if (requiresTenantSelection) {
+      showToast(`${ICONS.warning} Selecione uma empresa para atualizar contatos.`, "warn");
+      return;
+    }
+
     try {
       setSettingPrimaryContactId(contact.id);
 
@@ -292,7 +321,7 @@ export const PageContacts = ({ showToast }: { showToast: ShowToast }) => {
         isPrimary: true,
       };
 
-      await updateContact(contact.clientId, contact.id, payload);
+      await updateContact(contact.clientId, contact.id, payload, tenantId);
       showToast(`${ICONS.checkmark} Contato principal atualizado.`, "success");
       await loadAll();
     } catch (err) {
@@ -304,13 +333,18 @@ export const PageContacts = ({ showToast }: { showToast: ShowToast }) => {
   };
 
   const handleDeleteContact = async (contact: ContactResponse) => {
+    if (requiresTenantSelection) {
+      showToast(`${ICONS.warning} Selecione uma empresa para atualizar contatos.`, "warn");
+      return;
+    }
+
     const confirmed = window.confirm(`Excluir o contato "${contact.name}"?`);
     if (!confirmed)
       return;
 
     try {
       setDeletingContactId(contact.id);
-      await deleteContact(contact.clientId, contact.id);
+      await deleteContact(contact.clientId, contact.id, tenantId);
       showToast(`${ICONS.checkmark} Contato excluído com sucesso.`, "success");
       await loadAll();
     } catch (err) {
@@ -322,6 +356,11 @@ export const PageContacts = ({ showToast }: { showToast: ShowToast }) => {
   };
 
   const handleSave = async () => {
+    if (requiresTenantSelection) {
+      showToast(`${ICONS.warning} Selecione uma empresa para gerenciar contatos.`, "warn");
+      return;
+    }
+
     const hasEmail = form.email.trim().length > 0;
     const normalizedPhone = normalizePhone(form.whatsAppPhone);
 
@@ -352,14 +391,14 @@ export const PageContacts = ({ showToast }: { showToast: ShowToast }) => {
         const created = await createClient({
           legalName: newClientName,
           taxId: newClientCnpj.replace(/\D/g, ""),
-        });
+        }, tenantId);
         clientId = created.id;
       }
 
       if (editing) {
-        await updateContact(clientId, editing.id, payload);
+        await updateContact(clientId, editing.id, payload, tenantId);
       } else {
-        await createContact(clientId, payload);
+        await createContact(clientId, payload, tenantId);
       }
 
       showToast(`${ICONS.checkmark} ${t("toast.contactSaved")}`, "success");
@@ -390,9 +429,23 @@ export const PageContacts = ({ showToast }: { showToast: ShowToast }) => {
           onChange={e => setSearch(e.target.value)}
           placeholder={`${ICONS.search} ${t("contacts.searchPlaceholder")}`}
           className="bg-surface-2 border border-border-subtle-2 rounded-lg px-[13px] py-[9px] text-[13px] text-text-primary outline-none flex-1 focus:border-accent"
+          disabled={requiresTenantSelection}
         />
-        <Button variant="primary" onClick={openNew}>{t("contacts.newContact")}</Button>
+        <Button
+          variant="primary"
+          onClick={openNew}
+          disabled={requiresTenantSelection}
+          title={requiresTenantSelection ? "Selecione uma empresa para gerenciar contatos" : undefined}
+        >
+          {t("contacts.newContact")}
+        </Button>
       </div>
+
+      {requiresTenantSelection && (
+        <div className="rounded-xl border border-border-subtle bg-surface-2/60 px-4 py-3 text-sm text-text-secondary mb-4">
+          Selecione uma empresa no topo para visualizar e editar contatos.
+        </div>
+      )}
 
       <div className="text-xs text-text-muted mb-2">{companyRows.length} empresas encontradas</div>
 

@@ -54,9 +54,11 @@ const getBrowserTimeZone = () => {
 export const PageIntegration = ({
   showToast,
   session,
+  selectedTenantId,
 }: {
   showToast: ShowToast;
   session: StoredSession;
+  selectedTenantId?: string;
 }) => {
   const [smtp, setSmtp] = useState<SmtpConfigResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -105,13 +107,22 @@ export const PageIntegration = ({
   const [senderFrom, setSenderFrom] = useState("");
   const [senderName, setSenderName] = useState("");
 
-  const canEdit = session.role === "Admin" || session.role === "Master";
-  const canEditDispatchWindow = session.role === "Admin";
+  const tenantId = session.role === "Master" ? selectedTenantId : undefined;
+  const requiresTenantSelection = session.role === "Master" && !tenantId;
+  const canEdit = session.role === "Admin" || (session.role === "Master" && Boolean(tenantId));
+  const canEditDispatchWindow = canEdit;
 
   useEffect(() => {
     const load = async () => {
+      if (requiresTenantSelection) {
+        setSmtp(null);
+        setIsConfigured(false);
+        setLoading(false);
+        return;
+      }
+
       try {
-        const data = await getSmtpConfig();
+        const data = await getSmtpConfig(tenantId);
         setSmtp(data);
         setHost(data.host);
         setPort(String(data.port));
@@ -131,12 +142,18 @@ export const PageIntegration = ({
       }
     };
     void load();
-  }, [showToast]);
+  }, [showToast, tenantId, requiresTenantSelection]);
 
   const loadWhatsAppConfig = async () => {
+    if (requiresTenantSelection) {
+      setWaConfigured(false);
+      setWaLoading(false);
+      return;
+    }
+
     try {
       setWaLoading(true);
-      const data = await getWhatsAppConfig();
+      const data = await getWhatsAppConfig(tenantId);
       setWaProvider(data.provider);
       setWaNumberId(data.numberId);
       setWaApiBaseUrl(data.apiBaseUrl ?? "");
@@ -157,12 +174,18 @@ export const PageIntegration = ({
 
   useEffect(() => {
     void loadWhatsAppConfig();
-  }, [showToast]);
+  }, [showToast, tenantId, requiresTenantSelection]);
 
   const loadSyncHealth = async () => {
+    if (requiresTenantSelection) {
+      setSyncHealth(null);
+      setSyncHealthLoading(false);
+      return;
+    }
+
     try {
       setSyncHealthLoading(true);
-      const data = await getSyncHealth();
+      const data = await getSyncHealth(tenantId);
       setSyncHealth(data);
     } catch (err) {
       if (!(err instanceof ApiError && err.status === 403)) {
@@ -176,12 +199,18 @@ export const PageIntegration = ({
 
   useEffect(() => {
     void loadSyncHealth();
-  }, [showToast]);
+  }, [showToast, tenantId, requiresTenantSelection]);
 
   const loadApiConfig = async () => {
+    if (requiresTenantSelection) {
+      setApiLoading(false);
+      setApiHasToken(false);
+      return;
+    }
+
     try {
       setApiLoading(true);
-      const data = await getExternalApiConfig();
+      const data = await getExternalApiConfig(tenantId);
       setApiBaseUrl(data.baseUrl ?? "");
       setApiDocsUrl(data.docsUrl ?? "");
       setApiPendingPath(data.pendingTitlesPath ?? "titulos-pendentes");
@@ -200,12 +229,20 @@ export const PageIntegration = ({
 
   useEffect(() => {
     void loadApiConfig();
-  }, [showToast]);
+  }, [showToast, tenantId, requiresTenantSelection]);
 
   const loadDispatchWindowConfig = async () => {
+    if (requiresTenantSelection) {
+      setWindowLoading(false);
+      setDispatchWindowEnabled(false);
+      setDispatchWindowStartTime("09:00");
+      setDispatchWindowEndTime("18:00");
+      return;
+    }
+
     try {
       setWindowLoading(true);
-      const data = await getDispatchWindowConfig();
+      const data = await getDispatchWindowConfig(tenantId);
       setDispatchWindowEnabled(data.enabled);
       setDispatchWindowStartTime(data.startTime || "09:00");
       setDispatchWindowEndTime(data.endTime || "18:00");
@@ -226,7 +263,7 @@ export const PageIntegration = ({
 
   useEffect(() => {
     void loadDispatchWindowConfig();
-  }, [showToast]);
+  }, [showToast, tenantId, requiresTenantSelection]);
 
   const handleSave = async () => {
     if (!host || !port || !user) {
@@ -239,7 +276,7 @@ export const PageIntegration = ({
         host, port: parseInt(port, 10),
         user, password: password || undefined,
         senderFrom, senderName,
-      });
+      }, tenantId);
       setIsConfigured(true);
       setPassword(""); // Clear password after save for security
       showToast(`${ICONS.checkmark} ${t("toast.smtpSaved")}`, "success");
@@ -315,7 +352,7 @@ export const PageIntegration = ({
         accessToken: waToken.trim() || undefined,
         apiBaseUrl: normalizedApiBaseUrl || undefined,
         clearToken: waClearToken,
-      });
+      }, tenantId);
       setWaConfigured(waClearToken ? false : (waToken.trim() ? true : waConfigured));
       setWaToken("");
       setWaClearToken(false);
@@ -332,7 +369,7 @@ export const PageIntegration = ({
   const handleTestWhatsApp = async () => {
     try {
       setWaTesting(true);
-      const res = await testWhatsAppConfig();
+      const res = await testWhatsAppConfig(tenantId);
       showToast(`${ICONS.checkmark} ${res.message}`, "success");
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Falha ao validar configuração WhatsApp.";
@@ -349,7 +386,7 @@ export const PageIntegration = ({
     }
     try {
       setTesting(true);
-      const res = await testSmtpConfig();
+      const res = await testSmtpConfig(tenantId);
       showToast(`${ICONS.mailbox} ${res.message}`, "success");
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Falha no teste SMTP.";
@@ -375,7 +412,7 @@ export const PageIntegration = ({
         authenticationScheme: apiAuthScheme,
         token: apiToken.trim() || undefined,
         clearToken: clearApiToken,
-      });
+      }, tenantId);
 
       setApiHasToken(clearApiToken ? false : (apiToken.trim() ? true : apiHasToken));
       setApiToken("");
@@ -393,7 +430,7 @@ export const PageIntegration = ({
   const handleTestExternalApi = async () => {
     try {
       setApiTesting(true);
-      const res = await testExternalApiConfig();
+      const res = await testExternalApiConfig(tenantId);
       showToast(`${ICONS.checkmark} ${res.message}`, "success");
       await loadSyncHealth();
     } catch (err) {
@@ -419,7 +456,7 @@ export const PageIntegration = ({
         startTime: dispatchWindowStartTime.trim(),
         endTime: dispatchWindowEndTime.trim(),
         pauseAutomaticDispatchDuringProcessing: true,
-      });
+      }, tenantId);
       showToast(`${ICONS.checkmark} ${response.message}`, "success");
       await loadDispatchWindowConfig();
     } catch (err) {
@@ -432,6 +469,12 @@ export const PageIntegration = ({
 
   return (
     <div className="animate-fade-up">
+      {requiresTenantSelection && (
+        <div className="rounded-xl border border-border-subtle bg-surface-2/60 px-4 py-3 text-sm text-text-secondary mb-4">
+          Selecione uma empresa no topo para visualizar e editar integrações.
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4 mb-4">
         {/* SMTP */}
         <div className="bg-surface border border-border-subtle rounded-[14px] overflow-hidden">

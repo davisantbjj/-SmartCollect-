@@ -786,33 +786,33 @@ export async function uploadImportFile(file: File) {
 
 // ── Sync ──────────────────────────────────────────────────────────────────
 
-export async function syncPendingTitles() {
-  return request<SyncResponse>("/api/sync/pending-titles", { method: "POST" });
+export async function syncPendingTitles(tenantId?: string) {
+  return request<SyncResponse>(`/api/sync/pending-titles${tenantParam(tenantId)}`, { method: "POST" });
 }
 
-export async function syncOccurrences() {
-  return request<SyncResponse>("/api/sync/occurrences", { method: "POST" });
+export async function syncOccurrences(tenantId?: string) {
+  return request<SyncResponse>(`/api/sync/occurrences${tenantParam(tenantId)}`, { method: "POST" });
 }
 
-export async function getSyncHealth() {
-  return request<SyncHealthResponse>("/api/sync/health");
+export async function getSyncHealth(tenantId?: string) {
+  return request<SyncHealthResponse>(`/api/sync/health${tenantParam(tenantId)}`);
 }
 
 // ── Templates ─────────────────────────────────────────────────────────────
 
-export async function getTemplates() {
-  return request<MessageTemplateResponse[]>("/api/templates");
+export async function getTemplates(tenantId?: string) {
+  return request<MessageTemplateResponse[]>(`/api/templates${tenantParam(tenantId)}`);
 }
 
-export async function createTemplate(payload: CreateTemplateRequest) {
-  return request<MessageTemplateResponse>("/api/templates", {
+export async function createTemplate(payload: CreateTemplateRequest, tenantId?: string) {
+  return request<MessageTemplateResponse>(`/api/templates${tenantParam(tenantId)}`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
-export async function updateTemplate(id: string, payload: UpdateTemplateRequest) {
-  return request<MessageTemplateResponse>(`/api/templates/${id}`, {
+export async function updateTemplate(id: string, payload: UpdateTemplateRequest, tenantId?: string) {
+  return request<MessageTemplateResponse>(`/api/templates/${id}${tenantParam(tenantId)}`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });
@@ -820,83 +820,83 @@ export async function updateTemplate(id: string, payload: UpdateTemplateRequest)
 
 // ── Collection Rules ──────────────────────────────────────────────────────
 
-export async function getCollectionRules() {
-  return request<CollectionRuleResponse[]>("/api/collection-rules");
+export async function getCollectionRules(tenantId?: string) {
+  return request<CollectionRuleResponse[]>(`/api/collection-rules${tenantParam(tenantId)}`);
 }
 
-export async function createCollectionRule(payload: CreateCollectionRuleRequest) {
-  return request<CollectionRuleResponse>("/api/collection-rules", {
+export async function createCollectionRule(payload: CreateCollectionRuleRequest, tenantId?: string) {
+  return request<CollectionRuleResponse>(`/api/collection-rules${tenantParam(tenantId)}`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
-export async function updateCollectionRule(id: string, payload: CreateCollectionRuleRequest) {
-  return request<CollectionRuleResponse>(`/api/collection-rules/${id}`, {
+export async function updateCollectionRule(id: string, payload: CreateCollectionRuleRequest, tenantId?: string) {
+  return request<CollectionRuleResponse>(`/api/collection-rules/${id}${tenantParam(tenantId)}`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });
 }
 
-export async function deleteCollectionRule(id: string) {
-  return request<void>(`/api/collection-rules/${id}`, {
+export async function deleteCollectionRule(id: string, tenantId?: string) {
+  return request<void>(`/api/collection-rules/${id}${tenantParam(tenantId)}`, {
     method: "DELETE",
   });
 }
 
 // ── SMTP Config ───────────────────────────────────────────────────────────
 
-export async function getSmtpConfig() {
-  return request<SmtpConfigResponse>("/api/config/smtp");
+export async function getSmtpConfig(tenantId?: string) {
+  return request<SmtpConfigResponse>(`/api/config/smtp${tenantParam(tenantId)}`);
 }
 
-export async function saveSmtpConfig(payload: SmtpConfigRequest) {
-  return request<{ message: string }>("/api/config/smtp", {
+export async function saveSmtpConfig(payload: SmtpConfigRequest, tenantId?: string) {
+  return request<{ message: string }>(`/api/config/smtp${tenantParam(tenantId)}`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
-export async function testSmtpConfig() {
-  return request<{ message: string }>("/api/config/smtp/test", { method: "POST" });
+export async function testSmtpConfig(tenantId?: string) {
+  return request<{ message: string }>(`/api/config/smtp/test${tenantParam(tenantId)}`, { method: "POST" });
 }
 
-export async function getWhatsAppConfig() {
-  return request<WhatsAppConfigResponse>("/api/config/whatsapp");
+export async function getWhatsAppConfig(tenantId?: string) {
+  return request<WhatsAppConfigResponse>(`/api/config/whatsapp${tenantParam(tenantId)}`);
 }
 
-export async function saveWhatsAppConfig(payload: WhatsAppConfigRequest) {
-  return request<{ message: string }>("/api/config/whatsapp", {
+export async function saveWhatsAppConfig(payload: WhatsAppConfigRequest, tenantId?: string) {
+  return request<{ message: string }>(`/api/config/whatsapp${tenantParam(tenantId)}`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
-export async function testWhatsAppConfig() {
-  return request<{ message: string }>("/api/config/whatsapp/test", { method: "POST" });
+export async function testWhatsAppConfig(tenantId?: string) {
+  return request<{ message: string }>(`/api/config/whatsapp/test${tenantParam(tenantId)}`, { method: "POST" });
 }
 
-export async function getExternalApiConfig() {
-  return request<ExternalApiConfigResponse>("/api/config/external-api");
+export async function getExternalApiConfig(tenantId?: string) {
+  return request<ExternalApiConfigResponse>(`/api/config/external-api${tenantParam(tenantId)}`);
 }
 
-export async function saveExternalApiConfig(payload: ExternalApiConfigRequest) {
-  return request<{ message: string }>("/api/config/external-api", {
+export async function saveExternalApiConfig(payload: ExternalApiConfigRequest, tenantId?: string) {
+  return request<{ message: string }>(`/api/config/external-api${tenantParam(tenantId)}`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
-export async function testExternalApiConfig() {
-  return request<{ message: string }>("/api/config/external-api/test", { method: "POST" });
+export async function testExternalApiConfig(tenantId?: string) {
+  return request<{ message: string }>(`/api/config/external-api/test${tenantParam(tenantId)}`, { method: "POST" });
 }
 
-export async function getDispatchWindowConfig() {
-  return request<DispatchWindowConfigResponse>("/api/config/dispatch-window");
+export async function getDispatchWindowConfig(tenantId?: string) {
+  return request<DispatchWindowConfigResponse>(`/api/config/dispatch-window${tenantParam(tenantId)}`);
 }
 
-export async function saveDispatchWindowConfig(payload: DispatchWindowConfigRequest) {
-  return request<{ message: string }>("/api/config/dispatch-window", {
+export async function saveDispatchWindowConfig(payload: DispatchWindowConfigRequest, tenantId?: string) {
+  return request<{ message: string }>(`/api/config/dispatch-window${tenantParam(tenantId)}`, {
     method: "POST",
     body: JSON.stringify(payload),
   });

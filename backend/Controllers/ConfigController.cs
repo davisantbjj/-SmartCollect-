@@ -8,7 +8,7 @@ using SmartCollect.Api.Security;
 
 [ApiController]
 [Route("api/config")]
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = "Admin,Master")]
 public class ConfigController : ControllerBase
 {
     private readonly ISmtpConfigService _smtpService;
@@ -28,21 +28,28 @@ public class ConfigController : ControllerBase
         _dispatchWindowService = dispatchWindowService;
     }
 
-    private Guid GetTenantId() => TenantContextResolver.GetTenantIdOrThrow(User);
+    private Guid ResolveTenantId(Guid? tenantId) => TenantContextResolver.ResolveTenantOrThrow(User, tenantId);
 
     [HttpGet("smtp")]
-    public async Task<IActionResult> GetSmtp()
-    {
-        var result = await _smtpService.GetAsync(GetTenantId());
-        return result is null ? NotFound() : Ok(result);
-    }
-
-    [HttpPost("smtp")]
-    public async Task<IActionResult> SaveSmtp([FromBody] SmtpConfigRequest request)
+    public async Task<IActionResult> GetSmtp([FromQuery] Guid? tenantId = null)
     {
         try
         {
-            await _smtpService.SaveAsync(GetTenantId(), request);
+            var result = await _smtpService.GetAsync(ResolveTenantId(tenantId));
+            return result is null ? NotFound() : Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("smtp")]
+    public async Task<IActionResult> SaveSmtp([FromBody] SmtpConfigRequest request, [FromQuery] Guid? tenantId = null)
+    {
+        try
+        {
+            await _smtpService.SaveAsync(ResolveTenantId(tenantId), request);
             return Ok(new { message = "Configuração SMTP salva com sucesso." });
         }
         catch (InvalidOperationException ex)
@@ -52,27 +59,41 @@ public class ConfigController : ControllerBase
     }
 
     [HttpPost("smtp/test")]
-    public async Task<IActionResult> TestSmtp()
-    {
-        var success = await _smtpService.TestAsync(GetTenantId());
-        return success
-            ? Ok(new { message = "Conexão SMTP testada com sucesso." })
-            : BadRequest(new { message = "Falha no teste SMTP. Verifique host, porta e credenciais." });
-    }
-
-    [HttpGet("whatsapp")]
-    public async Task<IActionResult> GetWhatsApp()
-    {
-        var result = await _whatsAppService.GetAsync(GetTenantId());
-        return result is null ? NotFound() : Ok(result);
-    }
-
-    [HttpPost("whatsapp")]
-    public async Task<IActionResult> SaveWhatsApp([FromBody] WhatsAppConfigRequest request)
+    public async Task<IActionResult> TestSmtp([FromQuery] Guid? tenantId = null)
     {
         try
         {
-            await _whatsAppService.SaveAsync(GetTenantId(), request);
+            var success = await _smtpService.TestAsync(ResolveTenantId(tenantId));
+            return success
+                ? Ok(new { message = "Conexão SMTP testada com sucesso." })
+                : BadRequest(new { message = "Falha no teste SMTP. Verifique host, porta e credenciais." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("whatsapp")]
+    public async Task<IActionResult> GetWhatsApp([FromQuery] Guid? tenantId = null)
+    {
+        try
+        {
+            var result = await _whatsAppService.GetAsync(ResolveTenantId(tenantId));
+            return result is null ? NotFound() : Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("whatsapp")]
+    public async Task<IActionResult> SaveWhatsApp([FromBody] WhatsAppConfigRequest request, [FromQuery] Guid? tenantId = null)
+    {
+        try
+        {
+            await _whatsAppService.SaveAsync(ResolveTenantId(tenantId), request);
             return Ok(new { message = "Configuração WhatsApp salva com sucesso." });
         }
         catch (InvalidOperationException ex)
@@ -82,50 +103,85 @@ public class ConfigController : ControllerBase
     }
 
     [HttpPost("whatsapp/test")]
-    public async Task<IActionResult> TestWhatsApp()
-    {
-        var success = await _whatsAppService.TestAsync(GetTenantId());
-        return success
-            ? Ok(new { message = "Configuração WhatsApp validada com sucesso." })
-            : BadRequest(new { message = "Falha na validação WhatsApp. Verifique provedor, ID e token." });
-    }
-
-    [HttpGet("external-api")]
-    public async Task<IActionResult> GetExternalApiConfig(CancellationToken cancellationToken)
-    {
-        var result = await _syncService.GetExternalApiConfigAsync(GetTenantId(), cancellationToken);
-        return Ok(result);
-    }
-
-    [HttpPost("external-api")]
-    public async Task<IActionResult> SaveExternalApiConfig([FromBody] ExternalApiConfigRequest request, CancellationToken cancellationToken)
-    {
-        await _syncService.SaveExternalApiConfigAsync(GetTenantId(), request, cancellationToken);
-        return Ok(new { message = "Configuração da API externa salva com sucesso." });
-    }
-
-    [HttpPost("external-api/test")]
-    public async Task<IActionResult> TestExternalApi(CancellationToken cancellationToken)
-    {
-        var connected = await _syncService.CheckExternalApiConnectionAsync(GetTenantId(), cancellationToken);
-        return connected
-            ? Ok(new { message = "Conexão com API externa validada com sucesso." })
-            : StatusCode(502, new { message = "Não foi possível conectar na API externa com a configuração atual." });
-    }
-
-    [HttpGet("dispatch-window")]
-    public async Task<IActionResult> GetDispatchWindow(CancellationToken cancellationToken)
-    {
-        var result = await _dispatchWindowService.GetAsync(GetTenantId(), cancellationToken);
-        return Ok(result);
-    }
-
-    [HttpPost("dispatch-window")]
-    public async Task<IActionResult> SaveDispatchWindow([FromBody] DispatchWindowConfigRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> TestWhatsApp([FromQuery] Guid? tenantId = null)
     {
         try
         {
-            await _dispatchWindowService.SaveAsync(GetTenantId(), request, cancellationToken);
+            var success = await _whatsAppService.TestAsync(ResolveTenantId(tenantId));
+            return success
+                ? Ok(new { message = "Configuração WhatsApp validada com sucesso." })
+                : BadRequest(new { message = "Falha na validação WhatsApp. Verifique provedor, ID e token." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("external-api")]
+    public async Task<IActionResult> GetExternalApiConfig([FromQuery] Guid? tenantId = null, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await _syncService.GetExternalApiConfigAsync(ResolveTenantId(tenantId), cancellationToken);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("external-api")]
+    public async Task<IActionResult> SaveExternalApiConfig([FromBody] ExternalApiConfigRequest request, [FromQuery] Guid? tenantId = null, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _syncService.SaveExternalApiConfigAsync(ResolveTenantId(tenantId), request, cancellationToken);
+            return Ok(new { message = "Configuração da API externa salva com sucesso." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("external-api/test")]
+    public async Task<IActionResult> TestExternalApi([FromQuery] Guid? tenantId = null, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var connected = await _syncService.CheckExternalApiConnectionAsync(ResolveTenantId(tenantId), cancellationToken);
+            return connected
+                ? Ok(new { message = "Conexão com API externa validada com sucesso." })
+                : StatusCode(502, new { message = "Não foi possível conectar na API externa com a configuração atual." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("dispatch-window")]
+    public async Task<IActionResult> GetDispatchWindow([FromQuery] Guid? tenantId = null, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await _dispatchWindowService.GetAsync(ResolveTenantId(tenantId), cancellationToken);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("dispatch-window")]
+    public async Task<IActionResult> SaveDispatchWindow([FromBody] DispatchWindowConfigRequest request, [FromQuery] Guid? tenantId = null, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _dispatchWindowService.SaveAsync(ResolveTenantId(tenantId), request, cancellationToken);
             return Ok(new { message = "Janela de envio salva com sucesso." });
         }
         catch (InvalidOperationException ex)

@@ -36,9 +36,11 @@ const newTrigger = (): TriggerFormItem => ({
 export const PageSequence = ({
   showToast,
   session,
+  selectedTenantId,
 }: {
   showToast: ShowToast;
   session: StoredSession;
+  selectedTenantId?: string;
 }) => {
   const [rules, setRules] = useState<CollectionRuleResponse[]>([]);
   const [templates, setTemplates] = useState<MessageTemplateResponse[]>([]);
@@ -54,7 +56,12 @@ export const PageSequence = ({
   const [triggers, setTriggers] = useState<TriggerFormItem[]>([newTrigger()]);
   const [selectedRuleId, setSelectedRuleId] = useState<string>("");
 
-  const canEdit = session.role === "Admin" || session.role === "Worker";
+  const tenantId = session.role === "Master" ? selectedTenantId : undefined;
+  const requiresTenantSelection = session.role === "Master" && !tenantId;
+  const canEdit =
+    session.role === "Admin"
+    || session.role === "Worker"
+    || (session.role === "Master" && Boolean(tenantId));
   const activeRules = rules.filter(r => r.active);
   const selectedRule = rules.find(r => r.id === selectedRuleId) ?? activeRules[0] ?? rules[0];
 
@@ -72,9 +79,16 @@ export const PageSequence = ({
   };
 
   const load = async () => {
+    if (requiresTenantSelection) {
+      setRules([]);
+      setTemplates([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const [r, tpl] = await Promise.all([getCollectionRules(), getTemplates()]);
+      const [r, tpl] = await Promise.all([getCollectionRules(tenantId), getTemplates(tenantId)]);
       setRules(r);
       setTemplates(tpl.filter(t => t.active));
     } catch (err) {
@@ -87,7 +101,7 @@ export const PageSequence = ({
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [tenantId, requiresTenantSelection]);
 
   useEffect(() => {
     if (rules.length === 0) {
@@ -158,6 +172,11 @@ export const PageSequence = ({
   };
 
   const handleSave = async () => {
+    if (requiresTenantSelection) {
+      showToast(`${ICONS.warning} Selecione uma empresa para gerenciar régua de cobrança.`, "warn");
+      return;
+    }
+
     if (!ruleName.trim()) {
       showToast(`${ICONS.warning} Nome da régua é obrigatório.`, "warn");
       return;
@@ -190,10 +209,10 @@ export const PageSequence = ({
     try {
       setSaving(true);
       if (editingRuleId) {
-        await updateCollectionRule(editingRuleId, payload);
+        await updateCollectionRule(editingRuleId, payload, tenantId);
         showToast(`${ICONS.checkmark} Régua atualizada com sucesso!`, "success");
       } else {
-        await createCollectionRule(payload);
+        await createCollectionRule(payload, tenantId);
         showToast(`${ICONS.checkmark} Régua criada com sucesso!`, "success");
       }
       setEditorOpen(false);
@@ -210,6 +229,11 @@ export const PageSequence = ({
     if (!canEdit)
       return;
 
+    if (requiresTenantSelection) {
+      showToast(`${ICONS.warning} Selecione uma empresa para excluir regras.`, "warn");
+      return;
+    }
+
     if (rule.isDefault) {
       showToast(`${ICONS.info} Esta é uma régua padrão e não pode ser excluída.`, "info");
       return;
@@ -221,7 +245,7 @@ export const PageSequence = ({
 
     try {
       setDeletingRuleId(rule.id);
-      await deleteCollectionRule(rule.id);
+      await deleteCollectionRule(rule.id, tenantId);
       showToast(`${ICONS.checkmark} Régua excluída com sucesso!`, "success");
       await load();
     } catch (err) {
@@ -243,10 +267,16 @@ export const PageSequence = ({
 
   return (
     <div className="animate-fade-up">
+      {requiresTenantSelection && (
+        <div className="rounded-xl border border-border-subtle bg-surface-2/60 px-4 py-3 text-sm text-text-secondary mb-4">
+          Selecione uma empresa no topo para visualizar e editar a régua de cobrança.
+        </div>
+      )}
+
       <div className="flex justify-end items-center mb-[22px]">
         {canEdit && (
           <div className="flex gap-2">
-            <Button variant="primary" onClick={openNew}>
+            <Button variant="primary" onClick={openNew} disabled={requiresTenantSelection}>
               {ICONS.plus} Nova Régua
             </Button>
           </div>

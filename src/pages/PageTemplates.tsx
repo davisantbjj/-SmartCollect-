@@ -24,9 +24,11 @@ const emptyForm: TemplateForm = { name: "", channel: "Email", type: "Collection"
 export const PageTemplates = ({
   showToast,
   session,
+  selectedTenantId,
 }: {
   showToast: ShowToast;
   session: StoredSession;
+  selectedTenantId?: string;
 }) => {
   const [templates, setTemplates] = useState<MessageTemplateResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,12 +38,23 @@ export const PageTemplates = ({
   const [form, setForm] = useState<TemplateForm>(emptyForm);
   const [saving, setSaving] = useState(false);
 
-  const canEdit = session.role === "Admin" || session.role === "Worker";
+  const tenantId = session.role === "Master" ? selectedTenantId : undefined;
+  const requiresTenantSelection = session.role === "Master" && !tenantId;
+  const canEdit =
+    session.role === "Admin"
+    || session.role === "Worker"
+    || (session.role === "Master" && Boolean(tenantId));
 
   const load = async () => {
+    if (requiresTenantSelection) {
+      setTemplates([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const data = await getTemplates();
+      const data = await getTemplates(tenantId);
       setTemplates(data);
     } catch {
       showToast(`${ICONS.cross} Erro ao carregar templates.`, "error");
@@ -50,7 +63,7 @@ export const PageTemplates = ({
     }
   };
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); }, [tenantId, requiresTenantSelection]);
 
   const openNew = () => {
     setEditing(null);
@@ -72,6 +85,11 @@ export const PageTemplates = ({
   };
 
   const handleSave = async () => {
+    if (requiresTenantSelection) {
+      showToast(`${ICONS.warning} Selecione uma empresa para gerenciar templates.`, "warn");
+      return;
+    }
+
     if (!form.name || !form.body) {
       showToast(`${ICONS.warning} Nome e mensagem são obrigatórios.`, "warn");
       return;
@@ -86,12 +104,12 @@ export const PageTemplates = ({
         await updateTemplate(editing.id, {
           name: form.name, channel: form.channel, type: form.type,
           subject: form.subject || undefined, body: form.body, active: form.active,
-        });
+        }, tenantId);
       } else {
         await createTemplate({
           name: form.name, channel: form.channel, type: form.type,
           subject: form.subject || undefined, body: form.body,
-        });
+        }, tenantId);
       }
       showToast(`${ICONS.checkmark} ${t("toast.templateCreated")}`, "success");
       setModalOpen(false);
@@ -112,9 +130,17 @@ export const PageTemplates = ({
 
   return (
     <div className="animate-fade-up">
+      {requiresTenantSelection && (
+        <div className="rounded-xl border border-border-subtle bg-surface-2/60 px-4 py-3 text-sm text-text-secondary mb-4">
+          Selecione uma empresa no topo para visualizar e editar templates.
+        </div>
+      )}
+
       <div className="flex justify-end mb-5">
         {canEdit && (
-          <Button variant="primary" onClick={openNew}>{t("templates.createTemplate")}</Button>
+          <Button variant="primary" onClick={openNew} disabled={requiresTenantSelection}>
+            {t("templates.createTemplate")}
+          </Button>
         )}
       </div>
 

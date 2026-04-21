@@ -664,12 +664,14 @@ export async function getDashboardActivityLog(tenantId?: string, startDate?: str
 // ── Titles ────────────────────────────────────────────────────────────────
 
 export async function getTitles(params: {
+  tenantId?: string;
   status?: string;
   search?: string;
   page?: number;
   pageSize?: number;
 }) {
   const q = new URLSearchParams();
+  if (params.tenantId) q.set("tenantId", params.tenantId);
   if (params.status) q.set("status", params.status);
   if (params.search) q.set("search", params.search);
   q.set("page", String(params.page ?? 1));
@@ -681,8 +683,8 @@ export async function getTitleById(id: string) {
   return request<TitleResponse>(`/api/titles/${id}`);
 }
 
-export async function getTitleHistory(id: string) {
-  return request<TitleHistoryResponse[]>(`/api/titles/${id}/history`);
+export async function getTitleHistory(id: string, tenantId?: string) {
+  return request<TitleHistoryResponse[]>(`/api/titles/${id}/history${tenantParam(tenantId)}`);
 }
 
 export async function createTitle(payload: CreateTitleRequest) {

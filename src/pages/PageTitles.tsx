@@ -13,9 +13,15 @@ import type { ShowToast } from "../types";
 export const PageTitles = ({
   showToast,
   session,
+  selectedTenantId,
+  presetStatusFilter,
+  presetFilterToken,
 }: {
   showToast: ShowToast;
   session: StoredSession;
+  selectedTenantId?: string;
+  presetStatusFilter?: string;
+  presetFilterToken?: number;
 }) => {
   const [titles, setTitles] = useState<TitleResponse[]>([]);
   const [clients, setClients] = useState<ClientResponse[]>([]);
@@ -58,9 +64,18 @@ export const PageTitles = ({
   const canWrite = session.role === "Admin" || session.role === "Worker";
 
   const load = useCallback(async () => {
+    if (session.role === "Master" && !selectedTenantId) {
+      setTitles([]);
+      setTotalPages(1);
+      setTotalCount(0);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       const res = await getTitles({
+        tenantId: session.role === "Master" ? selectedTenantId : undefined,
         status: statusFilter === "all" ? undefined : statusFilter,
         search: search || undefined,
         page,
@@ -75,13 +90,24 @@ export const PageTitles = ({
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, search, page, showToast]);
+  }, [session.role, selectedTenantId, statusFilter, search, page, showToast]);
 
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
     getClients().then(setClients).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!presetFilterToken || !presetStatusFilter) return;
+
+    const allowedStatuses = new Set(["all", "Open", "Paid", "Overdue", "Cancelled"]);
+    if (!allowedStatuses.has(presetStatusFilter)) return;
+
+    setSearch("");
+    setStatusFilter(presetStatusFilter);
+    setPage(1);
+  }, [presetFilterToken, presetStatusFilter]);
 
   const handleCreate = async () => {
     if (!fClientId || !fCode || !fAmount || !fDue) {
@@ -260,7 +286,7 @@ export const PageTitles = ({
       setHistoryOpen(true);
       setHistoryLoading(true);
       setHistoryTitleCode(title.uniqueCode);
-      const items = await getTitleHistory(title.id);
+      const items = await getTitleHistory(title.id, session.role === "Master" ? selectedTenantId : undefined);
       setHistoryItems(items);
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Erro ao carregar histórico.";

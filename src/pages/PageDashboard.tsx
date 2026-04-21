@@ -32,10 +32,12 @@ export const PageDashboard = ({
   showToast,
   session,
   selectedTenantId,
+  onViewAllDefaulters,
 }: {
   showToast: ShowToast;
   session: StoredSession;
   selectedTenantId?: string;
+  onViewAllDefaulters?: () => void;
 }) => {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState({ totalReceivable: 0, totalOverdue: 0, totalPaid: 0, recoveryRate: 0 });
@@ -268,7 +270,7 @@ export const PageDashboard = ({
           <CardHeader
             title={<>{ICONS.trophy} {t("dashboard.topDefaulters")}</>}
             subtitle={t("dashboard.byOutstandingAmount")}
-            right={<Button variant="secondary" size="sm">{t("common.viewAll")}</Button>}
+            right={<Button variant="secondary" size="sm" onClick={onViewAllDefaulters} disabled={!onViewAllDefaulters}>{t("common.viewAll")}</Button>}
           />
           <div className="px-5 py-3.5 flex flex-col gap-[9px]">
             {topDefaulters.length === 0 && !loading && (

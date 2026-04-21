@@ -64,6 +64,7 @@ export default function SmartCollect() {
   const [session, setSessionState] = useState<StoredSession | null>(() => getSession());
   const [tenants, setTenants] = useState<TenantResponse[]>([]);
   const [selectedTenantId, setSelectedTenantId] = useState("");
+  const [titlesPreset, setTitlesPreset] = useState<{ status: string; token: number } | null>(null);
   const {
     toast,
     show: showToast,
@@ -129,6 +130,17 @@ export default function SmartCollect() {
     showToast(`${ICONS.folder} ${t("toast.importAreaOpened")}`, "info");
   }, [showToast]);
 
+  const goOverdueTitles = useCallback(() => {
+    if (session?.role === "Master" && !selectedTenantId) {
+      showToast(`${ICONS.warning} Selecione uma empresa para visualizar os títulos inadimplentes.`, "warn");
+      return;
+    }
+
+    setTitlesPreset({ status: "Overdue", token: Date.now() });
+    setPage("titles");
+    showToast(`${ICONS.trophy} Exibindo todos os inadimplentes.`, "info");
+  }, [session?.role, selectedTenantId, showToast]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password) {
@@ -188,7 +200,7 @@ export default function SmartCollect() {
     if (!session) return;
 
     const allowedByRole: Record<string, PageId[]> = {
-      Master: ["dashboard", "analytics", "tenants"],
+      Master: ["dashboard", "analytics", "titles", "tenants"],
       Admin: ["dashboard", "analytics", "titles", "import", "contacts", "sequence", "templates", "integration", "workers"],
       Worker: ["dashboard", "analytics", "titles", "import", "contacts", "sequence", "templates"],
     };
@@ -339,9 +351,9 @@ export default function SmartCollect() {
 
   // ── Main app ──────────────────────────────────────────────────────────────
   const pages: Record<PageId, React.ReactNode> = {
-    dashboard:   <PageDashboard showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} />,
+    dashboard:   <PageDashboard showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} onViewAllDefaulters={goOverdueTitles} />,
     analytics:   <PageAnalytics showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} />,
-    titles:      <PageTitles showToast={showToast} session={session} />,
+    titles:      <PageTitles showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} presetStatusFilter={titlesPreset?.status} presetFilterToken={titlesPreset?.token} />,
     import:      <PageImport showToast={showToast} session={session} />,
     contacts:    <PageContacts showToast={showToast} />,
     sequence:    <PageSequence showToast={showToast} session={session} />,

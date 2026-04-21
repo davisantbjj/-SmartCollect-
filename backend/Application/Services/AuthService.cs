@@ -62,9 +62,24 @@ public class AuthService : IAuthService
         _ => "Acesso bloqueado."
     };
 
+    private static UserRole ResolveTenantUserRole(string? role)
+    {
+        if (string.IsNullOrWhiteSpace(role))
+            return UserRole.Worker;
+
+        if (role.Equals(nameof(UserRole.Worker), StringComparison.OrdinalIgnoreCase))
+            return UserRole.Worker;
+
+        if (role.Equals(nameof(UserRole.Admin), StringComparison.OrdinalIgnoreCase))
+            return UserRole.Admin;
+
+        throw new InvalidOperationException("Perfil inválido. Use Admin ou Worker.");
+    }
+
     public async Task<AuthResponse?> RegisterAsync(Guid tenantId, RegisterRequest request)
     {
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+        var role = ResolveTenantUserRole(request.Role);
 
         var tenantExists = await _db.Tenants.AnyAsync(t => t.Id == tenantId && t.Active);
         if (!tenantExists) return null;
@@ -79,7 +94,7 @@ public class AuthService : IAuthService
             Name = request.Name,
             Email = normalizedEmail,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-            Role = UserRole.Worker,
+            Role = role,
             Active = true
         };
 

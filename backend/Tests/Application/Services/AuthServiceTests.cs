@@ -240,4 +240,39 @@ public class AuthServiceTests
         Assert.NotNull(result);
         Assert.Equal("Worker", result!.Role);
     }
+
+    [Fact]
+    public async Task Register_NewUser_WithAdminRole_ReturnsAdminRole()
+    {
+        var (_, tenant) = await SetupAsync();
+        var db = TestDbContextFactory.Create();
+        db.Tenants.Add(new Tenant { Id = tenant.Id, CompanyName = tenant.CompanyName, TaxId = tenant.TaxId });
+        await db.SaveChangesAsync();
+
+        var freshSvc = new AuthService(db, CreateConfig());
+        var result = await freshSvc.RegisterAsync(
+            tenant.Id,
+            new RegisterRequest("New Admin", "admin-new@test.com", "password123", "Admin"));
+
+        Assert.NotNull(result);
+        Assert.Equal("Admin", result!.Role);
+    }
+
+    [Fact]
+    public async Task Register_WithInvalidRole_Throws()
+    {
+        var (_, tenant) = await SetupAsync();
+        var db = TestDbContextFactory.Create();
+        db.Tenants.Add(new Tenant { Id = tenant.Id, CompanyName = tenant.CompanyName, TaxId = tenant.TaxId });
+        await db.SaveChangesAsync();
+
+        var freshSvc = new AuthService(db, CreateConfig());
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            freshSvc.RegisterAsync(
+                tenant.Id,
+                new RegisterRequest("Bad Role", "bad-role@test.com", "password123", "Master")));
+
+        Assert.Equal("Perfil inválido. Use Admin ou Worker.", ex.Message);
+    }
 }

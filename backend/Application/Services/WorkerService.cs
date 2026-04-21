@@ -14,12 +14,16 @@ public class WorkerService : IWorkerService
     public async Task<List<WorkerResponse>> ListAsync(Guid tenantId)
     {
         return await _db.Users
-            .Where(u => u.TenantId == tenantId && u.Role == UserRole.Worker)
-            .OrderBy(u => u.Name)
+            .Where(u =>
+                u.TenantId == tenantId &&
+                (u.Role == UserRole.Admin || u.Role == UserRole.Worker))
+            .OrderByDescending(u => u.Role == UserRole.Admin)
+            .ThenBy(u => u.Name)
             .Select(u => new WorkerResponse(
                 u.Id,
                 u.Name,
                 u.Email,
+                u.Role.ToString(),
                 u.Active,
                 u.CreatedAt,
                 u.LastLogin))
@@ -29,7 +33,10 @@ public class WorkerService : IWorkerService
     public async Task<WorkerResponse?> UpdateAsync(Guid tenantId, Guid workerId, UpdateWorkerRequest request)
     {
         var worker = await _db.Users
-            .FirstOrDefaultAsync(u => u.Id == workerId && u.TenantId == tenantId && u.Role == UserRole.Worker);
+            .FirstOrDefaultAsync(u =>
+                u.Id == workerId &&
+                u.TenantId == tenantId &&
+                (u.Role == UserRole.Admin || u.Role == UserRole.Worker));
 
         if (worker is null) return null;
 
@@ -45,6 +52,7 @@ public class WorkerService : IWorkerService
             worker.Id,
             worker.Name,
             worker.Email,
+            worker.Role.ToString(),
             worker.Active,
             worker.CreatedAt,
             worker.LastLogin);

@@ -388,7 +388,7 @@ export default function SmartCollect() {
     sequence:    <PageSequence showToast={showToast} session={session} />,
     templates:   <PageTemplates showToast={showToast} session={session} />,
     integration: <PageIntegration showToast={showToast} session={session} />,
-    workers:     <PageWorkers showToast={showToast} />,
+    workers:     <PageWorkers showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} />,
     tenants:     <PageTenants showToast={showToast} />,
   };
 

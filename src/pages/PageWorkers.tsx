@@ -4,13 +4,23 @@ import { ICONS } from "../utils/icons";
 import {
   ApiError,
   getWorkers,
-  registerWorker,
+  registerTenantUser,
   updateWorker,
+  type StoredSession,
+  type TenantUserRole,
   type WorkerResponse,
 } from "../services/api";
 import type { ShowToast } from "../types";
 
-export const PageWorkers = ({ showToast }: { showToast: ShowToast }) => {
+export const PageWorkers = ({
+  showToast,
+  session,
+  selectedTenantId,
+}: {
+  showToast: ShowToast;
+  session: StoredSession;
+  selectedTenantId?: string;
+}) => {
   const [workers, setWorkers] = useState<WorkerResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -22,17 +32,27 @@ export const PageWorkers = ({ showToast }: { showToast: ShowToast }) => {
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [newRole, setNewRole] = useState<TenantUserRole>("Worker");
 
   const [editName, setEditName] = useState("");
   const [editActive, setEditActive] = useState(true);
   const [editPassword, setEditPassword] = useState("");
 
+  const tenantId = session.role === "Master" ? selectedTenantId : undefined;
+  const requiresTenantSelection = session.role === "Master" && !tenantId;
+
   const load = async () => {
+    if (requiresTenantSelection) {
+      setWorkers([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      setWorkers(await getWorkers());
+      setWorkers(await getWorkers(tenantId));
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao carregar workers.";
+      const msg = err instanceof ApiError ? err.message : "Erro ao carregar usuários.";
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setLoading(false);
@@ -41,7 +61,7 @@ export const PageWorkers = ({ showToast }: { showToast: ShowToast }) => {
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [tenantId, requiresTenantSelection]);
 
   const openEdit = (worker: WorkerResponse) => {
     setSelected(worker);
@@ -57,17 +77,23 @@ export const PageWorkers = ({ showToast }: { showToast: ShowToast }) => {
       return;
     }
 
+    if (requiresTenantSelection) {
+      showToast(`${ICONS.warning} Selecione uma empresa para cadastrar usuários.`, "warn");
+      return;
+    }
+
     try {
       setSaving(true);
-      await registerWorker(newName, newEmail, newPassword);
-      showToast(`${ICONS.checkmark} Worker cadastrado com sucesso.`, "success");
+      await registerTenantUser(newName.trim(), newEmail.trim(), newPassword, newRole, tenantId);
+      showToast(`${ICONS.checkmark} Usuário cadastrado com sucesso.`, "success");
       setCreateOpen(false);
       setNewName("");
       setNewEmail("");
       setNewPassword("");
+      setNewRole("Worker");
       await load();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao cadastrar worker.";
+      const msg = err instanceof ApiError ? err.message : "Erro ao cadastrar usuário.";
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setSaving(false);
@@ -77,7 +103,12 @@ export const PageWorkers = ({ showToast }: { showToast: ShowToast }) => {
   const handleUpdate = async () => {
     if (!selected) return;
     if (!editName.trim()) {
-      showToast(`${ICONS.warning} Nome do worker é obrigatório.`, "warn");
+      showToast(`${ICONS.warning} Nome do usuário é obrigatório.`, "warn");
+      return;
+    }
+
+    if (requiresTenantSelection) {
+      showToast(`${ICONS.warning} Selecione uma empresa para atualizar usuários.`, "warn");
       return;
     }
 
@@ -87,12 +118,12 @@ export const PageWorkers = ({ showToast }: { showToast: ShowToast }) => {
         name: editName.trim(),
         active: editActive,
         password: editPassword.trim() || undefined,
-      });
-      showToast(`${ICONS.checkmark} Worker atualizado com sucesso.`, "success");
+      }, tenantId);
+      showToast(`${ICONS.checkmark} Usuário atualizado com sucesso.`, "success");
       setEditOpen(false);
       await load();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao atualizar worker.";
+      const msg = err instanceof ApiError ? err.message : "Erro ao atualizar usuário.";
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setSaving(false);
@@ -100,6 +131,11 @@ export const PageWorkers = ({ showToast }: { showToast: ShowToast }) => {
   };
 
   const handleToggleAccess = async (worker: WorkerResponse) => {
+    if (requiresTenantSelection) {
+      showToast(`${ICONS.warning} Selecione uma empresa para atualizar usuários.`, "warn");
+      return;
+    }
+
     const nextActive = !worker.active;
     const confirmed = window.confirm(
       `Deseja ${nextActive ? "reativar" : "inativar"} o acesso de \"${worker.name}\"?`
@@ -111,14 +147,14 @@ export const PageWorkers = ({ showToast }: { showToast: ShowToast }) => {
       await updateWorker(worker.id, {
         name: worker.name,
         active: nextActive,
-      });
+      }, tenantId);
       showToast(
-        `${ICONS.checkmark} Acesso do worker ${nextActive ? "reativado" : "inativado"} com sucesso.`,
+        `${ICONS.checkmark} Acesso do usuário ${nextActive ? "reativado" : "inativado"} com sucesso.`,
         "success"
       );
       await load();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao atualizar acesso do worker.";
+      const msg = err instanceof ApiError ? err.message : "Erro ao atualizar acesso do usuário.";
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setUpdatingWorkerId(null);
@@ -128,10 +164,21 @@ export const PageWorkers = ({ showToast }: { showToast: ShowToast }) => {
   return (
     <div className="animate-fade-up">
       <div className="flex justify-end mb-4">
-        <Button variant="primary" onClick={() => setCreateOpen(true)}>
-          {ICONS.plus} Novo Worker
+        <Button
+          variant="primary"
+          onClick={() => setCreateOpen(true)}
+          disabled={requiresTenantSelection}
+          title={requiresTenantSelection ? "Selecione uma empresa para cadastrar usuários" : undefined}
+        >
+          {ICONS.plus} Novo Usuário
         </Button>
       </div>
+
+      {requiresTenantSelection && (
+        <div className="rounded-xl border border-border-subtle bg-surface-2/60 px-4 py-3 text-sm text-text-secondary mb-4">
+          Selecione uma empresa no topo para gerenciar usuários.
+        </div>
+      )}
 
       <div className="rounded-xl border border-border-subtle overflow-hidden">
         <table className="w-full border-collapse text-[13px]">
@@ -139,6 +186,7 @@ export const PageWorkers = ({ showToast }: { showToast: ShowToast }) => {
             <tr className="bg-surface-2">
               <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">Nome</th>
               <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">E-mail</th>
+              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">Perfil</th>
               <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">Status</th>
               <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">Último Login</th>
               <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">Ações</th>
@@ -146,13 +194,18 @@ export const PageWorkers = ({ showToast }: { showToast: ShowToast }) => {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} className="text-center py-12 text-sm text-text-muted">Carregando workers...</td></tr>
+              <tr><td colSpan={6} className="text-center py-12 text-sm text-text-muted">Carregando usuários...</td></tr>
             ) : workers.length === 0 ? (
-              <tr><td colSpan={5} className="text-center py-12 text-sm text-text-muted">Nenhum worker cadastrado.</td></tr>
+              <tr><td colSpan={6} className="text-center py-12 text-sm text-text-muted">Nenhum usuário cadastrado.</td></tr>
             ) : workers.map(worker => (
               <tr key={worker.id} className="border-b border-border-subtle hover:bg-surface-2/50 transition-colors">
                 <td className="px-4 py-[13px] font-semibold">{worker.name}</td>
                 <td className="px-4 py-[13px] text-text-secondary">{worker.email}</td>
+                <td className="px-4 py-[13px]">
+                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${worker.role === "Admin" ? "bg-accent/12 text-accent" : "bg-surface-2 text-text-secondary"}`}>
+                    {worker.role === "Admin" ? "Admin" : "Worker"}
+                  </span>
+                </td>
                 <td className="px-4 py-[13px]">
                   <Badge status={worker.active ? "complete" : "cancelled"} />
                 </td>
@@ -190,7 +243,7 @@ export const PageWorkers = ({ showToast }: { showToast: ShowToast }) => {
       <Modal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        title="Novo Worker"
+        title="Novo Usuário"
         footer={<>
           <Button variant="secondary" onClick={() => setCreateOpen(false)}>Cancelar</Button>
           <Button variant="primary" onClick={handleCreate}>{saving ? "Salvando..." : "Cadastrar"}</Button>
@@ -200,13 +253,24 @@ export const PageWorkers = ({ showToast }: { showToast: ShowToast }) => {
           <FormInput label="Nome" value={newName} onChange={e => setNewName(e.target.value)} />
           <FormInput label="E-mail" type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} />
           <FormInput label="Senha" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+          <div>
+            <label className="block text-xs font-bold uppercase text-text-muted tracking-wider mb-1.5">Perfil</label>
+            <select
+              value={newRole}
+              onChange={e => setNewRole(e.target.value as TenantUserRole)}
+              className="w-full rounded-lg border border-border-subtle-2 bg-surface px-3.5 py-2.5 text-[13px] text-text-primary outline-none transition-[border-color] focus:border-accent focus:ring-2 focus:ring-accent/10"
+            >
+              <option value="Worker">Worker</option>
+              <option value="Admin">Admin</option>
+            </select>
+          </div>
         </div>
       </Modal>
 
       <Modal
         open={editOpen}
         onClose={() => setEditOpen(false)}
-        title="Editar Worker"
+        title="Editar Usuário"
         footer={<>
           <Button variant="secondary" onClick={() => setEditOpen(false)}>Cancelar</Button>
           <Button variant="primary" onClick={handleUpdate}>{saving ? "Salvando..." : "Salvar Alterações"}</Button>

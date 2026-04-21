@@ -42,7 +42,7 @@
     "titles": "Títulos",
     "importData": "Importar Dados",
     "contactsCRM": "Contatos (CRM)",
-    "workers": "Usuários Worker",
+    "workers": "Usuários",
     "configuration": "Configuração",
     "collectionSequence": "Régua de Cobrança",
     "templates": "Templates",
@@ -92,8 +92,8 @@
       "subtitle": "Configure SMTP, WhatsApp e API externa"
     },
     "workers": {
-      "title": "Usuários Worker",
-      "subtitle": "Gerencie acesso operacional da sua empresa"
+      "title": "Usuários",
+      "subtitle": "Gerencie acessos Admin e Worker da sua empresa"
     },
     "tenants": {
       "title": "Empresas",

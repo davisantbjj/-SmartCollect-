@@ -3,6 +3,7 @@ namespace SmartCollect.Api.Controllers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using SmartCollect.Api.Security;
 using SmartCollect.Application.DTOs.Auth;
 using SmartCollect.Application.Interfaces;
 
@@ -12,15 +13,6 @@ public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
     public AuthController(IAuthService authService) => _authService = authService;
-
-    private Guid? GetTenantId()
-    {
-        var tenantClaim = User.FindFirst("TenantId")?.Value;
-        if (Guid.TryParse(tenantClaim, out var tenantId)) return tenantId;
-        return null;
-    }
-
-    private bool IsMaster() => User.IsInRole("Master");
 
     private Guid? GetUserId()
     {
@@ -48,20 +40,24 @@ public class AuthController : ControllerBase
         }
     }
 
-    /// <summary>Register a new Worker inside the current tenant (Admin only)</summary>
+    /// <summary>Register a new tenant user (Admin/Worker) inside the selected tenant.</summary>
     [HttpPost("register")]
-    [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Register([FromBody] RegisterRequest request)
+    [Authorize(Roles = "Admin,Master")]
+    public async Task<IActionResult> Register([FromBody] RegisterRequest request, [FromQuery] Guid? tenantId = null)
     {
-        var tenantId = GetTenantId();
-        if (tenantId is null)
-            return Unauthorized(new { message = "Invalid tenant claim." });
+        try
+        {
+            var resolvedTenantId = TenantContextResolver.ResolveTenantOrThrow(User, tenantId);
+            var result = await _authService.RegisterAsync(resolvedTenantId, request);
+            if (result is null)
+                return Conflict(new { message = "E-mail já cadastrado neste tenant." });
 
-        var result = await _authService.RegisterAsync(tenantId.Value, request);
-        if (result is null)
-            return Conflict(new { message = "E-mail já cadastrado neste tenant." });
-
-        return Created("", result);
+            return Created("", result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     /// <summary>Register a new Master user (Master only — self-service for Atos Capital team)</summary>

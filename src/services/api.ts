@@ -411,6 +411,8 @@ export interface UpdateTenantRequest {
   adminPassword?: string;
 }
 
+export type TenantUserRole = "Admin" | "Worker";
+
 export interface UpdateTenantAccessRequest {
   active: boolean;
 }
@@ -419,6 +421,7 @@ export interface WorkerResponse {
   id: string;
   name: string;
   email: string;
+  role: TenantUserRole;
   active: boolean;
   createdAt: string;
   lastLogin?: string | null;
@@ -556,9 +559,20 @@ export async function registerWorker(
   email: string,
   password: string
 ): Promise<AuthResponse> {
-  return request<AuthResponse>("/api/auth/register", {
+  return registerTenantUser(name, email, password, "Worker");
+}
+
+export async function registerTenantUser(
+  name: string,
+  email: string,
+  password: string,
+  role: TenantUserRole,
+  tenantId?: string,
+): Promise<AuthResponse> {
+  const query = tenantId ? `?tenantId=${tenantId}` : "";
+  return request<AuthResponse>(`/api/auth/register${query}`, {
     method: "POST",
-    body: JSON.stringify({ name, email, password }),
+    body: JSON.stringify({ name, email, password, role }),
   });
 }
 
@@ -889,12 +903,12 @@ export async function saveDispatchWindowConfig(payload: DispatchWindowConfigRequ
 
 // ── Workers (Admin only) ──────────────────────────────────────────────────
 
-export async function getWorkers() {
-  return request<WorkerResponse[]>("/api/workers");
+export async function getWorkers(tenantId?: string) {
+  return request<WorkerResponse[]>(`/api/workers${tenantParam(tenantId)}`);
 }
 
-export async function updateWorker(id: string, payload: UpdateWorkerRequest) {
-  return request<WorkerResponse>(`/api/workers/${id}`, {
+export async function updateWorker(id: string, payload: UpdateWorkerRequest, tenantId?: string) {
+  return request<WorkerResponse>(`/api/workers/${id}${tenantParam(tenantId)}`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });

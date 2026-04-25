@@ -24,12 +24,12 @@ public class AppDbContextConfigurationTests
     }
 
     [Fact]
-    public void User_TenantIdEmail_HasUniqueCompositeIndex()
+    public void User_Email_HasUniqueIndex()
     {
         using var ctx = CreateContext();
         var indexes = ctx.Model.FindEntityType(typeof(User))!.GetIndexes();
         Assert.Contains(indexes, i =>
-            i.IsUnique && i.Properties.Select(p => p.Name).SequenceEqual(new[] { nameof(User.TenantId), nameof(User.Email) }));
+            i.IsUnique && i.Properties.Select(p => p.Name).SequenceEqual(new[] { nameof(User.Email) }));
     }
 
     [Fact]

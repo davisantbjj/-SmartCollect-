@@ -1,9 +1,9 @@
-
 import { useEffect, useState } from "react";
 import { Badge, Button, FormInput, Modal } from "../components/UI";
 import { ICONS } from "../utils/icons";
 import {
   ApiError,
+  deleteWorker,
   getWorkers,
   registerTenantUser,
   updateWorker,
@@ -29,6 +29,7 @@ export const PageWorkers = ({
   const [selected, setSelected] = useState<WorkerResponse | null>(null);
   const [saving, setSaving] = useState(false);
   const [updatingWorkerId, setUpdatingWorkerId] = useState<string | null>(null);
+  const [deletingWorkerId, setDeletingWorkerId] = useState<string | null>(null);
 
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
@@ -36,7 +37,7 @@ export const PageWorkers = ({
   const [newRole, setNewRole] = useState<TenantUserRole>("Worker");
 
   const [editName, setEditName] = useState("");
-  // Removido editActive do modal de edição
+  const [editEmail, setEditEmail] = useState("");
   const [editPassword, setEditPassword] = useState("");
 
   const tenantId = session.role === "Master" ? selectedTenantId : undefined;
@@ -53,7 +54,7 @@ export const PageWorkers = ({
       setLoading(true);
       setWorkers(await getWorkers(tenantId));
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao carregar usuários.";
+      const msg = err instanceof ApiError ? err.message : "Erro ao carregar usuarios.";
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setLoading(false);
@@ -67,25 +68,26 @@ export const PageWorkers = ({
   const openEdit = (worker: WorkerResponse) => {
     setSelected(worker);
     setEditName(worker.name);
+    setEditEmail(worker.email);
     setEditPassword("");
     setEditOpen(true);
   };
 
   const handleCreate = async () => {
-    if (!newName || !newEmail || !newPassword) {
+    if (!newName.trim() || !newEmail.trim() || !newPassword) {
       showToast(`${ICONS.warning} Preencha nome, e-mail e senha.`, "warn");
       return;
     }
 
     if (requiresTenantSelection) {
-      showToast(`${ICONS.warning} Selecione uma empresa para cadastrar usuários.`, "warn");
+      showToast(`${ICONS.warning} Selecione uma empresa para cadastrar usuarios.`, "warn");
       return;
     }
 
     try {
       setSaving(true);
       await registerTenantUser(newName.trim(), newEmail.trim(), newPassword, newRole, tenantId);
-      showToast(`${ICONS.checkmark} Usuário cadastrado com sucesso.`, "success");
+      showToast(`${ICONS.checkmark} Usuario cadastrado com sucesso.`, "success");
       setCreateOpen(false);
       setNewName("");
       setNewEmail("");
@@ -93,7 +95,7 @@ export const PageWorkers = ({
       setNewRole("Worker");
       await load();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao cadastrar usuário.";
+      const msg = err instanceof ApiError ? err.message : "Erro ao cadastrar usuario.";
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setSaving(false);
@@ -102,13 +104,19 @@ export const PageWorkers = ({
 
   const handleUpdate = async () => {
     if (!selected) return;
+
     if (!editName.trim()) {
-      showToast(`${ICONS.warning} Nome do usuário é obrigatório.`, "warn");
+      showToast(`${ICONS.warning} Nome do usuario e obrigatorio.`, "warn");
+      return;
+    }
+
+    if (!editEmail.trim()) {
+      showToast(`${ICONS.warning} E-mail do usuario e obrigatorio.`, "warn");
       return;
     }
 
     if (requiresTenantSelection) {
-      showToast(`${ICONS.warning} Selecione uma empresa para atualizar usuários.`, "warn");
+      showToast(`${ICONS.warning} Selecione uma empresa para atualizar usuarios.`, "warn");
       return;
     }
 
@@ -116,55 +124,52 @@ export const PageWorkers = ({
       setSaving(true);
       await updateWorker(selected.id, {
         name: editName.trim(),
-        active: selected.active, // sempre enviar o valor atual
+        email: editEmail.trim(),
+        active: selected.active,
         password: editPassword.trim() || undefined,
       }, tenantId);
-      showToast(`${ICONS.checkmark} Usuário atualizado com sucesso.`, "success");
+      showToast(`${ICONS.checkmark} Usuario atualizado com sucesso.`, "success");
       setEditOpen(false);
       await load();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao atualizar usuário.";
+      const msg = err instanceof ApiError ? err.message : "Erro ao atualizar usuario.";
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setSaving(false);
     }
   };
 
-  // Função para excluir usuário (inativar)
-  const handleDelete = async () => {
-    if (!selected) return;
+  const handleDelete = async (worker: WorkerResponse) => {
     if (requiresTenantSelection) {
-      showToast(`${ICONS.warning} Selecione uma empresa para excluir usuários.`, "warn");
+      showToast(`${ICONS.warning} Selecione uma empresa para excluir usuarios.`, "warn");
       return;
     }
-    const confirmed = window.confirm(`Tem certeza que deseja excluir o usuário \"${selected.name}\"? Esta ação não pode ser desfeita.`);
+
+    const confirmed = window.confirm(`Tem certeza que deseja excluir definitivamente o usuario "${worker.name}"?`);
     if (!confirmed) return;
+
     try {
-      setSaving(true);
-      await updateWorker(selected.id, {
-        name: selected.name,
-        active: false,
-      }, tenantId);
-      showToast(`${ICONS.checkmark} Usuário excluído com sucesso.`, "success");
-      setEditOpen(false);
+      setDeletingWorkerId(worker.id);
+      await deleteWorker(worker.id, tenantId);
+      showToast(`${ICONS.checkmark} Usuario excluido com sucesso.`, "success");
       await load();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao excluir usuário.";
+      const msg = err instanceof ApiError ? err.message : "Erro ao excluir usuario.";
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
-      setSaving(false);
+      setDeletingWorkerId(null);
     }
   };
 
   const handleToggleAccess = async (worker: WorkerResponse) => {
     if (requiresTenantSelection) {
-      showToast(`${ICONS.warning} Selecione uma empresa para atualizar usuários.`, "warn");
+      showToast(`${ICONS.warning} Selecione uma empresa para atualizar usuarios.`, "warn");
       return;
     }
 
     const nextActive = !worker.active;
     const confirmed = window.confirm(
-      `Deseja ${nextActive ? "reativar" : "inativar"} o acesso de \"${worker.name}\"?`
+      `Deseja ${nextActive ? "reativar" : "inativar"} o acesso de "${worker.name}"?`
     );
     if (!confirmed) return;
 
@@ -172,15 +177,16 @@ export const PageWorkers = ({
       setUpdatingWorkerId(worker.id);
       await updateWorker(worker.id, {
         name: worker.name,
+        email: worker.email,
         active: nextActive,
       }, tenantId);
       showToast(
-        `${ICONS.checkmark} Acesso do usuário ${nextActive ? "reativado" : "inativado"} com sucesso.`,
+        `${ICONS.checkmark} Acesso do usuario ${nextActive ? "reativado" : "inativado"} com sucesso.`,
         "success"
       );
       await load();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao atualizar acesso do usuário.";
+      const msg = err instanceof ApiError ? err.message : "Erro ao atualizar acesso do usuario.";
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setUpdatingWorkerId(null);
@@ -195,13 +201,13 @@ export const PageWorkers = ({
           onClick={() => setCreateOpen(true)}
           disabled={requiresTenantSelection}
         >
-          {ICONS.plus} Novo Usuário
+          {ICONS.plus} Novo Usuario
         </Button>
       </div>
 
       {requiresTenantSelection && (
         <div className="rounded-xl border border-border-subtle bg-surface-2/60 px-4 py-3 text-sm text-text-secondary mb-4">
-          Selecione uma empresa no topo para gerenciar usuários.
+          Selecione uma empresa no topo para gerenciar usuarios.
         </div>
       )}
 
@@ -213,15 +219,15 @@ export const PageWorkers = ({
               <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">E-mail</th>
               <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">Perfil</th>
               <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">Status</th>
-              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">Último Login</th>
-              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">Ações</th>
+              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">Ultimo Login</th>
+              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">Acoes</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="text-center py-12 text-sm text-text-muted">Carregando usuários...</td></tr>
+              <tr><td colSpan={6} className="text-center py-12 text-sm text-text-muted">Carregando usuarios...</td></tr>
             ) : workers.length === 0 ? (
-              <tr><td colSpan={6} className="text-center py-12 text-sm text-text-muted">Nenhum usuário cadastrado.</td></tr>
+              <tr><td colSpan={6} className="text-center py-12 text-sm text-text-muted">Nenhum usuario cadastrado.</td></tr>
             ) : workers.map(worker => (
               <tr key={worker.id} className="border-b border-border-subtle hover:bg-surface-2/50 transition-colors">
                 <td className="px-4 py-[13px] font-semibold">{worker.name}</td>
@@ -268,7 +274,7 @@ export const PageWorkers = ({
       <Modal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        title="Novo Usuário"
+        title="Novo Usuario"
         footer={<>
           <Button variant="secondary" onClick={() => setCreateOpen(false)}>Cancelar</Button>
           <Button variant="primary" onClick={handleCreate}>{saving ? "Salvando..." : "Cadastrar"}</Button>
@@ -295,15 +301,24 @@ export const PageWorkers = ({
       <Modal
         open={editOpen}
         onClose={() => setEditOpen(false)}
-        title="Editar Usuário"
+        title="Editar Usuario"
         footer={<>
+          {selected && !selected.active && (
+            <Button
+              variant="danger"
+              disabled={deletingWorkerId === selected.id}
+              onClick={() => void handleDelete(selected)}
+            >
+              {deletingWorkerId === selected.id ? "Excluindo..." : `${ICONS.cross} Excluir`}
+            </Button>
+          )}
           <Button variant="secondary" onClick={() => setEditOpen(false)}>Cancelar</Button>
-          <Button variant="primary" onClick={handleUpdate}>{saving ? "Salvando..." : "Salvar Alterações"}</Button>
+          <Button variant="primary" onClick={handleUpdate}>{saving ? "Salvando..." : "Salvar Alteracoes"}</Button>
         </>}
       >
         <div className="grid gap-3">
           <FormInput label="Nome" value={editName} onChange={e => setEditName(e.target.value)} />
-          {/* Opção de ativo/inativo removida do modal de edição */}
+          <FormInput label="E-mail" type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} />
           <FormInput
             label="Nova senha (opcional)"
             type="password"

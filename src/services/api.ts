@@ -429,6 +429,7 @@ export interface WorkerResponse {
 
 export interface UpdateWorkerRequest {
   name: string;
+  email: string;
   active: boolean;
   password?: string;
 }
@@ -912,5 +913,11 @@ export async function updateWorker(id: string, payload: UpdateWorkerRequest, ten
   return request<WorkerResponse>(`/api/workers/${id}${tenantParam(tenantId)}`, {
     method: "PUT",
     body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteWorker(id: string, tenantId?: string) {
+  return request<void>(`/api/workers/${id}${tenantParam(tenantId)}`, {
+    method: "DELETE",
   });
 }

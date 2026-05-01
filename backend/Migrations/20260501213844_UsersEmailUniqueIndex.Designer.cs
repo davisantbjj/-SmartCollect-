@@ -12,8 +12,8 @@ using SmartCollect.Infrastructure.Data;
 namespace SmartCollect.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260425170728_GlobalUniqueUserEmail")]
-    partial class GlobalUniqueUserEmail
+    [Migration("20260501213844_UsersEmailUniqueIndex")]
+    partial class UsersEmailUniqueIndex
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

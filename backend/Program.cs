@@ -70,7 +70,7 @@ else if (!runningInsideBackendFolder && File.Exists(currentEnvPath))
 var configuredConnectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 var connectionBuilder = new NpgsqlConnectionStringBuilder(
     string.IsNullOrWhiteSpace(configuredConnectionString)
-        ? "Host=localhost;Port=55432;Database=smartcollect;Username=smartcollect"
+        ? "Host=localhost;Port=5432;Database=smartcollect;Username=smartcollect"
         : configuredConnectionString);
 
 var dbHost = Environment.GetEnvironmentVariable("POSTGRES_HOST") ?? Environment.GetEnvironmentVariable("DB_HOST");

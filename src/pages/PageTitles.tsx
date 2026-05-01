@@ -62,7 +62,11 @@ export const PageTitles = ({
   const [fIssue, setFIssue] = useState("");
   const [fBoleto, setFBoleto] = useState("");
 
-  const canWrite = session.role === "Admin" || session.role === "Worker";
+  const tenantId = session.role === "Master" ? selectedTenantId : undefined;
+  const requiresTenantSelection = session.role === "Master" && !tenantId;
+  const canWrite = session.role === "Admin"
+    || session.role === "Worker"
+    || (session.role === "Master" && Boolean(tenantId));
 
   const load = useCallback(async () => {
     if (session.role === "Master" && !selectedTenantId) {
@@ -96,8 +100,13 @@ export const PageTitles = ({
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
-    getClients().then(setClients).catch(() => {});
-  }, []);
+    if (requiresTenantSelection) {
+      setClients([]);
+      return;
+    }
+
+    getClients(tenantId).then(setClients).catch(() => {});
+  }, [tenantId, requiresTenantSelection]);
 
   useEffect(() => {
     if (!presetFilterToken || !presetStatusFilter) return;
@@ -117,6 +126,11 @@ export const PageTitles = ({
     }
     try {
       setSaving(true);
+      if (requiresTenantSelection) {
+        showToast(`${ICONS.warning} Selecione uma empresa para cadastrar títulos.`, "warn");
+        return;
+      }
+
       await createTitle({
         clientId: fClientId,
         uniqueCode: fCode,
@@ -124,7 +138,7 @@ export const PageTitles = ({
         dueDate: fDue,
         issueDate: fIssue || fDue,
         boletoUrl: fBoleto || undefined,
-      });
+      }, tenantId);
       showToast(`${ICONS.checkmark} ${t("toast.titleCreated")}`, "success");
       setModalOpen(false);
       setFClientId(""); setFCode(""); setFAmount(""); setFDue(""); setFIssue(""); setFBoleto("");
@@ -158,7 +172,7 @@ export const PageTitles = ({
 
     try {
       setStatusSaving(true);
-      const updated = await updateTitleStatus(selected.id, { status: statusDraft });
+      const updated = await updateTitleStatus(selected.id, { status: statusDraft }, tenantId);
       setSelected(updated);
       setStatusDraft(updated.status);
       showToast(`${ICONS.checkmark} Status do título atualizado.`, "success");
@@ -243,7 +257,7 @@ export const PageTitles = ({
     setCollectContacts([]);
     setCollectContactsLoading(true);
     setCollectOpen(true);
-    void getContactsByClient(title.clientId)
+    void getContactsByClient(title.clientId, tenantId)
       .then(items => {
         setCollectContacts(
           [...items].sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary) || a.name.localeCompare(b.name, "pt-BR"))
@@ -294,7 +308,11 @@ export const PageTitles = ({
         ...(selectedContactIds.length > 0 ? { contactIds: selectedContactIds } : {}),
       };
 
-      await sendCollection(collectTarget.id, useQuickTemplate || selectedContactIds.length > 0 ? payload : undefined);
+      await sendCollection(
+        collectTarget.id,
+        useQuickTemplate || selectedContactIds.length > 0 ? payload : undefined,
+        tenantId
+      );
       showToast(`${ICONS.checkmark} ${t("toast.manualCollectionSent")}`, "success");
       setCollectOpen(false);
       void load();

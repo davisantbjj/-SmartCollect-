@@ -702,22 +702,22 @@ export async function getTitleHistory(id: string, tenantId?: string) {
   return request<TitleHistoryResponse[]>(`/api/titles/${id}/history${tenantParam(tenantId)}`);
 }
 
-export async function createTitle(payload: CreateTitleRequest) {
-  return request<TitleResponse>("/api/titles", {
+export async function createTitle(payload: CreateTitleRequest, tenantId?: string) {
+  return request<TitleResponse>(`/api/titles${tenantParam(tenantId)}`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
-export async function updateTitleStatus(id: string, payload: UpdateTitleStatusRequest) {
-  return request<TitleResponse>(`/api/titles/${id}/status`, {
+export async function updateTitleStatus(id: string, payload: UpdateTitleStatusRequest, tenantId?: string) {
+  return request<TitleResponse>(`/api/titles/${id}/status${tenantParam(tenantId)}`, {
     method: "PATCH",
     body: JSON.stringify(payload),
   });
 }
 
-export async function sendCollection(titleId: string, payload?: SendCollectionRequest) {
-  return request<{ message: string }>(`/api/titles/${titleId}/collect`, {
+export async function sendCollection(titleId: string, payload?: SendCollectionRequest, tenantId?: string) {
+  return request<{ message: string }>(`/api/titles/${titleId}/collect${tenantParam(tenantId)}`, {
     method: "POST",
     body: payload ? JSON.stringify(payload) : undefined,
   });

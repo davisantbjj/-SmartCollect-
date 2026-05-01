@@ -221,11 +221,11 @@ export const PageTemplates = ({
       >
         <div className="grid grid-cols-2 gap-3.5">
           <FormInput label={t("templates.templateName")} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder={t("templates.templateNamePlaceholder")} />
-          <FormSelect label={t("templates.channel")} value={form.channel} onChange={e => setForm(f => ({ ...f, channel: e.target.value }))}>
-            <option value="Email">{t("channel.email")}</option>
-            <option value="WhatsApp">WhatsApp</option>
-            <option value="Both">{t("common.both")}</option>
-          </FormSelect>
+          <FormInput
+            label={t("templates.channel")}
+            value={form.channel === "Email" ? t("channel.email") : form.channel === "Both" ? t("common.both") : "WhatsApp"}
+            readOnly
+          />
           <FormSelect label="Tipo" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
             <option value="Collection">Cobrança</option>
             <option value="ThankYou">Agradecimento</option>

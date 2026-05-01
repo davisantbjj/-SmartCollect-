@@ -43,6 +43,7 @@ export const PageTitles = ({
   const [collectOpen, setCollectOpen] = useState(false);
   const [collectTarget, setCollectTarget] = useState<TitleResponse | null>(null);
   const [useQuickTemplate, setUseQuickTemplate] = useState(false);
+  const [quickTemplateType, setQuickTemplateType] = useState<"Collection" | "ThankYou">("Collection");
   const [quickChannel, setQuickChannel] = useState("Email");
   const [quickSubject, setQuickSubject] = useState("");
   const [quickBody, setQuickBody] = useState("");
@@ -183,6 +184,31 @@ export const PageTitles = ({
       "{{Empresa}}",
     ].join("\n");
 
+  const buildDefaultThankYouBody = (title: TitleResponse) =>
+    [
+      "Olá {{ClienteNome}},",
+      "",
+      `Recebemos o pagamento do título {{TituloCodigo}} no valor de {{Valor}}.`,
+      "Obrigado pelo retorno.",
+      "",
+      "Atenciosamente,",
+      "{{Empresa}}",
+    ].join("\n");
+
+  const applyQuickTemplateDefaults = (type: "Collection" | "ThankYou", title: TitleResponse) => {
+    if (type === "ThankYou") {
+      setQuickTemplateType("ThankYou");
+      setQuickChannel("Email");
+      setQuickSubject(`Pagamento confirmado — ${title.uniqueCode}`);
+      setQuickBody(buildDefaultThankYouBody(title));
+      return;
+    }
+
+    setQuickTemplateType("Collection");
+    setQuickSubject(`Cobrança do título ${title.uniqueCode}`);
+    setQuickBody(buildDefaultQuickBody(title));
+  };
+
   const toChannelPills = (channels: string[]): string[] => {
     const resolved = new Set<string>();
 
@@ -211,8 +237,7 @@ export const PageTitles = ({
     setCollectTarget(title);
     setUseQuickTemplate(false);
     setQuickChannel("Email");
-    setQuickSubject(`Cobrança do título ${title.uniqueCode}`);
-    setQuickBody(buildDefaultQuickBody(title));
+    applyQuickTemplateDefaults("Collection", title);
     setCollectRecipientMode("companyDefault");
     setCollectCustomContactIds([]);
     setCollectContacts([]);
@@ -605,17 +630,36 @@ export const PageTitles = ({
           {useQuickTemplate ? (
             <div className="space-y-3">
               <div>
+                <label className="block text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted mb-[5px]">Tipo</label>
+                <select
+                  value={quickTemplateType}
+                  onChange={e => {
+                    if (!collectTarget) return;
+                    applyQuickTemplateDefaults(e.target.value as "Collection" | "ThankYou", collectTarget);
+                  }}
+                  className="bg-surface-2 border border-border-subtle-2 rounded-lg px-[13px] py-[9px] text-[13px] text-text-primary outline-none w-full focus:border-accent"
+                >
+                  <option value="Collection">Cobrança</option>
+                  <option value="ThankYou">Agradecimento</option>
+                </select>
+              </div>
+              <div>
                 <label className="block text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted mb-[5px]">Canal</label>
                 <select
                   value={quickChannel}
                   onChange={e => setQuickChannel(e.target.value)}
+                  disabled={quickTemplateType === "ThankYou"}
                   className="bg-surface-2 border border-border-subtle-2 rounded-lg px-[13px] py-[9px] text-[13px] text-text-primary outline-none w-full focus:border-accent"
                 >
                   <option value="Email">E-mail</option>
                   <option value="WhatsApp">WhatsApp</option>
                   <option value="Both">Ambos</option>
                 </select>
-                <div className="text-[11px] text-text-muted mt-1">Use "Ambos" para registrar envio multi-canal no fluxo manual.</div>
+                <div className="text-[11px] text-text-muted mt-1">
+                  {quickTemplateType === "ThankYou"
+                    ? "Agradecimentos são enviados apenas por e-mail."
+                    : "Use \"Ambos\" para registrar envio multi-canal no fluxo manual."}
+                </div>
               </div>
 
               <FormInput

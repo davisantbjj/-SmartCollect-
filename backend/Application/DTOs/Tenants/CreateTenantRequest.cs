@@ -4,7 +4,7 @@ public record CreateTenantRequest(
     string CompanyName,
     string TaxId,
     string EmailDomain,
-    string AdminName,
-    string AdminEmail,
-    string AdminPassword
+    string? AdminName,
+    string? AdminEmail,
+    string? AdminPassword
 );

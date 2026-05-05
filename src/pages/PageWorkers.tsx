@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Badge, Button, FormInput, Modal } from "../components/UI";
 import { ICONS } from "../utils/icons";
+import { t } from "../i18n";
 import {
   ApiError,
   deleteWorker,
@@ -54,7 +55,7 @@ export const PageWorkers = ({
       setLoading(true);
       setWorkers(await getWorkers(tenantId));
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao carregar usuarios.";
+      const msg = err instanceof ApiError ? err.message : t("workers.errors.load");
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setLoading(false);
@@ -75,19 +76,19 @@ export const PageWorkers = ({
 
   const handleCreate = async () => {
     if (!newName.trim() || !newEmail.trim() || !newPassword) {
-      showToast(`${ICONS.warning} Preencha nome, e-mail e senha.`, "warn");
+      showToast(`${ICONS.warning} ${t("workers.validation.requiredFields")}`, "warn");
       return;
     }
 
     if (requiresTenantSelection) {
-      showToast(`${ICONS.warning} Selecione uma empresa para cadastrar usuarios.`, "warn");
+      showToast(`${ICONS.warning} ${t("workers.validation.selectTenantCreate")}`, "warn");
       return;
     }
 
     try {
       setSaving(true);
       await registerTenantUser(newName.trim(), newEmail.trim(), newPassword, newRole, tenantId);
-      showToast(`${ICONS.checkmark} Usuario cadastrado com sucesso.`, "success");
+      showToast(`${ICONS.checkmark} ${t("workers.messages.created")}`, "success");
       setCreateOpen(false);
       setNewName("");
       setNewEmail("");
@@ -95,7 +96,7 @@ export const PageWorkers = ({
       setNewRole("Worker");
       await load();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao cadastrar usuario.";
+      const msg = err instanceof ApiError ? err.message : t("workers.errors.create");
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setSaving(false);
@@ -106,17 +107,17 @@ export const PageWorkers = ({
     if (!selected) return;
 
     if (!editName.trim()) {
-      showToast(`${ICONS.warning} Nome do usuario e obrigatorio.`, "warn");
+      showToast(`${ICONS.warning} ${t("workers.validation.nameRequired")}`, "warn");
       return;
     }
 
     if (!editEmail.trim()) {
-      showToast(`${ICONS.warning} E-mail do usuario e obrigatorio.`, "warn");
+      showToast(`${ICONS.warning} ${t("workers.validation.emailRequired")}`, "warn");
       return;
     }
 
     if (requiresTenantSelection) {
-      showToast(`${ICONS.warning} Selecione uma empresa para atualizar usuarios.`, "warn");
+      showToast(`${ICONS.warning} ${t("workers.validation.selectTenantUpdate")}`, "warn");
       return;
     }
 
@@ -128,11 +129,11 @@ export const PageWorkers = ({
         active: selected.active,
         password: editPassword.trim() || undefined,
       }, tenantId);
-      showToast(`${ICONS.checkmark} Usuario atualizado com sucesso.`, "success");
+      showToast(`${ICONS.checkmark} ${t("workers.messages.updated")}`, "success");
       setEditOpen(false);
       await load();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao atualizar usuario.";
+      const msg = err instanceof ApiError ? err.message : t("workers.errors.update");
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setSaving(false);
@@ -141,20 +142,20 @@ export const PageWorkers = ({
 
   const handleDelete = async (worker: WorkerResponse) => {
     if (requiresTenantSelection) {
-      showToast(`${ICONS.warning} Selecione uma empresa para excluir usuarios.`, "warn");
+      showToast(`${ICONS.warning} ${t("workers.validation.selectTenantDelete")}`, "warn");
       return;
     }
 
-    const confirmed = window.confirm(`Tem certeza que deseja excluir definitivamente o usuario "${worker.name}"?`);
+    const confirmed = window.confirm(`${t("workers.confirmDelete")} "${worker.name}"?`);
     if (!confirmed) return;
 
     try {
       setDeletingWorkerId(worker.id);
       await deleteWorker(worker.id, tenantId);
-      showToast(`${ICONS.checkmark} Usuario excluido com sucesso.`, "success");
+      showToast(`${ICONS.checkmark} ${t("workers.messages.deleted")}`, "success");
       await load();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao excluir usuario.";
+      const msg = err instanceof ApiError ? err.message : t("workers.errors.delete");
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setDeletingWorkerId(null);
@@ -163,13 +164,13 @@ export const PageWorkers = ({
 
   const handleToggleAccess = async (worker: WorkerResponse) => {
     if (requiresTenantSelection) {
-      showToast(`${ICONS.warning} Selecione uma empresa para atualizar usuarios.`, "warn");
+      showToast(`${ICONS.warning} ${t("workers.validation.selectTenantUpdate")}`, "warn");
       return;
     }
 
     const nextActive = !worker.active;
     const confirmed = window.confirm(
-      `Deseja ${nextActive ? "reativar" : "inativar"} o acesso de "${worker.name}"?`
+      `${t("workers.confirmTogglePrefix")} ${nextActive ? t("workers.actions.reactivate") : t("workers.actions.deactivate")} ${t("workers.confirmToggleSuffix")} "${worker.name}"?`
     );
     if (!confirmed) return;
 
@@ -181,12 +182,12 @@ export const PageWorkers = ({
         active: nextActive,
       }, tenantId);
       showToast(
-        `${ICONS.checkmark} Acesso do usuario ${nextActive ? "reativado" : "inativado"} com sucesso.`,
+        `${ICONS.checkmark} ${nextActive ? t("workers.messages.accessReactivated") : t("workers.messages.accessDeactivated")}`,
         "success"
       );
       await load();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao atualizar acesso do usuario.";
+      const msg = err instanceof ApiError ? err.message : t("workers.errors.accessUpdate");
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setUpdatingWorkerId(null);
@@ -201,13 +202,13 @@ export const PageWorkers = ({
           onClick={() => setCreateOpen(true)}
           disabled={requiresTenantSelection}
         >
-          {ICONS.plus} Novo Usuario
+          {ICONS.plus} {t("workers.newUser")}
         </Button>
       </div>
 
       {requiresTenantSelection && (
         <div className="rounded-xl border border-border-subtle bg-surface-2/60 px-4 py-3 text-sm text-text-secondary mb-4">
-          Selecione uma empresa no topo para gerenciar usuarios.
+          {t("workers.validation.selectTenantManage")}
         </div>
       )}
 
@@ -216,37 +217,37 @@ export const PageWorkers = ({
           <thead>
             <tr className="bg-surface-2">
               <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">Nome</th>
-              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">E-mail</th>
-              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">Perfil</th>
-              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">Status</th>
-              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">Ultimo Login</th>
-              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">Acoes</th>
+              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">{t("workers.table.email")}</th>
+              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">{t("workers.table.role")}</th>
+              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">{t("workers.table.status")}</th>
+              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">{t("workers.table.lastLogin")}</th>
+              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">{t("workers.table.actions")}</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="text-center py-12 text-sm text-text-muted">Carregando usuarios...</td></tr>
+              <tr><td colSpan={6} className="text-center py-12 text-sm text-text-muted">{t("workers.loading")}</td></tr>
             ) : workers.length === 0 ? (
-              <tr><td colSpan={6} className="text-center py-12 text-sm text-text-muted">Nenhum usuario cadastrado.</td></tr>
+              <tr><td colSpan={6} className="text-center py-12 text-sm text-text-muted">{t("workers.empty")}</td></tr>
             ) : workers.map(worker => (
               <tr key={worker.id} className="border-b border-border-subtle hover:bg-surface-2/50 transition-colors">
                 <td className="px-4 py-[13px] font-semibold">{worker.name}</td>
                 <td className="px-4 py-[13px] text-text-secondary">{worker.email}</td>
                 <td className="px-4 py-[13px]">
                   <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${worker.role === "Admin" ? "bg-accent/12 text-accent" : "bg-surface-2 text-text-secondary"}`}>
-                    {worker.role === "Admin" ? "Admin" : "Worker"}
+                    {worker.role === "Admin" ? t("workers.roles.admin") : t("workers.roles.worker")}
                   </span>
                 </td>
                 <td className="px-4 py-[13px]">
                   <Badge status={worker.active ? "complete" : "cancelled"} />
                 </td>
                 <td className="px-4 py-[13px] text-text-secondary text-xs">
-                  {worker.lastLogin ? new Date(worker.lastLogin).toLocaleString("pt-BR") : "Nunca acessou"}
+                  {worker.lastLogin ? new Date(worker.lastLogin).toLocaleString("pt-BR") : t("workers.neverLogged")}
                 </td>
                 <td className="px-4 py-[13px]">
                   <div className="flex gap-1.5">
                     <Button size="sm" variant="secondary" onClick={() => openEdit(worker)}>
-                      {ICONS.pencil} Editar
+                      {ICONS.pencil} {t("common.edit")}
                     </Button>
                     <button
                       type="button"
@@ -261,7 +262,7 @@ export const PageWorkers = ({
                       >
                         <span className={`block h-3 w-3 rounded-full bg-white transition-transform ${worker.active ? "translate-x-3" : "translate-x-0"}`} />
                       </span>
-                      <span>{worker.active ? "Ativo" : "Inativo"}</span>
+                      <span>{worker.active ? t("common.active") : t("common.inactive")}</span>
                     </button>
                   </div>
                 </td>
@@ -274,25 +275,25 @@ export const PageWorkers = ({
       <Modal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        title="Novo Usuario"
+        title={t("workers.modalCreateTitle")}
         footer={<>
-          <Button variant="secondary" onClick={() => setCreateOpen(false)}>Cancelar</Button>
-          <Button variant="primary" onClick={handleCreate}>{saving ? "Salvando..." : "Cadastrar"}</Button>
+          <Button variant="secondary" onClick={() => setCreateOpen(false)}>{t("common.cancel")}</Button>
+          <Button variant="primary" onClick={handleCreate}>{saving ? t("common.saving") : t("workers.createAction")}</Button>
         </>}
       >
         <div className="grid gap-3">
-          <FormInput label="Nome" value={newName} onChange={e => setNewName(e.target.value)} />
-          <FormInput label="E-mail" type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} />
-          <FormInput label="Senha" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+          <FormInput label={t("workers.labels.name")} value={newName} onChange={e => setNewName(e.target.value)} />
+          <FormInput label={t("workers.labels.email")} type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} />
+          <FormInput label={t("workers.labels.password")} type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
           <div>
-            <label className="block text-xs font-bold uppercase text-text-muted tracking-wider mb-1.5">Perfil</label>
+            <label className="block text-xs font-bold uppercase text-text-muted tracking-wider mb-1.5">{t("workers.labels.role")}</label>
             <select
               value={newRole}
               onChange={e => setNewRole(e.target.value as TenantUserRole)}
               className="w-full rounded-lg border border-border-subtle-2 bg-surface px-3.5 py-2.5 text-[13px] text-text-primary outline-none transition-[border-color] focus:border-accent focus:ring-2 focus:ring-accent/10"
             >
-              <option value="Worker">Worker</option>
-              <option value="Admin">Admin</option>
+              <option value="Worker">{t("workers.roles.worker")}</option>
+              <option value="Admin">{t("workers.roles.admin")}</option>
             </select>
           </div>
         </div>
@@ -301,7 +302,7 @@ export const PageWorkers = ({
       <Modal
         open={editOpen}
         onClose={() => setEditOpen(false)}
-        title="Editar Usuario"
+        title={t("workers.modalEditTitle")}
         footer={<>
           {selected && !selected.active && (
             <Button
@@ -309,22 +310,22 @@ export const PageWorkers = ({
               disabled={deletingWorkerId === selected.id}
               onClick={() => void handleDelete(selected)}
             >
-              {deletingWorkerId === selected.id ? "Excluindo..." : `${ICONS.cross} Excluir`}
+              {deletingWorkerId === selected.id ? t("workers.actionDeleting") : `${ICONS.cross} ${t("workers.actionDelete")}`}
             </Button>
           )}
-          <Button variant="secondary" onClick={() => setEditOpen(false)}>Cancelar</Button>
-          <Button variant="primary" onClick={handleUpdate}>{saving ? "Salvando..." : "Salvar Alteracoes"}</Button>
+          <Button variant="secondary" onClick={() => setEditOpen(false)}>{t("common.cancel")}</Button>
+          <Button variant="primary" onClick={handleUpdate}>{saving ? t("common.saving") : t("workers.saveChanges")}</Button>
         </>}
       >
         <div className="grid gap-3">
-          <FormInput label="Nome" value={editName} onChange={e => setEditName(e.target.value)} />
-          <FormInput label="E-mail" type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} />
+          <FormInput label={t("workers.labels.name")} value={editName} onChange={e => setEditName(e.target.value)} />
+          <FormInput label={t("workers.labels.email")} type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} />
           <FormInput
-            label="Nova senha (opcional)"
+            label={t("workers.labels.passwordOptional")}
             type="password"
             value={editPassword}
             onChange={e => setEditPassword(e.target.value)}
-            placeholder="Deixe em branco para manter"
+            placeholder={t("workers.placeholders.keepBlank")}
           />
         </div>
       </Modal>

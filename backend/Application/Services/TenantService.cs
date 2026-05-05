@@ -69,10 +69,26 @@ public class TenantService : ITenantService
         if (taxIdExists)
             throw new InvalidOperationException($"A tenant with TaxId '{request.TaxId}' already exists.");
 
-        var normalizedAdminEmail = request.AdminEmail.Trim().ToLowerInvariant();
-        var adminEmailExists = await _db.Users.AnyAsync(u => u.Email == normalizedAdminEmail);
-        if (adminEmailExists)
-            throw new InvalidOperationException("E-mail do administrador já cadastrado no sistema.");
+        var hasAnyAdminInfo =
+            !string.IsNullOrWhiteSpace(request.AdminName)
+            || !string.IsNullOrWhiteSpace(request.AdminEmail)
+            || !string.IsNullOrWhiteSpace(request.AdminPassword);
+        var hasAllAdminInfo =
+            !string.IsNullOrWhiteSpace(request.AdminName)
+            && !string.IsNullOrWhiteSpace(request.AdminEmail)
+            && !string.IsNullOrWhiteSpace(request.AdminPassword);
+
+        if (hasAnyAdminInfo && !hasAllAdminInfo)
+            throw new InvalidOperationException("Informe nome, e-mail e senha do administrador ou deixe todos em branco.");
+
+        string? normalizedAdminEmail = null;
+        if (hasAllAdminInfo)
+        {
+            normalizedAdminEmail = request.AdminEmail!.Trim().ToLowerInvariant();
+            var adminEmailExists = await _db.Users.AnyAsync(u => u.Email == normalizedAdminEmail);
+            if (adminEmailExists)
+                throw new InvalidOperationException("E-mail do administrador já cadastrado no sistema.");
+        }
 
         var tenant = new Domain.Entities.Tenant
         {
@@ -86,18 +102,22 @@ public class TenantService : ITenantService
 
         await _db.Tenants.AddAsync(tenant);
 
-        var admin = new Domain.Entities.User
+        Domain.Entities.User? admin = null;
+        if (hasAllAdminInfo)
         {
-            Id = Guid.NewGuid(),
-            TenantId = tenant.Id,
-            Name = request.AdminName,
-            Email = normalizedAdminEmail,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.AdminPassword),
-            Role = UserRole.Admin,
-            Active = true
-        };
+            admin = new Domain.Entities.User
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenant.Id,
+                Name = request.AdminName!.Trim(),
+                Email = normalizedAdminEmail!,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.AdminPassword!),
+                Role = UserRole.Admin,
+                Active = true
+            };
 
-        await _db.Users.AddAsync(admin);
+            await _db.Users.AddAsync(admin);
+        }
         await _db.SaveChangesAsync();
 
         return new TenantResponse(
@@ -107,11 +127,11 @@ public class TenantService : ITenantService
             tenant.EmailDomain,
             tenant.Plan.ToString(),
             tenant.Active,
-            1,
+            admin is null ? 0 : 1,
             0,
             tenant.CreatedAt,
-            admin.Name,
-            admin.Email);
+            admin?.Name,
+            admin?.Email);
     }
 
     public async Task<TenantResponse?> UpdateAsync(Guid tenantId, UpdateTenantRequest request)

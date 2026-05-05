@@ -292,7 +292,7 @@ export interface MessageTemplateResponse {
 
 export interface CreateTemplateRequest {
   name: string;
-  channel: string;
+  channel?: string;
   subject?: string;
   body: string;
   type: string;
@@ -300,7 +300,7 @@ export interface CreateTemplateRequest {
 
 export interface UpdateTemplateRequest {
   name: string;
-  channel: string;
+  channel?: string;
   subject?: string;
   body: string;
   type: string;
@@ -396,9 +396,9 @@ export interface CreateTenantRequest {
   companyName: string;
   taxId: string;
   emailDomain: string;
-  adminName: string;
-  adminEmail: string;
-  adminPassword: string;
+  adminName?: string;
+  adminEmail?: string;
+  adminPassword?: string;
 }
 
 export interface UpdateTenantRequest {

@@ -92,7 +92,7 @@ export const PageSequence = ({
       setRules(r);
       setTemplates(tpl.filter(t => t.active));
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao carregar régua.";
+      const msg = err instanceof ApiError ? err.message : t("sequence.errors.load");
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setLoading(false);
@@ -118,7 +118,7 @@ export const PageSequence = ({
 
   const openNew = () => {
     setEditingRuleId(null);
-    setRuleName("Nova Régua");
+    setRuleName(t("sequence.newRuleName"));
     setRuleDescription("");
     setRuleActive(false);
     setTriggers([
@@ -173,22 +173,22 @@ export const PageSequence = ({
 
   const handleSave = async () => {
     if (requiresTenantSelection) {
-      showToast(`${ICONS.warning} Selecione uma empresa para gerenciar régua de cobrança.`, "warn");
+      showToast(`${ICONS.warning} ${t("sequence.validation.selectTenant")}`, "warn");
       return;
     }
 
     if (!ruleName.trim()) {
-      showToast(`${ICONS.warning} Nome da régua é obrigatório.`, "warn");
+      showToast(`${ICONS.warning} ${t("sequence.validation.nameRequired")}`, "warn");
       return;
     }
 
     if (triggers.length === 0) {
-      showToast(`${ICONS.warning} Adicione ao menos um gatilho.`, "warn");
+      showToast(`${ICONS.warning} ${t("sequence.validation.addTrigger")}`, "warn");
       return;
     }
 
     if (triggers.some(tr => !tr.templateId)) {
-      showToast(`${ICONS.warning} Todo gatilho precisa de um template.`, "warn");
+      showToast(`${ICONS.warning} ${t("sequence.validation.triggerNeedsTemplate")}`, "warn");
       return;
     }
 
@@ -210,15 +210,15 @@ export const PageSequence = ({
       setSaving(true);
       if (editingRuleId) {
         await updateCollectionRule(editingRuleId, payload, tenantId);
-        showToast(`${ICONS.checkmark} Régua atualizada com sucesso!`, "success");
+        showToast(`${ICONS.checkmark} ${t("sequence.messages.updated")}`, "success");
       } else {
         await createCollectionRule(payload, tenantId);
-        showToast(`${ICONS.checkmark} Régua criada com sucesso!`, "success");
+        showToast(`${ICONS.checkmark} ${t("sequence.messages.created")}`, "success");
       }
       setEditorOpen(false);
       await load();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao salvar régua.";
+      const msg = err instanceof ApiError ? err.message : t("sequence.errors.save");
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setSaving(false);
@@ -230,26 +230,26 @@ export const PageSequence = ({
       return;
 
     if (requiresTenantSelection) {
-      showToast(`${ICONS.warning} Selecione uma empresa para excluir regras.`, "warn");
+      showToast(`${ICONS.warning} ${t("sequence.validation.selectTenantDelete")}`, "warn");
       return;
     }
 
     if (rule.isDefault) {
-      showToast(`${ICONS.info} Esta é uma régua padrão e não pode ser excluída.`, "info");
+      showToast(`${ICONS.info} ${t("sequence.validation.cannotDeleteDefault")}`, "info");
       return;
     }
 
-    const confirmed = window.confirm(`Excluir a régua \"${rule.name}\"? Esta ação não pode ser desfeita.`);
+    const confirmed = window.confirm(`${t("sequence.confirmDelete")} "${rule.name}"? ${t("sequence.confirmDeleteWarn")}`);
     if (!confirmed)
       return;
 
     try {
       setDeletingRuleId(rule.id);
       await deleteCollectionRule(rule.id, tenantId);
-      showToast(`${ICONS.checkmark} Régua excluída com sucesso!`, "success");
+      showToast(`${ICONS.checkmark} ${t("sequence.messages.deleted")}`, "success");
       await load();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao excluir régua.";
+      const msg = err instanceof ApiError ? err.message : t("sequence.errors.delete");
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setDeletingRuleId(null);
@@ -263,13 +263,13 @@ export const PageSequence = ({
     { color: colors.warn, bg: `${colors.warn}0a`, border: `${colors.warn}25`, icon: ICONS.warningLight, title: t("sequence.rule.pendingTitle"), desc: t("sequence.rule.pendingDesc") },
   ];
 
-  if (loading) return <div className="py-12 text-center text-sm text-text-muted">Carregando régua...</div>;
+  if (loading) return <div className="py-12 text-center text-sm text-text-muted">{t("sequence.loading")}</div>;
 
   return (
     <div className="animate-fade-up">
       {requiresTenantSelection && (
         <div className="rounded-xl border border-border-subtle bg-surface-2/60 px-4 py-3 text-sm text-text-secondary mb-4">
-          Selecione uma empresa no topo para visualizar e editar a régua de cobrança.
+          {t("sequence.validation.selectTenant")}
         </div>
       )}
 
@@ -277,7 +277,7 @@ export const PageSequence = ({
         {canEdit && (
           <div className="flex gap-2">
             <Button variant="primary" onClick={openNew} disabled={requiresTenantSelection}>
-              {ICONS.plus} Nova Régua
+              {ICONS.plus} {t("sequence.newRuleButton")}
             </Button>
           </div>
         )}
@@ -304,9 +304,11 @@ export const PageSequence = ({
                       </div>
                       <div className="flex-1 bg-surface-2 rounded-[10px] px-[15px] py-3 border border-border-subtle flex items-center justify-between">
                         <div>
-                          <div className="text-[11px] text-text-muted mb-0.5">{tr.templateName ?? "Template"}</div>
+                          <div className="text-[11px] text-text-muted mb-0.5">{tr.templateName ?? t("sequence.templateFallback")}</div>
                           <div className="text-[13.5px] font-semibold">
-                            {tr.daysOffset >= 0 ? `${tr.daysOffset} dias após vencimento` : `${Math.abs(tr.daysOffset)} dias antes do vencimento`}
+                            {tr.daysOffset >= 0
+                              ? `${tr.daysOffset} ${t("sequence.daysAfterDue")}`
+                              : `${Math.abs(tr.daysOffset)} ${t("sequence.daysBeforeDue")}`}
                           </div>
                         </div>
                         <ChannelPills channels={toChannelPills(tr.channel)} />
@@ -318,7 +320,7 @@ export const PageSequence = ({
             ) : (
               <div className="text-center py-8 text-sm text-text-muted">
                 <div className="text-2xl mb-2">{ICONS.timer}</div>
-                {rules.length > 0 ? "Selecione uma régua abaixo para visualizar os gatilhos." : "Nenhuma régua configurada ainda."}
+                {rules.length > 0 ? t("sequence.selectRulePrompt") : t("sequence.noRulesPrompt")}
               </div>
             )}
           </div>
@@ -337,31 +339,37 @@ export const PageSequence = ({
 
           {rules.length > 0 && (
             <div className="px-5 pb-5">
-              <div className="text-[11px] font-bold uppercase text-text-muted mb-2 tracking-wider">Todas as Réguas</div>
+              <div className="text-[11px] font-bold uppercase text-text-muted mb-2 tracking-wider">{t("sequence.allRulesTitle")}</div>
               <div className="flex flex-col gap-2">
                 {rules.map(rule => (
                   <div
                     key={rule.id}
                     onClick={() => setSelectedRuleId(rule.id)}
-                    className={`flex items-center justify-between px-3 py-2 rounded-lg border cursor-pointer ${selectedRule?.id === rule.id ? "border-accent bg-accent/10" : rule.active ? "border-accent/30 bg-accent/5" : "border-border-subtle bg-surface-2"}`}
+                    className={`flex items-center justify-between px-3 py-2 rounded-lg border cursor-pointer ${
+                      selectedRule?.id === rule.id
+                        ? "border-accent bg-accent/14 shadow-[inset_0_0_0_1px_rgba(59,130,246,0.25)]"
+                        : rule.active
+                          ? "border-success/40 bg-success/8"
+                          : "border-border-subtle bg-surface-2"
+                    }`}
                   >
                     <div>
                       <div className="text-sm font-semibold flex items-center gap-2">
                         <span>{rule.name}</span>
                         {rule.isDefault && (
                           <span className="text-[10px] font-bold uppercase tracking-wide text-accent bg-accent/10 px-1.5 py-0.5 rounded-full">
-                            Régua padrão
+                            {t("sequence.defaultBadge")}
                           </span>
                         )}
                       </div>
-                      <div className="text-xs text-text-muted">{rule.triggers.length} gatilhos</div>
+                      <div className="text-xs text-text-muted">{rule.triggers.length} {t("sequence.triggersCountLabel")}</div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {rule.active && <span className="text-[11px] font-bold text-success bg-success/10 px-2 py-0.5 rounded-full">Ativa</span>}
+                      {rule.active && <span className="text-[11px] font-bold text-success bg-success/10 px-2 py-0.5 rounded-full">{t("sequence.activeBadge")}</span>}
                       {canEdit && (
                         <>
                           <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openEdit(rule); }}>
-                            {ICONS.pencil} Editar
+                            {ICONS.pencil} {t("common.edit")}
                           </Button>
                           <Button
                             size="sm"
@@ -369,7 +377,7 @@ export const PageSequence = ({
                             onClick={(e) => { e.stopPropagation(); void handleDeleteRule(rule); }}
                             disabled={deletingRuleId === rule.id || rule.isDefault}
                           >
-                            {rule.isDefault ? "Padrão" : deletingRuleId === rule.id ? "Excluindo..." : "Excluir"}
+                            {rule.isDefault ? t("sequence.actionDefault") : deletingRuleId === rule.id ? t("sequence.actionDeleting") : t("sequence.actionDelete")}
                           </Button>
                         </>
                       )}
@@ -385,15 +393,15 @@ export const PageSequence = ({
       <Modal
         open={editorOpen}
         onClose={() => setEditorOpen(false)}
-        title={editingRuleId ? "Editar Régua" : "Nova Régua"}
+        title={editingRuleId ? t("sequence.modalEditTitle") : t("sequence.modalNewTitle")}
         maxWidth={860}
         footer={<>
-          <Button variant="secondary" onClick={() => setEditorOpen(false)}>Cancelar</Button>
-          <Button variant="primary" onClick={handleSave}>{saving ? "Salvando..." : "Salvar Régua"}</Button>
+          <Button variant="secondary" onClick={() => setEditorOpen(false)}>{t("common.cancel")}</Button>
+          <Button variant="primary" onClick={handleSave}>{saving ? t("common.saving") : t("sequence.saveSequence")}</Button>
         </>}
       >
         <div className="grid grid-cols-2 gap-3.5 mb-4">
-          <FormInput label="Nome" value={ruleName} onChange={e => setRuleName(e.target.value)} />
+          <FormInput label={t("sequence.ruleNameLabel")} value={ruleName} onChange={e => setRuleName(e.target.value)} />
           <div className="flex items-center justify-start mt-6">
             <button
               type="button"
@@ -405,11 +413,11 @@ export const PageSequence = ({
               <span className={`h-4 w-7 rounded-full p-[2px] transition-colors ${ruleActive ? "bg-success/75" : "bg-text-muted/40"}`}>
                 <span className={`block h-3 w-3 rounded-full bg-white transition-transform ${ruleActive ? "translate-x-3" : "translate-x-0"}`} />
               </span>
-              <span>Régua ativa</span>
+              <span>{t("sequence.ruleActiveLabel")}</span>
             </button>
           </div>
           <div className="col-span-2">
-            <FormInput label="Descrição" value={ruleDescription} onChange={e => setRuleDescription(e.target.value)} />
+            <FormInput label={t("sequence.ruleDescriptionLabel")} value={ruleDescription} onChange={e => setRuleDescription(e.target.value)} />
           </div>
         </div>
 
@@ -417,11 +425,11 @@ export const PageSequence = ({
           <table className="w-full border-collapse text-[13px]">
             <thead>
               <tr className="bg-surface-2">
-                <th className="px-3 py-2 text-left text-xs font-bold uppercase text-text-muted">Template</th>
-                <th className="px-3 py-2 text-left text-xs font-bold uppercase text-text-muted">Canal</th>
-                <th className="px-3 py-2 text-left text-xs font-bold uppercase text-text-muted">Referência</th>
-                <th className="px-3 py-2 text-left text-xs font-bold uppercase text-text-muted">Offset</th>
-                <th className="px-3 py-2 text-left text-xs font-bold uppercase text-text-muted">Ações</th>
+                <th className="px-3 py-2 text-left text-xs font-bold uppercase text-text-muted">{t("sequence.table.template")}</th>
+                <th className="px-3 py-2 text-left text-xs font-bold uppercase text-text-muted">{t("sequence.table.channel")}</th>
+                <th className="px-3 py-2 text-left text-xs font-bold uppercase text-text-muted">{t("sequence.table.reference")}</th>
+                <th className="px-3 py-2 text-left text-xs font-bold uppercase text-text-muted">{t("sequence.table.offset")}</th>
+                <th className="px-3 py-2 text-left text-xs font-bold uppercase text-text-muted">{t("sequence.table.actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -437,7 +445,7 @@ export const PageSequence = ({
                       }}
                       className="bg-surface-2 border border-border-subtle-2 rounded-lg px-2 py-1.5 text-xs w-full"
                     >
-                      <option value="">Selecione...</option>
+                      <option value="">{t("sequence.selectTemplatePlaceholder")}</option>
                       {templates.map(tpl => (
                         <option key={tpl.id} value={tpl.id}>{tpl.name}</option>
                       ))}
@@ -445,22 +453,22 @@ export const PageSequence = ({
                   </td>
                   <td className="px-3 py-2">
                     <FormSelect value={tr.channel} onChange={e => setTriggerAt(idx, old => ({ ...old, channel: e.target.value }))}>
-                      <option value="Email">Email</option>
-                      <option value="WhatsApp">WhatsApp</option>
-                      <option value="Both">Ambos</option>
+                      <option value="Email">{t("channel.email")}</option>
+                      <option value="WhatsApp">{t("channel.whatsapp")}</option>
+                      <option value="Both">{t("common.both")}</option>
                     </FormSelect>
                   </td>
                   <td className="px-3 py-2">
                     <FormSelect value={tr.reference} onChange={e => setTriggerAt(idx, old => ({ ...old, reference: e.target.value }))}>
-                      <option value="DueDate">Vencimento</option>
-                      <option value="IssueDate">Emissão</option>
+                      <option value="DueDate">{t("sequence.referenceDueDate")}</option>
+                      <option value="IssueDate">{t("sequence.referenceIssueDate")}</option>
                     </FormSelect>
                   </td>
                   <td className="px-3 py-2">
                     <FormInput type="number" value={String(tr.daysOffset)} onChange={e => setTriggerAt(idx, old => ({ ...old, daysOffset: Number(e.target.value || 0) }))} />
                   </td>
                   <td className="px-3 py-2">
-                    <Button size="sm" variant="danger" onClick={() => removeTrigger(idx)} disabled={triggers.length === 1}>Remover</Button>
+                    <Button size="sm" variant="danger" onClick={() => removeTrigger(idx)} disabled={triggers.length === 1}>{t("sequence.actionRemove")}</Button>
                   </td>
                 </tr>
               ))}
@@ -469,7 +477,7 @@ export const PageSequence = ({
         </div>
 
         <div className="mt-3 flex justify-end">
-          <Button size="sm" variant="secondary" onClick={addTrigger}>{ICONS.plus} Adicionar Gatilho</Button>
+          <Button size="sm" variant="secondary" onClick={addTrigger}>{ICONS.plus} {t("sequence.addTrigger")}</Button>
         </div>
       </Modal>
     </div>

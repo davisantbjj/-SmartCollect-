@@ -147,9 +147,32 @@ var applyMigrationsOnStartup = app.Environment.IsDevelopment()
 
 if (applyMigrationsOnStartup)
 {
-    using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<SmartCollect.Infrastructure.Data.AppDbContext>();
-    db.Database.Migrate();
+    var lockKey = 84239211;
+    var lockAcquired = false;
+
+    using (var lockConnection = new NpgsqlConnection(connectionBuilder.ConnectionString))
+    {
+        lockConnection.Open();
+        using var lockCommand = new NpgsqlCommand("SELECT pg_try_advisory_lock(@key)", lockConnection);
+        lockCommand.Parameters.AddWithValue("key", lockKey);
+        lockAcquired = (bool)(lockCommand.ExecuteScalar() ?? false);
+
+        if (lockAcquired)
+        {
+            using var scope = app.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<SmartCollect.Infrastructure.Data.AppDbContext>();
+            db.Database.Migrate();
+        }
+    }
+
+    if (!lockAcquired)
+    {
+        Console.WriteLine("Skipping migrations: another instance is running them.");
+    }
+    else
+    {
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SmartCollect.Infrastructure.Data.AppDbContext>();
 
     var configuredAdminEmail = (Environment.GetEnvironmentVariable("ADMIN_EMAIL") ?? "admin@atoscapital.com.br")
         .ToLowerInvariant();
@@ -239,6 +262,13 @@ if (applyMigrationsOnStartup)
 
             db.SaveChanges();
         }
+    }
+
+        using var unlockConnection = new NpgsqlConnection(connectionBuilder.ConnectionString);
+        unlockConnection.Open();
+        using var unlockCommand = new NpgsqlCommand("SELECT pg_advisory_unlock(@key)", unlockConnection);
+        unlockCommand.Parameters.AddWithValue("key", lockKey);
+        unlockCommand.ExecuteScalar();
     }
 }
 

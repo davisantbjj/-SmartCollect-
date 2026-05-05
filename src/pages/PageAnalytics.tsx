@@ -68,7 +68,7 @@ export const PageAnalytics = ({
         setSends(snd.items.map(i => ({ day: toBrDayLabel(i.day), email: i.emailCount, wa: i.whatsAppCount })));
         setChannel(ch);
       } catch (err) {
-        const msg = err instanceof ApiError ? err.message : "Falha ao carregar analytics.";
+        const msg = err instanceof ApiError ? err.message : t("analyticsPage.errors.load");
         if (!cancelled) showToast(`${ICONS.cross} ${msg}`, "error");
       } finally {
         if (!cancelled) setLoading(false);
@@ -109,16 +109,16 @@ export const PageAnalytics = ({
     <div className="animate-fade-up">
       {isMaster && (
         <div className="mb-4 px-4 py-2.5 bg-accent/8 border border-accent/20 rounded-[10px] text-sm text-accent font-semibold flex items-center gap-2">
-          {ICONS.analytics} {selectedTenantId ? "Analytics da empresa selecionada" : "Analytics agregado de todas as empresas"}
+          {ICONS.analytics} {selectedTenantId ? t("analyticsPage.master.selectedTenant") : t("analyticsPage.master.allTenants")}
         </div>
       )}
 
       <div className="grid grid-cols-4 gap-3.5 mb-6">
         {[
-          { value: `${paymentRate.toFixed(1)}%`, label: t("analytics.recoveryRate"), subtitle: `${statusBreakdown.paid.toLocaleString("pt-BR")} pagos de ${totalOperational.toLocaleString("pt-BR")}`, color: colors.success },
-          { value: `${criticalTitles.toLocaleString("pt-BR")}`, label: t("analytics.criticalTitles"), subtitle: `${safePercent(criticalTitles, totalTitles || 1)}% do total de títulos`, color: overdueColor },
-          { value: new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(summary.totalOverdue), label: t("analytics.overdueAmount"), subtitle: `${overduePortfolioRate}% da carteira a receber`, color: overdueColor },
-          { value: `${avgDeliveryRate.toFixed(1)}%`, label: t("analytics.avgDeliveryRate"), subtitle: `${totalDelivered.toLocaleString("pt-BR")} de ${totalSent.toLocaleString("pt-BR")} entregues`, color: colors.accent },
+          { value: `${paymentRate.toFixed(1)}%`, label: t("analytics.recoveryRate"), subtitle: `${statusBreakdown.paid.toLocaleString("pt-BR")} ${t("analyticsPage.metrics.paidOf")} ${totalOperational.toLocaleString("pt-BR")}`, color: colors.success },
+          { value: `${criticalTitles.toLocaleString("pt-BR")}`, label: t("analytics.criticalTitles"), subtitle: `${safePercent(criticalTitles, totalTitles || 1)}% ${t("analyticsPage.metrics.ofTotalTitles")}`, color: overdueColor },
+          { value: new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(summary.totalOverdue), label: t("analytics.overdueAmount"), subtitle: `${overduePortfolioRate}% ${t("analyticsPage.metrics.overdueShare")}`, color: overdueColor },
+          { value: `${avgDeliveryRate.toFixed(1)}%`, label: t("analytics.avgDeliveryRate"), subtitle: `${totalDelivered.toLocaleString("pt-BR")} ${t("analyticsPage.metrics.deliveredOf")} ${totalSent.toLocaleString("pt-BR")} ${t("analyticsPage.metrics.delivered")}`, color: colors.accent },
         ].map((metric, index) => (
           <div key={index} className="bg-surface border border-border-subtle rounded-[14px] overflow-hidden p-[22px] text-center">
             <div className="font-extrabold text-[30px] tracking-[-1px] mb-[5px]" style={{ color: metric.color }}>{metric.value}</div>
@@ -133,17 +133,17 @@ export const PageAnalytics = ({
           <CardHeader title={t("dashboard.channelEffectiveness")} subtitle={t("dashboard.engagementMetrics")} />
           <div className="p-5 grid grid-cols-2 gap-3">
             {[
-              { label: "E-mail", sent: channel.emailSent, delivery: emailDeliveryRate, read: emailReadRate, color: colors.accent },
-              { label: "WhatsApp", sent: channel.whatsAppSent, delivery: waDeliveryRate, read: waReadRate, color: colors.wa },
+              { label: t("channel.email"), sent: channel.emailSent, delivery: emailDeliveryRate, read: emailReadRate, color: colors.accent },
+              { label: t("channel.whatsapp"), sent: channel.whatsAppSent, delivery: waDeliveryRate, read: waReadRate, color: colors.wa },
             ].map(ch => (
               <div key={ch.label} className="bg-surface-2 border border-border-subtle rounded-[10px] p-3">
                 <div className="font-bold text-sm mb-2">{ch.label}</div>
-                <div className="text-xs text-text-muted mb-1">Enviados: <strong className="text-text-primary">{ch.sent.toLocaleString("pt-BR")}</strong></div>
-                <div className="text-xs text-text-muted mb-1">Entregues: <strong style={{ color: ch.color }}>{ch.delivery}%</strong></div>
+                <div className="text-xs text-text-muted mb-1">{t("dashboard.sent")}: <strong className="text-text-primary">{ch.sent.toLocaleString("pt-BR")}</strong></div>
+                <div className="text-xs text-text-muted mb-1">{t("dashboard.delivered")}: <strong style={{ color: ch.color }}>{ch.delivery}%</strong></div>
                 <div className="h-[3px] bg-surface-3 rounded-sm mb-2">
                   <div className="h-full rounded-sm" style={{ width: `${Math.min(ch.delivery, 100)}%`, background: ch.color }} />
                 </div>
-                <div className="text-xs text-text-muted">Leituras: <strong style={{ color: ch.color }}>{ch.read}%</strong></div>
+                <div className="text-xs text-text-muted">{t("analyticsPage.metrics.reads")}: <strong style={{ color: ch.color }}>{ch.read}%</strong></div>
               </div>
             ))}
           </div>

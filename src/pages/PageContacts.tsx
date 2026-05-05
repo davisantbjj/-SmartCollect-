@@ -108,12 +108,12 @@ const normalizeDispatchMode = (client: ClientResponse): DispatchMode => {
 
 const getDepartmentLabel = (department: string) => {
   const normalized = department.trim().toLowerCase();
-  if (normalized === "finance") return "Financeiro";
-  if (normalized === "commercial") return "Comercial";
-  if (normalized === "management") return "Gestao";
-  if (normalized === "other") return "Outros";
-  if (normalized === "purchasing") return "Compras";
-  if (normalized === "partner") return "Socio";
+  if (normalized === "finance") return t("contactsPage.departments.finance");
+  if (normalized === "commercial") return t("contactsPage.departments.commercial");
+  if (normalized === "management") return t("contactsPage.departments.management");
+  if (normalized === "other") return t("contactsPage.departments.other");
+  if (normalized === "purchasing") return t("contactsPage.departments.purchasing");
+  if (normalized === "partner") return t("contactsPage.departments.partner");
   return department;
 };
 
@@ -164,7 +164,7 @@ export const PageContacts = ({
       const batches = await Promise.all(companyList.map(c => getContactsByClient(c.id, tenantId).catch(() => [])));
       setContacts(batches.flat());
     } catch {
-      showToast(`${ICONS.cross} Erro ao carregar contatos.`, "error");
+      showToast(`${ICONS.cross} ${t("contactsPage.errors.load")}`, "error");
     } finally {
       setLoading(false);
     }
@@ -273,12 +273,12 @@ export const PageContacts = ({
 
   const handleSetDispatchPreference = async (clientId: string, mode: DispatchMode, selectedContactIds: string[]) => {
     if (requiresTenantSelection) {
-      showToast(`${ICONS.warning} Selecione uma empresa para atualizar as preferencias de envio.`, "warn");
+      showToast(`${ICONS.warning} ${t("contactsPage.validation.selectTenantDispatch")}`, "warn");
       return;
     }
 
     if (mode === "Selected" && selectedContactIds.length === 0) {
-      showToast(`${ICONS.warning} Selecione ao menos um contato para o envio personalizado.`, "warn");
+      showToast(`${ICONS.warning} ${t("contactsPage.validation.customRequiresContact")}`, "warn");
       return;
     }
 
@@ -293,11 +293,11 @@ export const PageContacts = ({
       const updated = await updateClientDispatchPreference(clientId, payload, tenantId);
       setClients(prev => prev.map(c => c.id === updated.id ? updated : c));
       showToast(
-        `${ICONS.checkmark} Regra de envio atualizada para ${updated.dispatchMode === "All" ? "todos os contatos" : updated.dispatchMode === "Selected" ? "contatos selecionados" : "contato principal"}.`,
+        `${ICONS.checkmark} ${t("contactsPage.messages.dispatchUpdated")} ${updated.dispatchMode === "All" ? t("contactsPage.dispatchModes.all") : updated.dispatchMode === "Selected" ? t("contactsPage.dispatchModes.selected") : t("contactsPage.dispatchModes.primary")}.`,
         "success"
       );
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao atualizar preferência de envio.";
+      const msg = err instanceof ApiError ? err.message : t("contactsPage.errors.updateDispatch");
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setUpdatingDispatchClientId(null);
@@ -306,7 +306,7 @@ export const PageContacts = ({
 
   const handleSetPrimaryContact = async (contact: ContactResponse) => {
     if (requiresTenantSelection) {
-      showToast(`${ICONS.warning} Selecione uma empresa para atualizar contatos.`, "warn");
+      showToast(`${ICONS.warning} ${t("contactsPage.validation.selectTenantContacts")}`, "warn");
       return;
     }
 
@@ -322,10 +322,10 @@ export const PageContacts = ({
       };
 
       await updateContact(contact.clientId, contact.id, payload, tenantId);
-      showToast(`${ICONS.checkmark} Contato principal atualizado.`, "success");
+      showToast(`${ICONS.checkmark} ${t("contactsPage.messages.primaryUpdated")}`, "success");
       await loadAll();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao definir contato principal.";
+      const msg = err instanceof ApiError ? err.message : t("contactsPage.errors.setPrimary");
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setSettingPrimaryContactId(null);
@@ -334,21 +334,21 @@ export const PageContacts = ({
 
   const handleDeleteContact = async (contact: ContactResponse) => {
     if (requiresTenantSelection) {
-      showToast(`${ICONS.warning} Selecione uma empresa para atualizar contatos.`, "warn");
+      showToast(`${ICONS.warning} ${t("contactsPage.validation.selectTenantContacts")}`, "warn");
       return;
     }
 
-    const confirmed = window.confirm(`Excluir o contato "${contact.name}"?`);
+    const confirmed = window.confirm(`${t("contactsPage.confirm.deleteContact")} "${contact.name}"?`);
     if (!confirmed)
       return;
 
     try {
       setDeletingContactId(contact.id);
       await deleteContact(contact.clientId, contact.id, tenantId);
-      showToast(`${ICONS.checkmark} Contato excluído com sucesso.`, "success");
+      showToast(`${ICONS.checkmark} ${t("contactsPage.messages.deleted")}`, "success");
       await loadAll();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao excluir contato.";
+      const msg = err instanceof ApiError ? err.message : t("contactsPage.errors.delete");
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setDeletingContactId(null);
@@ -357,7 +357,7 @@ export const PageContacts = ({
 
   const handleSave = async () => {
     if (requiresTenantSelection) {
-      showToast(`${ICONS.warning} Selecione uma empresa para gerenciar contatos.`, "warn");
+      showToast(`${ICONS.warning} ${t("contactsPage.validation.selectTenantManage")}`, "warn");
       return;
     }
 
@@ -365,7 +365,7 @@ export const PageContacts = ({
     const normalizedPhone = normalizePhone(form.whatsAppPhone);
 
     if (!form.name || (!hasEmail && !normalizedPhone)) {
-      showToast(`${ICONS.warning} Nome e pelo menos um canal de contato são obrigatórios.`, "warn");
+      showToast(`${ICONS.warning} ${t("contactsPage.validation.requireContactChannel")}`, "warn");
       return;
     }
 
@@ -383,7 +383,7 @@ export const PageContacts = ({
 
       if (!clientId) {
         if (!newClientName || !newClientCnpj) {
-          showToast(`${ICONS.warning} Informe o cliente ou crie um novo.`, "warn");
+          showToast(`${ICONS.warning} ${t("contactsPage.validation.selectOrCreateClient")}`, "warn");
           setSaving(false);
           return;
         }
@@ -405,7 +405,7 @@ export const PageContacts = ({
       setModalOpen(false);
       await loadAll();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao salvar contato.";
+      const msg = err instanceof ApiError ? err.message : t("contactsPage.errors.save");
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setSaving(false);
@@ -435,7 +435,7 @@ export const PageContacts = ({
           variant="primary"
           onClick={openNew}
           disabled={requiresTenantSelection}
-          title={requiresTenantSelection ? "Selecione uma empresa para gerenciar contatos" : undefined}
+          title={requiresTenantSelection ? t("contactsPage.validation.selectTenantManage") : undefined}
         >
           {t("contacts.newContact")}
         </Button>
@@ -443,11 +443,11 @@ export const PageContacts = ({
 
       {requiresTenantSelection && (
         <div className="rounded-xl border border-border-subtle bg-surface-2/60 px-4 py-3 text-sm text-text-secondary mb-4">
-          Selecione uma empresa no topo para visualizar e editar contatos.
+          {t("contactsPage.validation.selectTenantView")}
         </div>
       )}
 
-      <div className="text-xs text-text-muted mb-2">{companyRows.length} empresas encontradas</div>
+      <div className="text-xs text-text-muted mb-2">{companyRows.length} {t("contactsPage.table.found")}</div>
 
       <div className="rounded-xl border border-border-subtle overflow-hidden">
         <table className="w-full border-collapse text-[13px]">
@@ -460,9 +460,9 @@ export const PageContacts = ({
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="text-center py-12 text-sm text-text-muted">Carregando...</td></tr>
+              <tr><td colSpan={6} className="text-center py-12 text-sm text-text-muted">{t("common.loading")}</td></tr>
             ) : companyRows.length === 0 ? (
-              <tr><td colSpan={6} className="text-center py-8 text-sm text-text-muted">Nenhuma empresa encontrada.</td></tr>
+              <tr><td colSpan={6} className="text-center py-8 text-sm text-text-muted">{t("contactsPage.table.empty")}</td></tr>
             ) : companyRows.map(({ client, contacts: companyContacts, primaryContact, status }) => (
               <tr key={client.id} className="border-b border-border-subtle hover:bg-surface-2/50 transition-colors">
                 <td className="px-4 py-[13px]">
@@ -474,12 +474,12 @@ export const PageContacts = ({
                     <>
                       <div className="font-semibold text-text-primary flex items-center gap-1.5">
                         {primaryContact.name}
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-success/10 text-success">Principal</span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-success/10 text-success">{t("contactsPage.labels.primary")}</span>
                       </div>
                       <div className="mt-0.5">{primaryContact.email || "—"}</div>
                     </>
                   ) : (
-                    <span className="text-text-muted">Sem contato principal</span>
+                    <span className="text-text-muted">{t("contactsPage.table.noPrimary")}</span>
                   )}
                 </td>
                 <td className="px-4 py-[13px] text-xs text-text-secondary">{primaryContact?.whatsAppPhone || "—"}</td>
@@ -488,7 +488,7 @@ export const PageContacts = ({
                 <td className="px-4 py-[13px]">
                   <div className="flex items-center gap-1.5">
                     <Button size="sm" variant="secondary" onClick={() => setCompanyDetailsClientId(client.id)}>
-                      {ICONS.eye} Ver contatos ({companyContacts.length})
+                      {ICONS.eye} {t("contactsPage.actions.viewContacts")} ({companyContacts.length})
                     </Button>
                   </div>
                 </td>
@@ -501,13 +501,13 @@ export const PageContacts = ({
       <Modal
         open={!!companyDetailsClientId}
         onClose={() => setCompanyDetailsClientId(null)}
-        title={selectedCompany ? `Contatos - ${selectedCompany.legalName}` : "Contatos da empresa"}
+        title={selectedCompany ? `${t("contactsPage.modal.companyContactsPrefix")} ${selectedCompany.legalName}` : t("contactsPage.modal.companyContactsTitle")}
         maxWidth={860}
         footer={<>
           <Button variant="secondary" onClick={() => setCompanyDetailsClientId(null)}>{t("common.cancel")}</Button>
           {selectedCompany && (
             <Button variant="primary" onClick={() => openNewForClient(selectedCompany.id)}>
-              {ICONS.plus} Adicionar contato
+              {ICONS.plus} {t("contactsPage.actions.addContact")}
             </Button>
           )}
         </>}
@@ -517,10 +517,10 @@ export const PageContacts = ({
             <div className="rounded-xl border border-border-subtle bg-surface-2 px-4 py-3">
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-muted">Regra de envio</div>
-                  <div className="text-sm font-semibold text-text-primary mt-0.5">Escolha como a empresa recebe as cobrancas.</div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-muted">{t("contactsPage.dispatch.title")}</div>
+                  <div className="text-sm font-semibold text-text-primary mt-0.5">{t("contactsPage.dispatch.subtitle")}</div>
                   <div className="text-xs text-text-muted mt-1">
-                    Modo atual: {dispatchModeDraft === "All" ? "Todos os contatos" : dispatchModeDraft === "Selected" ? "Contatos selecionados" : "Contato principal"}
+                    {t("contactsPage.dispatch.currentMode")} {dispatchModeDraft === "All" ? t("contactsPage.dispatchModes.all") : dispatchModeDraft === "Selected" ? t("contactsPage.dispatchModes.selected") : t("contactsPage.dispatchModes.primary")}
                   </div>
                 </div>
 
@@ -531,19 +531,19 @@ export const PageContacts = ({
                     disabled={updatingDispatchClientId === selectedCompany.id}
                     className="w-full bg-surface border border-border-subtle-2 rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-accent cursor-pointer"
                   >
-                    <option value="Primary">Contato principal</option>
-                    <option value="All">Todos os contatos</option>
-                    <option value="Selected">Contatos selecionados</option>
+                    <option value="Primary">{t("contactsPage.dispatchModes.primary")}</option>
+                    <option value="All">{t("contactsPage.dispatchModes.all")}</option>
+                    <option value="Selected">{t("contactsPage.dispatchModes.selected")}</option>
                   </select>
                 </div>
               </div>
 
               {dispatchModeDraft === "Selected" && (
                 <div className="mt-3 rounded-lg border border-border-subtle bg-surface px-3 py-2.5">
-                  <div className="text-[11px] font-bold uppercase tracking-[0.6px] text-text-muted mb-2">Escolher contatos para envio</div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.6px] text-text-muted mb-2">{t("contactsPage.dispatch.selectContacts")}</div>
                   <div className="flex flex-col gap-1.5">
                     {selectedCompanyContacts.length === 0 ? (
-                      <div className="text-xs text-text-muted">Nenhum contato disponível.</div>
+                      <div className="text-xs text-text-muted">{t("contactsPage.dispatch.noContacts")}</div>
                     ) : (
                       selectedCompanyContacts.map(contact => (
                         <label key={contact.id} className="flex items-center gap-2 text-xs text-text-secondary">
@@ -556,7 +556,7 @@ export const PageContacts = ({
                             className="accent-accent"
                           />
                           <span className="font-semibold text-text-primary">{contact.name}</span>
-                          {contact.isPrimary && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-success/10 text-success font-bold">Principal</span>}
+                          {contact.isPrimary && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-success/10 text-success font-bold">{t("contactsPage.labels.primary")}</span>}
                         </label>
                       ))
                     )}
@@ -571,7 +571,7 @@ export const PageContacts = ({
                   onClick={() => void handleSetDispatchPreference(selectedCompany.id, dispatchModeDraft, dispatchSelectedContactIdsDraft)}
                   disabled={updatingDispatchClientId === selectedCompany.id}
                 >
-                  {updatingDispatchClientId === selectedCompany.id ? "Salvando..." : "Salvar regra de envio"}
+                  {updatingDispatchClientId === selectedCompany.id ? t("contactsPage.actions.saving") : t("contactsPage.actions.saveDispatch")}
                 </Button>
               </div>
             </div>
@@ -579,12 +579,12 @@ export const PageContacts = ({
 
           {selectedCompanyContacts.length === 0 ? (
             <div className="rounded-xl border border-border-subtle bg-surface-2 px-4 py-6 text-center text-sm text-text-muted">
-              Esta empresa ainda nao possui contatos.
+              {t("contactsPage.company.noContacts")}
             </div>
           ) : (
             <>
               <div className="text-xs text-text-muted bg-surface-2 border border-border-subtle rounded-xl px-4 py-2.5">
-                Para definir o contato principal desta empresa, use o botao "Tornar principal" na lista abaixo.
+                {t("contactsPage.company.primaryHelp")}
               </div>
               <div className="flex flex-col gap-2">
                 {selectedCompanyContacts.map(contact => (
@@ -593,14 +593,14 @@ export const PageContacts = ({
                       <div className="font-semibold text-[15px] flex items-center gap-2 flex-wrap">
                         <span className="text-text-primary">{contact.name}</span>
                         {contact.isPrimary && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-success/10 text-success">Principal</span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-success/10 text-success">{t("contactsPage.labels.primary")}</span>
                         )}
                         <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-surface border border-border-subtle text-text-muted">
                           {getDepartmentLabel(contact.department)}
                         </span>
                       </div>
-                      <div className="text-xs text-text-secondary mt-1 break-all">{contact.email || "Sem e-mail cadastrado"}</div>
-                      <div className="text-xs text-text-secondary mt-0.5">{contact.whatsAppPhone || "Sem WhatsApp cadastrado"}</div>
+                      <div className="text-xs text-text-secondary mt-1 break-all">{contact.email || t("contactsPage.labels.noEmail")}</div>
+                      <div className="text-xs text-text-secondary mt-0.5">{contact.whatsAppPhone || t("contactsPage.labels.noWhatsApp")}</div>
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
@@ -611,7 +611,7 @@ export const PageContacts = ({
                           onClick={() => void handleSetPrimaryContact(contact)}
                           disabled={settingPrimaryContactId === contact.id}
                         >
-                          {settingPrimaryContactId === contact.id ? "Salvando..." : "Tornar principal"}
+                          {settingPrimaryContactId === contact.id ? t("contactsPage.actions.saving") : t("contactsPage.actions.makePrimary")}
                         </Button>
                       )}
                       <Button size="sm" variant="secondary" onClick={() => openEditFromCompany(contact)}>
@@ -623,7 +623,7 @@ export const PageContacts = ({
                         onClick={() => void handleDeleteContact(contact)}
                         disabled={deletingContactId === contact.id}
                       >
-                        {deletingContactId === contact.id ? "Excluindo..." : "Excluir"}
+                        {deletingContactId === contact.id ? t("contactsPage.actions.deleting") : t("contactsPage.actions.delete")}
                       </Button>
                     </div>
                   </div>
@@ -637,21 +637,21 @@ export const PageContacts = ({
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editing ? "Editar Contato" : t("contacts.modalTitle")}
+        title={editing ? t("contactsPage.modal.editTitle") : t("contacts.modalTitle")}
         footer={<>
           <Button variant="secondary" onClick={() => setModalOpen(false)}>{t("common.cancel")}</Button>
-          <Button variant="primary" onClick={handleSave}>{saving ? "Salvando..." : t("contacts.saveContact")}</Button>
+          <Button variant="primary" onClick={handleSave}>{saving ? t("contactsPage.actions.saving") : t("contacts.saveContact")}</Button>
         </>}
       >
         <div className="grid grid-cols-2 gap-3.5">
           <div className="col-span-2">
-            <label className="block text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted mb-[5px]">Empresa</label>
+            <label className="block text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted mb-[5px]">{t("contactsPage.labels.company")}</label>
             <select
               value={form.clientId}
               onChange={e => setForm(f => ({ ...f, clientId: e.target.value }))}
               className="bg-surface-2 border border-border-subtle-2 rounded-lg px-[13px] py-[9px] text-[13px] text-text-primary outline-none w-full focus:border-accent"
             >
-              <option value="">Nova empresa...</option>
+              <option value="">{t("contactsPage.labels.newCompany")}</option>
               {clients.map(c => (
                 <option key={c.id} value={c.id}>{c.legalName} — {c.taxId}</option>
               ))}
@@ -660,8 +660,8 @@ export const PageContacts = ({
 
           {!form.clientId && (
             <>
-              <FormInput label="Razão Social *" value={newClientName} onChange={e => setNewClientName(e.target.value)} placeholder="Nome da empresa" />
-              <FormInput label="CNPJ *" value={newClientCnpj} onChange={e => setNewClientCnpj(formatCnpj(e.target.value))} placeholder="00.000.000/0001-00" />
+              <FormInput label={t("contactsPage.labels.companyNameRequired")} value={newClientName} onChange={e => setNewClientName(e.target.value)} placeholder={t("contactsPage.placeholders.companyName")} />
+              <FormInput label={t("contactsPage.labels.cnpjRequired")} value={newClientCnpj} onChange={e => setNewClientCnpj(formatCnpj(e.target.value))} placeholder={t("common.cnpjPlaceholder")} />
             </>
           )}
 
@@ -684,17 +684,17 @@ export const PageContacts = ({
               onChange={e => setForm(f => ({ ...f, isPrimary: e.target.checked }))}
               className="accent-accent"
             />
-            <label htmlFor="primary" className="text-sm text-text-secondary cursor-pointer">Contato principal</label>
+            <label htmlFor="primary" className="text-sm text-text-secondary cursor-pointer">{t("contactsPage.labels.primaryContact")}</label>
           </div>
 
           <div className="col-span-2">
             <FormInput label={`${t("contacts.contactName")} *`} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder={t("contacts.fullName")} />
           </div>
           <div className="col-span-2">
-            <FormInput label={t("contacts.col.email")} type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="contato@empresa.com.br" />
+            <FormInput label={t("contacts.col.email")} type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder={t("contactsPage.placeholders.contactEmail")} />
           </div>
           <div className="col-span-2">
-            <FormInput label={t("contacts.mobileWhatsapp")} value={form.whatsAppPhone} onChange={e => setForm(f => ({ ...f, whatsAppPhone: formatPhone(e.target.value) }))} placeholder="+55 11 99999-9999" />
+            <FormInput label={t("contacts.mobileWhatsapp")} value={form.whatsAppPhone} onChange={e => setForm(f => ({ ...f, whatsAppPhone: formatPhone(e.target.value) }))} placeholder={t("contactsPage.placeholders.whatsAppPhone")} />
           </div>
         </div>
       </Modal>

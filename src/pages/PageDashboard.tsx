@@ -133,7 +133,7 @@ export const PageDashboard = ({
         {
           if (!fullFailureWarnedRef.current)
           {
-            showToast(`${ICONS.cross} Falha ao carregar o dashboard.`, "error");
+            showToast(`${ICONS.cross} ${t("dashboardPage.errors.load")}`, "error");
             fullFailureWarnedRef.current = true;
           }
         }
@@ -142,7 +142,7 @@ export const PageDashboard = ({
           fullFailureWarnedRef.current = false;
           if (failed > 0 && !partialFailureWarnedRef.current)
           {
-            showToast(`${ICONS.warning} Parte dos dados do dashboard não pôde ser carregada.`, "warn");
+            showToast(`${ICONS.warning} ${t("dashboardPage.errors.partial")}`, "warn");
             partialFailureWarnedRef.current = true;
           }
 
@@ -150,7 +150,7 @@ export const PageDashboard = ({
             partialFailureWarnedRef.current = false;
         }
       } catch {
-        if (!cancelled) showToast(`${ICONS.cross} Falha ao carregar o dashboard.`, "error");
+        if (!cancelled) showToast(`${ICONS.cross} ${t("dashboardPage.errors.load")}`, "error");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -183,27 +183,27 @@ export const PageDashboard = ({
   const pendingColor = "#F97316";
 
   const criticalityItems = [
-    { label: t("dashboard.statusOverdue"), value: statusBreakdown.overdue, tone: "Alta", color: overdueColor, bg: "bg-danger/10" },
-    { label: t("dashboard.statusPending"), value: statusBreakdown.pendingData, tone: "Média", color: pendingColor, bg: "bg-orange-500/10" },
-    { label: t("dashboard.statusOpen"), value: statusBreakdown.open, tone: "Acompanhar", color: receivableColor, bg: "bg-warn/10" },
-    { label: t("dashboard.statusPaid"), value: statusBreakdown.paid, tone: "Baixa", color: colors.success, bg: "bg-success/10" },
-    { label: t("dashboard.statusCancelled"), value: statusBreakdown.cancelled, tone: "Neutra", color: colors.text3, bg: "bg-surface-2" },
+    { label: t("dashboard.statusOverdue"), value: statusBreakdown.overdue, tone: t("dashboardPage.tones.high"), color: overdueColor, bg: "bg-danger/10" },
+    { label: t("dashboard.statusPending"), value: statusBreakdown.pendingData, tone: t("dashboardPage.tones.medium"), color: pendingColor, bg: "bg-orange-500/10" },
+    { label: t("dashboard.statusOpen"), value: statusBreakdown.open, tone: t("dashboardPage.tones.monitor"), color: receivableColor, bg: "bg-warn/10" },
+    { label: t("dashboard.statusPaid"), value: statusBreakdown.paid, tone: t("dashboardPage.tones.low"), color: colors.success, bg: "bg-success/10" },
+    { label: t("dashboard.statusCancelled"), value: statusBreakdown.cancelled, tone: t("dashboardPage.tones.neutral"), color: colors.text3, bg: "bg-surface-2" },
   ];
 
   return (
     <div className="animate-fade-up">
       {isMaster && (
         <div className="mb-4 px-4 py-2.5 bg-accent/8 border border-accent/20 rounded-[10px] text-sm text-accent font-semibold flex items-center gap-2">
-          {ICONS.dashboard} {selectedTenantId ? "Visão da empresa selecionada" : "Visão agregada de todos os tenants"}
+          {ICONS.dashboard} {selectedTenantId ? t("dashboardPage.master.selectedTenant") : t("dashboardPage.master.allTenants")}
         </div>
       )}
 
       {/* KPIs */}
       <div className="grid grid-cols-4 gap-4 mb-6">
-        <KpiCard label={t("dashboard.totalReceivable")}  value={formatBRL(summary.totalReceivable)} icon={ICONS.money}     delta={loading ? "..." : `${receivableShare}% da carteira`} deltaDir="up"   accentColor={receivableColor} delay={1} />
-        <KpiCard label={t("dashboard.totalOverdue")}     value={formatBRL(summary.totalOverdue)}    icon={ICONS.warning}   delta={loading ? "..." : `${overdueShare}% do a receber`}  deltaDir="down" accentColor={overdueColor} delay={2} />
-        <KpiCard label={t("dashboard.totalPaid")}        value={formatBRL(summary.totalPaid)}       icon={ICONS.checkmark} delta={loading ? "..." : `${paidShare}% liquidado`} deltaDir="up"   accentColor={colors.success} delay={3} />
-        <KpiCard label={t("dashboard.recoveryRate")}     value={`${paymentRate.toFixed(1)}%`} icon={ICONS.dashboard} delta="Atual" deltaDir="up" accentColor={colors.success} delay={4} />
+        <KpiCard label={t("dashboard.totalReceivable")}  value={formatBRL(summary.totalReceivable)} icon={ICONS.money}     delta={loading ? "..." : `${receivableShare}% ${t("dashboardPage.kpi.receivableShare")}`} deltaDir="up"   accentColor={receivableColor} delay={1} />
+        <KpiCard label={t("dashboard.totalOverdue")}     value={formatBRL(summary.totalOverdue)}    icon={ICONS.warning}   delta={loading ? "..." : `${overdueShare}% ${t("dashboardPage.kpi.overdueShare")}`}  deltaDir="down" accentColor={overdueColor} delay={2} />
+        <KpiCard label={t("dashboard.totalPaid")}        value={formatBRL(summary.totalPaid)}       icon={ICONS.checkmark} delta={loading ? "..." : `${paidShare}% ${t("dashboardPage.kpi.paidShare")}`} deltaDir="up"   accentColor={colors.success} delay={3} />
+        <KpiCard label={t("dashboard.recoveryRate")}     value={`${paymentRate.toFixed(1)}%`} icon={ICONS.dashboard} delta={t("dashboardPage.kpi.current")} deltaDir="up" accentColor={colors.success} delay={4} />
       </div>
 
       <div className="bg-surface border border-border-subtle rounded-[14px] overflow-hidden mb-6">
@@ -243,7 +243,7 @@ export const PageDashboard = ({
           <CardHeader title={t("dashboard.agingList")} subtitle={t("dashboard.agingSubtitle")} />
           <div className="p-5 flex flex-col gap-3.5">
             {aging.length === 0 && !loading && (
-              <div className="text-xs text-text-muted">Sem dados de aging.</div>
+              <div className="text-xs text-text-muted">{t("dashboardPage.aging.empty")}</div>
             )}
             {aging.map(item => (
               <div key={item.label}>
@@ -274,7 +274,7 @@ export const PageDashboard = ({
           />
           <div className="px-5 py-3.5 flex flex-col gap-[9px]">
             {topDefaulters.length === 0 && !loading && (
-              <div className="text-xs text-text-muted">Sem inadimplentes no período.</div>
+              <div className="text-xs text-text-muted">{t("dashboardPage.defaulters.empty")}</div>
             )}
             {topDefaulters.map(item => (
               <div key={item.rank} className="flex items-center gap-3 bg-surface-2 rounded-[9px] px-[13px] py-[10px] border border-border-subtle">
@@ -295,8 +295,8 @@ export const PageDashboard = ({
           <div className="p-5">
             <div className="grid grid-cols-2 gap-3 mb-5">
               {[
-                { name: "E-mail",   icon: ICONS.email, color: colors.accent, sent: channelMetrics.emailSent,     delivery: emailDeliveryRate, read: emailReadRate, readLabel: t("dashboard.opened") },
-                { name: "WhatsApp", icon: ICONS.chat,  color: colors.wa,    sent: channelMetrics.whatsAppSent,   delivery: waDeliveryRate,    read: waReadRate,    readLabel: t("dashboard.read")   },
+                { name: t("channel.email"),   icon: ICONS.email, color: colors.accent, sent: channelMetrics.emailSent,     delivery: emailDeliveryRate, read: emailReadRate, readLabel: t("dashboard.opened") },
+                { name: t("channel.whatsapp"), icon: ICONS.chat,  color: colors.wa,    sent: channelMetrics.whatsAppSent,   delivery: waDeliveryRate,    read: waReadRate,    readLabel: t("dashboard.read")   },
               ].map(ch => (
                 <div key={ch.name} className="bg-surface-2 rounded-[10px] p-3.5 border border-border-subtle">
                   <div className="flex items-center gap-[7px] mb-3.5 font-bold text-[13px]">
@@ -329,8 +329,8 @@ export const PageDashboard = ({
                 <XAxis dataKey="month" tick={{ fill: colors.text3, fontSize: 10 }} axisLine={false} tickLine={false} />
                 <YAxis hide />
                 <Tooltip content={<ChartTooltip />} />
-                <Area type="monotone" dataKey="email" name="E-mail"    stroke={colors.accent} fill={`${colors.accent}22`} strokeWidth={2} />
-                <Area type="monotone" dataKey="wa"    name="WhatsApp"  stroke={colors.wa}     fill={`${colors.wa}22`}     strokeWidth={2} />
+                <Area type="monotone" dataKey="email" name={t("channel.email")}    stroke={colors.accent} fill={`${colors.accent}22`} strokeWidth={2} />
+                <Area type="monotone" dataKey="wa"    name={t("channel.whatsapp")}  stroke={colors.wa}     fill={`${colors.wa}22`}     strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           </div>

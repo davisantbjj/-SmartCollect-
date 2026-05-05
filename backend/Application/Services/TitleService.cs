@@ -86,6 +86,9 @@ public class TitleService : ITitleService
 
     public async Task<TitleResponse> CreateAsync(Guid tenantId, CreateTitleRequest request)
     {
+        var dueDateUtc = NormalizeToUtc(request.DueDate);
+        var issueDateUtc = NormalizeToUtc(request.IssueDate);
+
         var clientExists = await _db.Clients.AnyAsync(c => c.Id == request.ClientId && c.TenantId == tenantId);
         if (!clientExists)
             throw new InvalidOperationException("Cliente não encontrado ou não pertence a este tenant.");
@@ -101,16 +104,16 @@ public class TitleService : ITitleService
             var changes = new List<string>();
             if (existing.ClientId != request.ClientId) changes.Add("cliente atualizado");
             if (existing.Amount != request.Amount) changes.Add($"valor atualizado para {request.Amount:0.00}");
-            if (existing.DueDate.Date != request.DueDate.Date) changes.Add($"vencimento atualizado para {request.DueDate:dd/MM/yyyy}");
-            if (existing.IssueDate.Date != request.IssueDate.Date) changes.Add($"emissao atualizada para {request.IssueDate:dd/MM/yyyy}");
+            if (existing.DueDate.Date != dueDateUtc.Date) changes.Add($"vencimento atualizado para {dueDateUtc:dd/MM/yyyy}");
+            if (existing.IssueDate.Date != issueDateUtc.Date) changes.Add($"emissao atualizada para {issueDateUtc:dd/MM/yyyy}");
             if (!string.Equals(existing.BoletoUrl ?? string.Empty, request.BoletoUrl ?? string.Empty, StringComparison.OrdinalIgnoreCase))
                 changes.Add("link de boleto atualizado");
 
             // Update mutable fields only (never change TenantId, ClientId status arbitrarily)
             existing.ClientId = request.ClientId;
             existing.Amount = request.Amount;
-            existing.DueDate = request.DueDate;
-            existing.IssueDate = request.IssueDate;
+            existing.DueDate = dueDateUtc;
+            existing.IssueDate = issueDateUtc;
             if (!string.IsNullOrWhiteSpace(request.BoletoUrl))
                 existing.BoletoUrl = request.BoletoUrl;
 
@@ -139,7 +142,7 @@ public class TitleService : ITitleService
             !string.IsNullOrWhiteSpace(c.Email) ||
             !string.IsNullOrWhiteSpace(c.WhatsAppPhone));
 
-        var status = request.DueDate.Date < DateTime.UtcNow.Date
+        var status = dueDateUtc.Date < DateTime.UtcNow.Date
             ? TitleStatus.Overdue
             : hasContactInfo ? TitleStatus.Open : TitleStatus.PendingData;
 
@@ -150,8 +153,8 @@ public class TitleService : ITitleService
             ClientId = request.ClientId,
             UniqueCode = request.UniqueCode,
             Amount = request.Amount,
-            DueDate = request.DueDate,
-            IssueDate = request.IssueDate,
+            DueDate = dueDateUtc,
+            IssueDate = issueDateUtc,
             BoletoUrl = request.BoletoUrl,
             Status = status
         };
@@ -586,4 +589,12 @@ public class TitleService : ITitleService
 
         return t.DueDate.Date < DateTime.UtcNow.Date;
     }
+
+    private static DateTime NormalizeToUtc(DateTime value)
+        => value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+        };
 }

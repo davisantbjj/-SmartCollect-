@@ -13,8 +13,8 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         // TenantId is nullable — Master users have no tenant
         builder.Property(u => u.TenantId).IsRequired(false);
 
-        // Unique email per tenant (ignores Master users with null TenantId — handled by app logic)
-        builder.HasIndex(u => new { u.TenantId, u.Email }).IsUnique();
+        // Unique email globally (Master/Admin/Worker share the same login identifier)
+        builder.HasIndex(u => u.Email).IsUnique();
 
         builder.Property(u => u.Role).HasConversion<string>();
 

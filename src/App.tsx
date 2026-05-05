@@ -30,6 +30,7 @@ const PageTenants    = lazy(() => import("./pages/PageTenants").then(m => ({ def
 const LOGIN_RECENT_EMAILS_KEY = "smartcollect.login.recentEmails";
 const LOGIN_RECENT_EMAILS_MAX = 6;
 const LAST_PAGE_KEY = "smartcollect.lastPage";
+const MASTER_SELECTED_TENANT_KEY = "smartcollect.master.selectedTenantId";
 const ALL_PAGE_IDS: PageId[] = [
   "dashboard",
   "analytics",
@@ -63,7 +64,14 @@ export default function SmartCollect() {
   const [page, setPage] = useState<PageId>(() => getInitialPage());
   const [session, setSessionState] = useState<StoredSession | null>(() => getSession());
   const [tenants, setTenants] = useState<TenantResponse[]>([]);
-  const [selectedTenantId, setSelectedTenantId] = useState("");
+  const [selectedTenantId, setSelectedTenantId] = useState(() => {
+    try {
+      return localStorage.getItem(MASTER_SELECTED_TENANT_KEY) ?? "";
+    } catch {
+      return "";
+    }
+  });
+  const [titlesPreset, setTitlesPreset] = useState<{ status: string; token: number } | null>(null);
   const {
     toast,
     show: showToast,
@@ -129,6 +137,17 @@ export default function SmartCollect() {
     showToast(`${ICONS.folder} ${t("toast.importAreaOpened")}`, "info");
   }, [showToast]);
 
+  const goOverdueTitles = useCallback(() => {
+    if (session?.role === "Master" && !selectedTenantId) {
+      showToast(`${ICONS.warning} Selecione uma empresa para visualizar os títulos inadimplentes.`, "warn");
+      return;
+    }
+
+    setTitlesPreset({ status: "Overdue", token: Date.now() });
+    setPage("titles");
+    showToast(`${ICONS.trophy} Exibindo todos os inadimplentes.`, "info");
+  }, [session?.role, selectedTenantId, showToast]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password) {
@@ -156,6 +175,7 @@ export default function SmartCollect() {
     setTenants([]);
     setSelectedTenantId("");
     localStorage.removeItem(LAST_PAGE_KEY);
+    localStorage.removeItem(MASTER_SELECTED_TENANT_KEY);
     setPage("dashboard");
     setEmail("");
     setPassword("");
@@ -165,6 +185,11 @@ export default function SmartCollect() {
   useEffect(() => {
     localStorage.setItem(LAST_PAGE_KEY, page);
   }, [page]);
+
+  useEffect(() => {
+    if (session?.role === "Master")
+      localStorage.setItem(MASTER_SELECTED_TENANT_KEY, selectedTenantId);
+  }, [session?.role, selectedTenantId]);
 
   useEffect(() => {
     if (!session || session.role !== "Master") return;
@@ -185,17 +210,33 @@ export default function SmartCollect() {
   }, [session, showToast]);
 
   useEffect(() => {
+    if (session?.role !== "Master") {
+      setSelectedTenantId("");
+      localStorage.removeItem(MASTER_SELECTED_TENANT_KEY);
+      return;
+    }
+
+    if (!selectedTenantId) return;
+    if (tenants.some(tenant => tenant.id === selectedTenantId)) return;
+
+    setSelectedTenantId("");
+  }, [session?.role, selectedTenantId, tenants]);
+
+  useEffect(() => {
     if (!session) return;
 
+    const masterBasePages: PageId[] = ["dashboard", "analytics", "tenants"];
+    const adminOperationalPages: PageId[] = ["titles", "import", "contacts", "sequence", "templates", "integration", "workers"];
+
     const allowedByRole: Record<string, PageId[]> = {
-      Master: ["dashboard", "analytics", "tenants"],
+      Master: selectedTenantId ? [...masterBasePages, ...adminOperationalPages] : masterBasePages,
       Admin: ["dashboard", "analytics", "titles", "import", "contacts", "sequence", "templates", "integration", "workers"],
       Worker: ["dashboard", "analytics", "titles", "import", "contacts", "sequence", "templates"],
     };
 
     const allowed = allowedByRole[session.role] ?? ["dashboard"];
     if (!allowed.includes(page)) setPage("dashboard");
-  }, [session, page]);
+  }, [session, page, selectedTenantId]);
 
   // ── Login screen ─────────────────────────────────────────────────────────
   if (!session) {
@@ -339,15 +380,15 @@ export default function SmartCollect() {
 
   // ── Main app ──────────────────────────────────────────────────────────────
   const pages: Record<PageId, React.ReactNode> = {
-    dashboard:   <PageDashboard showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} />,
+    dashboard:   <PageDashboard showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} onViewAllDefaulters={goOverdueTitles} />,
     analytics:   <PageAnalytics showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} />,
-    titles:      <PageTitles showToast={showToast} session={session} />,
+    titles:      <PageTitles showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} presetStatusFilter={titlesPreset?.status} presetFilterToken={titlesPreset?.token} />,
     import:      <PageImport showToast={showToast} session={session} />,
-    contacts:    <PageContacts showToast={showToast} />,
-    sequence:    <PageSequence showToast={showToast} session={session} />,
-    templates:   <PageTemplates showToast={showToast} session={session} />,
-    integration: <PageIntegration showToast={showToast} session={session} />,
-    workers:     <PageWorkers showToast={showToast} />,
+    contacts:    <PageContacts showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} />,
+    sequence:    <PageSequence showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} />,
+    templates:   <PageTemplates showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} />,
+    integration: <PageIntegration showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} />,
+    workers:     <PageWorkers showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} />,
     tenants:     <PageTenants showToast={showToast} />,
   };
 
@@ -359,6 +400,7 @@ export default function SmartCollect() {
         isDark={isDark}
         toggleTheme={toggleTheme}
         session={session}
+        selectedTenantId={selectedTenantId}
         showToast={showToast}
         onSessionUpdate={setSessionState}
         onLogout={handleLogout}

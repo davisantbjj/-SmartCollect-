@@ -40,27 +40,27 @@ public class TenantService : ITenantService
 
     public async Task<TenantResponse?> GetByIdAsync(Guid tenantId)
     {
-        var t = await _db.Tenants
+        var tenant = await _db.Tenants
             .Include(t => t.Users)
             .FirstOrDefaultAsync(t => t.Id == tenantId);
 
-        if (t is null) return null;
+        if (tenant is null) return null;
 
         var titleCount = await _db.Titles.CountAsync(ti => ti.TenantId == tenantId);
-        var admin = t.Users.FirstOrDefault(u => u.Role == UserRole.Admin);
+        var admin = tenant.Users.FirstOrDefault(u => u.Role == UserRole.Admin);
 
         return new TenantResponse(
-            t.Id,
-            t.CompanyName,
-            t.TaxId,
-            t.EmailDomain,
-            t.Plan.ToString(),
-            t.Active,
-            t.Users.Count,
+            tenant.Id,
+            tenant.CompanyName,
+            tenant.TaxId,
+            tenant.EmailDomain,
+            tenant.Plan.ToString(),
+            tenant.Active,
+            tenant.Users.Count,
             titleCount,
-                t.CreatedAt,
-                admin?.Name,
-                admin?.Email);
+            tenant.CreatedAt,
+            admin?.Name,
+            admin?.Email);
     }
 
     public async Task<TenantResponse> CreateAsync(CreateTenantRequest request)
@@ -68,6 +68,27 @@ public class TenantService : ITenantService
         var taxIdExists = await _db.Tenants.AnyAsync(t => t.TaxId == request.TaxId);
         if (taxIdExists)
             throw new InvalidOperationException($"A tenant with TaxId '{request.TaxId}' already exists.");
+
+        var hasAnyAdminInfo =
+            !string.IsNullOrWhiteSpace(request.AdminName)
+            || !string.IsNullOrWhiteSpace(request.AdminEmail)
+            || !string.IsNullOrWhiteSpace(request.AdminPassword);
+        var hasAllAdminInfo =
+            !string.IsNullOrWhiteSpace(request.AdminName)
+            && !string.IsNullOrWhiteSpace(request.AdminEmail)
+            && !string.IsNullOrWhiteSpace(request.AdminPassword);
+
+        if (hasAnyAdminInfo && !hasAllAdminInfo)
+            throw new InvalidOperationException("Informe nome, e-mail e senha do administrador ou deixe todos em branco.");
+
+        string? normalizedAdminEmail = null;
+        if (hasAllAdminInfo)
+        {
+            normalizedAdminEmail = request.AdminEmail!.Trim().ToLowerInvariant();
+            var adminEmailExists = await _db.Users.AnyAsync(u => u.Email == normalizedAdminEmail);
+            if (adminEmailExists)
+                throw new InvalidOperationException("E-mail do administrador já cadastrado no sistema.");
+        }
 
         var tenant = new Domain.Entities.Tenant
         {
@@ -81,19 +102,22 @@ public class TenantService : ITenantService
 
         await _db.Tenants.AddAsync(tenant);
 
-        // Create first Admin user for the new tenant
-        var admin = new Domain.Entities.User
+        Domain.Entities.User? admin = null;
+        if (hasAllAdminInfo)
         {
-            Id = Guid.NewGuid(),
-            TenantId = tenant.Id,
-            Name = request.AdminName,
-            Email = request.AdminEmail.Trim().ToLowerInvariant(),
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.AdminPassword),
-            Role = UserRole.Admin,
-            Active = true
-        };
+            admin = new Domain.Entities.User
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenant.Id,
+                Name = request.AdminName!.Trim(),
+                Email = normalizedAdminEmail!,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.AdminPassword!),
+                Role = UserRole.Admin,
+                Active = true
+            };
 
-        await _db.Users.AddAsync(admin);
+            await _db.Users.AddAsync(admin);
+        }
         await _db.SaveChangesAsync();
 
         return new TenantResponse(
@@ -103,11 +127,11 @@ public class TenantService : ITenantService
             tenant.EmailDomain,
             tenant.Plan.ToString(),
             tenant.Active,
-            1,
+            admin is null ? 0 : 1,
             0,
             tenant.CreatedAt,
-            admin.Name,
-            admin.Email);
+            admin?.Name,
+            admin?.Email);
     }
 
     public async Task<TenantResponse?> UpdateAsync(Guid tenantId, UpdateTenantRequest request)
@@ -154,12 +178,11 @@ public class TenantService : ITenantService
                 throw new InvalidOperationException("Nome e e-mail do administrador são obrigatórios.");
 
             var duplicatedEmail = await _db.Users.AnyAsync(u =>
-                u.TenantId == tenantId &&
                 u.Id != admin.Id &&
                 u.Email == adminEmail);
 
             if (duplicatedEmail)
-                throw new InvalidOperationException("E-mail do administrador já cadastrado neste tenant.");
+                throw new InvalidOperationException("E-mail do administrador já cadastrado no sistema.");
 
             admin.Name = adminName;
             admin.Email = adminEmail;

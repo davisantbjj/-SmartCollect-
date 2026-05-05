@@ -54,9 +54,11 @@ const getBrowserTimeZone = () => {
 export const PageIntegration = ({
   showToast,
   session,
+  selectedTenantId,
 }: {
   showToast: ShowToast;
   session: StoredSession;
+  selectedTenantId?: string;
 }) => {
   const [smtp, setSmtp] = useState<SmtpConfigResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -105,13 +107,22 @@ export const PageIntegration = ({
   const [senderFrom, setSenderFrom] = useState("");
   const [senderName, setSenderName] = useState("");
 
-  const canEdit = session.role === "Admin" || session.role === "Master";
-  const canEditDispatchWindow = session.role === "Admin";
+  const tenantId = session.role === "Master" ? selectedTenantId : undefined;
+  const requiresTenantSelection = session.role === "Master" && !tenantId;
+  const canEdit = session.role === "Admin" || (session.role === "Master" && Boolean(tenantId));
+  const canEditDispatchWindow = canEdit;
 
   useEffect(() => {
     const load = async () => {
+      if (requiresTenantSelection) {
+        setSmtp(null);
+        setIsConfigured(false);
+        setLoading(false);
+        return;
+      }
+
       try {
-        const data = await getSmtpConfig();
+        const data = await getSmtpConfig(tenantId);
         setSmtp(data);
         setHost(data.host);
         setPort(String(data.port));
@@ -124,19 +135,25 @@ export const PageIntegration = ({
         if (err instanceof ApiError && err.status === 404) {
           setIsConfigured(false);
         } else {
-          showToast(`${ICONS.cross} Erro ao carregar config SMTP.`, "error");
+          showToast(`${ICONS.cross} ${t("integrationPage.errors.loadSmtp")}`, "error");
         }
       } finally {
         setLoading(false);
       }
     };
     void load();
-  }, [showToast]);
+  }, [showToast, tenantId, requiresTenantSelection]);
 
   const loadWhatsAppConfig = async () => {
+    if (requiresTenantSelection) {
+      setWaConfigured(false);
+      setWaLoading(false);
+      return;
+    }
+
     try {
       setWaLoading(true);
-      const data = await getWhatsAppConfig();
+      const data = await getWhatsAppConfig(tenantId);
       setWaProvider(data.provider);
       setWaNumberId(data.numberId);
       setWaApiBaseUrl(data.apiBaseUrl ?? "");
@@ -148,7 +165,7 @@ export const PageIntegration = ({
       if (err instanceof ApiError && err.status === 404) {
         setWaConfigured(false);
       } else {
-        showToast(`${ICONS.cross} Erro ao carregar config WhatsApp.`, "error");
+        showToast(`${ICONS.cross} ${t("integrationPage.errors.loadWhatsApp")}`, "error");
       }
     } finally {
       setWaLoading(false);
@@ -157,16 +174,22 @@ export const PageIntegration = ({
 
   useEffect(() => {
     void loadWhatsAppConfig();
-  }, [showToast]);
+  }, [showToast, tenantId, requiresTenantSelection]);
 
   const loadSyncHealth = async () => {
+    if (requiresTenantSelection) {
+      setSyncHealth(null);
+      setSyncHealthLoading(false);
+      return;
+    }
+
     try {
       setSyncHealthLoading(true);
-      const data = await getSyncHealth();
+      const data = await getSyncHealth(tenantId);
       setSyncHealth(data);
     } catch (err) {
       if (!(err instanceof ApiError && err.status === 403)) {
-        showToast(`${ICONS.cross} Falha ao validar integração externa.`, "error");
+        showToast(`${ICONS.cross} ${t("integrationPage.errors.validateExternal")}`, "error");
       }
       setSyncHealth(null);
     } finally {
@@ -176,12 +199,18 @@ export const PageIntegration = ({
 
   useEffect(() => {
     void loadSyncHealth();
-  }, [showToast]);
+  }, [showToast, tenantId, requiresTenantSelection]);
 
   const loadApiConfig = async () => {
+    if (requiresTenantSelection) {
+      setApiLoading(false);
+      setApiHasToken(false);
+      return;
+    }
+
     try {
       setApiLoading(true);
-      const data = await getExternalApiConfig();
+      const data = await getExternalApiConfig(tenantId);
       setApiBaseUrl(data.baseUrl ?? "");
       setApiDocsUrl(data.docsUrl ?? "");
       setApiPendingPath(data.pendingTitlesPath ?? "titulos-pendentes");
@@ -191,7 +220,7 @@ export const PageIntegration = ({
       setClearApiToken(false);
       setApiToken("");
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Falha ao carregar configuracao da API externa.";
+      const msg = err instanceof ApiError ? err.message : t("integrationPage.errors.loadApiConfig");
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setApiLoading(false);
@@ -200,12 +229,20 @@ export const PageIntegration = ({
 
   useEffect(() => {
     void loadApiConfig();
-  }, [showToast]);
+  }, [showToast, tenantId, requiresTenantSelection]);
 
   const loadDispatchWindowConfig = async () => {
+    if (requiresTenantSelection) {
+      setWindowLoading(false);
+      setDispatchWindowEnabled(false);
+      setDispatchWindowStartTime("09:00");
+      setDispatchWindowEndTime("18:00");
+      return;
+    }
+
     try {
       setWindowLoading(true);
-      const data = await getDispatchWindowConfig();
+      const data = await getDispatchWindowConfig(tenantId);
       setDispatchWindowEnabled(data.enabled);
       setDispatchWindowStartTime(data.startTime || "09:00");
       setDispatchWindowEndTime(data.endTime || "18:00");
@@ -216,7 +253,7 @@ export const PageIntegration = ({
         setDispatchWindowStartTime("09:00");
         setDispatchWindowEndTime("18:00");
       } else {
-        const msg = err instanceof ApiError ? err.message : "Falha ao carregar janela de envio.";
+        const msg = err instanceof ApiError ? err.message : t("integrationPage.errors.loadDispatchWindow");
         showToast(`${ICONS.cross} ${msg}`, "error");
       }
     } finally {
@@ -226,11 +263,11 @@ export const PageIntegration = ({
 
   useEffect(() => {
     void loadDispatchWindowConfig();
-  }, [showToast]);
+  }, [showToast, tenantId, requiresTenantSelection]);
 
   const handleSave = async () => {
     if (!host || !port || !user) {
-      showToast(`${ICONS.warning} Host, porta e usuário são obrigatórios.`, "warn");
+      showToast(`${ICONS.warning} ${t("integrationPage.validation.smtpRequired")}`, "warn");
       return;
     }
     try {
@@ -239,12 +276,12 @@ export const PageIntegration = ({
         host, port: parseInt(port, 10),
         user, password: password || undefined,
         senderFrom, senderName,
-      });
+      }, tenantId);
       setIsConfigured(true);
       setPassword(""); // Clear password after save for security
       showToast(`${ICONS.checkmark} ${t("toast.smtpSaved")}`, "success");
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao salvar SMTP.";
+      const msg = err instanceof ApiError ? err.message : t("integrationPage.errors.saveSmtp");
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setSaving(false);
@@ -252,35 +289,41 @@ export const PageIntegration = ({
   };
 
   const getWaNumberLabel = () => {
-    if (waProvider === "Twilio") return "Número remetente (E.164)";
-    if (waProvider === "Z-API") return "ID da instância";
-    if (waProvider === "Evolution API") return "Nome da instância";
-    return "Phone Number ID";
+    if (waProvider === "Twilio") return t("integrationPage.wa.numberLabelTwilio");
+    if (waProvider === "Z-API") return t("integrationPage.wa.numberLabelZApi");
+    if (waProvider === "Evolution API") return t("integrationPage.wa.numberLabelEvolution");
+    return t("integrationPage.wa.numberLabelDefault");
   };
 
   const getWaBaseLabel = () => {
-    if (waProvider === "Twilio") return "Account SID (Twilio)";
-    if (waProvider === "Evolution API") return "Base URL API (Evolution)";
+    if (waProvider === "Twilio") return t("integrationPage.wa.baseLabelTwilio");
+    if (waProvider === "Evolution API") return t("integrationPage.wa.baseLabelEvolution");
     return t("integration.apiBaseUrlOptional");
   };
 
   const getWaBasePlaceholder = () => {
-    if (waProvider === "Twilio") return "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
-    if (waProvider === "Evolution API") return "https://evolution.seudominio.com";
-    return "https://api.provedor.com";
+    if (waProvider === "Twilio") return t("integrationPage.wa.basePlaceholderTwilio");
+    if (waProvider === "Evolution API") return t("integrationPage.wa.basePlaceholderEvolution");
+    return t("integrationPage.wa.basePlaceholderDefault");
   };
 
   const getWaTokenLabel = () => {
-    if (waProvider === "Twilio") return waConfigured ? "Auth Token (deixe vazio para manter)" : "Auth Token (Twilio)";
-    if (waProvider === "360dialog") return waConfigured ? "API Key (deixe vazio para manter)" : "API Key (360dialog)";
-    return waConfigured ? "Token de acesso (deixe vazio para manter)" : "Token de acesso";
+    if (waProvider === "Twilio") return waConfigured
+      ? t("integrationPage.wa.tokenLabelTwilioKeep")
+      : t("integrationPage.wa.tokenLabelTwilio");
+    if (waProvider === "360dialog") return waConfigured
+      ? t("integrationPage.wa.tokenLabel360Keep")
+      : t("integrationPage.wa.tokenLabel360");
+    return waConfigured
+      ? t("integrationPage.wa.tokenLabelKeep")
+      : t("integrationPage.wa.tokenLabel");
   };
 
   const getWaNumberPlaceholder = () => {
-    if (waProvider === "Twilio") return "+14155238886 (sandbox) ou +55DDDNÚMERO";
-    if (waProvider === "Z-API") return "instance-id";
-    if (waProvider === "Evolution API") return "instance-name";
-    return "Phone Number ID";
+    if (waProvider === "Twilio") return t("integrationPage.wa.numberPlaceholderTwilio");
+    if (waProvider === "Z-API") return t("integrationPage.wa.numberPlaceholderZApi");
+    if (waProvider === "Evolution API") return t("integrationPage.wa.numberPlaceholderEvolution");
+    return t("integrationPage.wa.numberPlaceholderDefault");
   };
 
   const handleSaveWhatsApp = async () => {
@@ -293,17 +336,17 @@ export const PageIntegration = ({
       : waApiBaseUrl.trim();
 
     if (!normalizedNumberId) {
-      showToast(`${ICONS.warning} ${getWaNumberLabel()} é obrigatório.`, "warn");
+      showToast(`${ICONS.warning} ${getWaNumberLabel()} ${t("integrationPage.validation.required")}`, "warn");
       return;
     }
 
     if (waProvider === "Twilio" && !normalizedApiBaseUrl) {
-      showToast(`${ICONS.warning} Account SID (Twilio) é obrigatório.`, "warn");
+      showToast(`${ICONS.warning} ${t("integrationPage.validation.waTwilioAccountRequired")}`, "warn");
       return;
     }
 
     if (waProvider === "Evolution API" && !normalizedApiBaseUrl) {
-      showToast(`${ICONS.warning} Base URL da Evolution API é obrigatória.`, "warn");
+      showToast(`${ICONS.warning} ${t("integrationPage.validation.waEvolutionBaseRequired")}`, "warn");
       return;
     }
 
@@ -315,14 +358,14 @@ export const PageIntegration = ({
         accessToken: waToken.trim() || undefined,
         apiBaseUrl: normalizedApiBaseUrl || undefined,
         clearToken: waClearToken,
-      });
+      }, tenantId);
       setWaConfigured(waClearToken ? false : (waToken.trim() ? true : waConfigured));
       setWaToken("");
       setWaClearToken(false);
-      showToast(`${ICONS.checkmark} Configuração WhatsApp salva com sucesso.`, "success");
+      showToast(`${ICONS.checkmark} ${t("integrationPage.messages.waSaved")}`, "success");
       await loadWhatsAppConfig();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao salvar configuração WhatsApp.";
+      const msg = err instanceof ApiError ? err.message : t("integrationPage.errors.saveWhatsApp");
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setWaSaving(false);
@@ -332,10 +375,10 @@ export const PageIntegration = ({
   const handleTestWhatsApp = async () => {
     try {
       setWaTesting(true);
-      const res = await testWhatsAppConfig();
+      const res = await testWhatsAppConfig(tenantId);
       showToast(`${ICONS.checkmark} ${res.message}`, "success");
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Falha ao validar configuração WhatsApp.";
+      const msg = err instanceof ApiError ? err.message : t("integrationPage.errors.testWhatsApp");
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setWaTesting(false);
@@ -344,15 +387,15 @@ export const PageIntegration = ({
 
   const handleTest = async () => {
     if (!isConfigured) {
-      showToast(`${ICONS.warning} Salve a configuração SMTP antes de testar.`, "warn");
+      showToast(`${ICONS.warning} ${t("integrationPage.validation.smtpTestBeforeSave")}`, "warn");
       return;
     }
     try {
       setTesting(true);
-      const res = await testSmtpConfig();
+      const res = await testSmtpConfig(tenantId);
       showToast(`${ICONS.mailbox} ${res.message}`, "success");
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Falha no teste SMTP.";
+      const msg = err instanceof ApiError ? err.message : t("integrationPage.errors.testSmtp");
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setTesting(false);
@@ -361,7 +404,7 @@ export const PageIntegration = ({
 
   const handleSaveExternalApi = async () => {
     if (!apiBaseUrl.trim() || !apiPendingPath.trim() || !apiOccurrencesPath.trim()) {
-      showToast(`${ICONS.warning} Base URL e endpoints sao obrigatorios.`, "warn");
+      showToast(`${ICONS.warning} ${t("integrationPage.validation.apiRequired")}`, "warn");
       return;
     }
 
@@ -375,15 +418,15 @@ export const PageIntegration = ({
         authenticationScheme: apiAuthScheme,
         token: apiToken.trim() || undefined,
         clearToken: clearApiToken,
-      });
+      }, tenantId);
 
       setApiHasToken(clearApiToken ? false : (apiToken.trim() ? true : apiHasToken));
       setApiToken("");
       setClearApiToken(false);
-      showToast(`${ICONS.checkmark} Configuracao da API externa salva.`, "success");
+      showToast(`${ICONS.checkmark} ${t("integrationPage.messages.apiSaved")}`, "success");
       await loadSyncHealth();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Falha ao salvar configuracao da API externa.";
+      const msg = err instanceof ApiError ? err.message : t("integrationPage.errors.saveApiConfig");
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setApiSaving(false);
@@ -393,11 +436,11 @@ export const PageIntegration = ({
   const handleTestExternalApi = async () => {
     try {
       setApiTesting(true);
-      const res = await testExternalApiConfig();
+      const res = await testExternalApiConfig(tenantId);
       showToast(`${ICONS.checkmark} ${res.message}`, "success");
       await loadSyncHealth();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Falha ao testar API externa.";
+      const msg = err instanceof ApiError ? err.message : t("integrationPage.errors.testExternalApi");
       showToast(`${ICONS.cross} ${msg}`, "error");
       await loadSyncHealth();
     } finally {
@@ -407,7 +450,7 @@ export const PageIntegration = ({
 
   const handleSaveDispatchWindow = async () => {
     if (!dispatchWindowStartTime.trim() || !dispatchWindowEndTime.trim()) {
-      showToast(`${ICONS.warning} Informe horario inicial e horario final.`, "warn");
+      showToast(`${ICONS.warning} ${t("integrationPage.validation.windowRequired")}`, "warn");
       return;
     }
 
@@ -419,11 +462,11 @@ export const PageIntegration = ({
         startTime: dispatchWindowStartTime.trim(),
         endTime: dispatchWindowEndTime.trim(),
         pauseAutomaticDispatchDuringProcessing: true,
-      });
+      }, tenantId);
       showToast(`${ICONS.checkmark} ${response.message}`, "success");
       await loadDispatchWindowConfig();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Falha ao salvar janela de envio.";
+      const msg = err instanceof ApiError ? err.message : t("integrationPage.errors.saveDispatchWindow");
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setWindowSaving(false);
@@ -432,6 +475,12 @@ export const PageIntegration = ({
 
   return (
     <div className="animate-fade-up">
+      {requiresTenantSelection && (
+        <div className="rounded-xl border border-border-subtle bg-surface-2/60 px-4 py-3 text-sm text-text-secondary mb-4">
+          {t("integrationPage.validation.selectTenant")}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4 mb-4">
         {/* SMTP */}
         <div className="bg-surface border border-border-subtle rounded-[14px] overflow-hidden">
@@ -450,13 +499,13 @@ export const PageIntegration = ({
           />
           <div className="p-5">
             {loading ? (
-              <div className="text-sm text-text-muted py-4">Carregando...</div>
+              <div className="text-sm text-text-muted py-4">{t("common.loading")}</div>
             ) : (
               <>
                 <div className="grid grid-cols-2 gap-3.5">
                   <FormInput label={t("integration.smtpHost")} value={host} onChange={e => setHost(e.target.value)} disabled={!canEdit} placeholder="mail.empresa.com.br" />
                   <div>
-                    <label className="text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted mb-[5px] block">Segurança SMTP</label>
+                    <label className="text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted mb-[5px] block">{t("integrationPage.smtp.securityLabel")}</label>
                     <select
                       value={smtpSecurity}
                       disabled={!canEdit}
@@ -467,8 +516,8 @@ export const PageIntegration = ({
                       }}
                       className="bg-surface-2 border border-border-subtle-2 rounded-lg px-[13px] py-[9px] text-[13px] text-text-primary outline-none w-full focus:border-accent disabled:opacity-70"
                     >
-                      <option value="TLS">TLS (STARTTLS)</option>
-                      <option value="SSL">SSL/TLS</option>
+                      <option value="TLS">{t("integrationPage.smtp.securityTls")}</option>
+                      <option value="SSL">{t("integrationPage.smtp.securitySsl")}</option>
                     </select>
                   </div>
                   <FormInput label={t("integration.port")} value={port} onChange={e => setPort(e.target.value)} disabled={!canEdit} placeholder={smtpSecurity === "SSL" ? "465" : "587"} type="number" />
@@ -481,14 +530,14 @@ export const PageIntegration = ({
                         value={password}
                         onChange={e => setPassword(e.target.value)}
                         disabled={!canEdit}
-                        placeholder={isConfigured ? "••••••••" : "Senha SMTP"}
+                        placeholder={isConfigured ? "••••••••" : t("integrationPage.smtp.passwordPlaceholder")}
                         className="bg-surface-2 border border-border-subtle-2 rounded-lg px-[13px] py-[9px] text-[13px] text-text-primary outline-none w-full focus:border-accent disabled:opacity-70 pr-10"
                       />
                       <button
                         type="button"
                         onClick={() => setShowSmtpPassword(v => !v)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted"
-                        aria-label={showSmtpPassword ? "Ocultar senha SMTP" : "Exibir senha SMTP"}
+                        aria-label={showSmtpPassword ? t("integrationPage.smtp.passwordHide") : t("integrationPage.smtp.passwordShow")}
                       >
                         {showSmtpPassword ? (
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -512,17 +561,17 @@ export const PageIntegration = ({
 
                 {senderFrom && (
                   <div className="mt-3 text-xs text-text-muted bg-surface-2 rounded-lg px-3 py-2 border border-border-subtle">
-                    {ICONS.email} Remetente: <strong className="text-text-primary">{senderName || "SmartCollect"} &lt;{senderFrom}&gt;</strong>
+                    {ICONS.email} {t("integrationPage.smtp.senderLabel")} <strong className="text-text-primary">{senderName || t("integrationPage.smtp.senderFallback")} &lt;{senderFrom}&gt;</strong>
                   </div>
                 )}
 
                 {canEdit && (
                   <div className="mt-4 flex gap-2.5">
                     <Button size="sm" variant="secondary" onClick={handleTest}>
-                      {testing ? "Testando..." : <>{ICONS.mailbox} {t("integration.testSend")}</>}
+                      {testing ? t("integrationPage.smtp.testing") : <>{ICONS.mailbox} {t("integration.testSend")}</>}
                     </Button>
                     <Button size="sm" variant="primary" onClick={handleSave}>
-                      {saving ? "Salvando..." : t("common.save")}
+                      {saving ? t("common.saving") : t("common.save")}
                     </Button>
                   </div>
                 )}
@@ -548,7 +597,7 @@ export const PageIntegration = ({
           />
           <div className="p-5">
             {waLoading ? (
-              <div className="text-sm text-text-muted py-4">Carregando...</div>
+              <div className="text-sm text-text-muted py-4">{t("common.loading")}</div>
             ) : (
               <>
                 <div className="grid grid-cols-2 gap-3.5">
@@ -577,7 +626,7 @@ export const PageIntegration = ({
                     type="password"
                     value={waToken}
                     onChange={e => setWaToken(e.target.value)}
-                    placeholder={waConfigured ? "••••••••" : t("integration.accessToken")}
+                    placeholder={waConfigured ? "••••••••" : t("integrationPage.wa.tokenPlaceholder")}
                     disabled={!canEdit}
                   />
                   <FormInput
@@ -603,17 +652,17 @@ export const PageIntegration = ({
                         onChange={e => setWaClearToken(e.target.checked)}
                         className="accent-accent"
                       />
-                      Limpar token salvo
+                      {t("integrationPage.wa.clearToken")}
                     </label>
                   )}
                 </div>
                 {canEdit && (
                   <div className="mt-4 flex gap-2.5">
                     <Button size="sm" variant="secondary" onClick={handleTestWhatsApp}>
-                      {waTesting ? "Validando..." : <>{ICONS.checkmark} Validar</>}
+                      {waTesting ? t("integrationPage.wa.testing") : <>{ICONS.checkmark} {t("integrationPage.wa.validate")}</>}
                     </Button>
                     <Button size="sm" variant="primary" onClick={handleSaveWhatsApp}>
-                      {waSaving ? "Salvando..." : t("common.save")}
+                      {waSaving ? t("common.saving") : t("common.save")}
                     </Button>
                   </div>
                 )}
@@ -626,24 +675,24 @@ export const PageIntegration = ({
       {/* API externa */}
       <div className="bg-surface border border-border-subtle rounded-[14px] overflow-hidden">
         <CardHeader
-          title={<>{ICONS.link} API Externa - Atos (JSON)</>}
-          subtitle="A API deve enviar JSON com o mesmo formato da planilha de importacao"
+          title={<>{ICONS.link} {t("integrationPage.api.title")}</>}
+          subtitle={t("integrationPage.api.subtitle")}
           right={
             <span className={`${syncHealth?.connected ? "bg-success/[0.12] text-success" : "bg-danger/[0.12] text-danger"} text-[11px] font-bold px-[9px] py-[3px] rounded-full flex items-center gap-[5px]`}>
               <span className="text-[7px]">{ICONS.dot}</span>
-              {syncHealthLoading ? "Verificando" : syncHealth?.connected ? t("common.online") : "Offline"}
+              {syncHealthLoading ? t("integrationPage.api.checking") : syncHealth?.connected ? t("common.online") : t("integrationPage.api.offline")}
             </span>
           }
         />
         <div className="p-5">
           {apiLoading ? (
-            <div className="text-sm text-text-muted py-4">Carregando configuracao...</div>
+            <div className="text-sm text-text-muted py-4">{t("integrationPage.api.loading")}</div>
           ) : (
             <>
               <div className="grid grid-cols-2 gap-3.5 mb-4">
                 <div className="col-span-2">
                   <FormInput
-                    label="Base URL"
+                    label={t("integrationPage.api.baseUrlLabel")}
                     value={apiBaseUrl}
                     onChange={e => setApiBaseUrl(e.target.value)}
                     disabled={!canEdit}
@@ -652,7 +701,7 @@ export const PageIntegration = ({
                 </div>
                 <div className="col-span-2">
                   <FormInput
-                    label="URL Documentacao"
+                    label={t("integrationPage.api.docsLabel")}
                     value={apiDocsUrl}
                     onChange={e => setApiDocsUrl(e.target.value)}
                     disabled={!canEdit}
@@ -660,35 +709,35 @@ export const PageIntegration = ({
                   />
                 </div>
                 <FormInput
-                  label="Endpoint Titulos Pendentes"
+                  label={t("integrationPage.api.pendingEndpointLabel")}
                   value={apiPendingPath}
                   onChange={e => setApiPendingPath(e.target.value)}
                   disabled={!canEdit}
                   placeholder="titulos-pendentes"
                 />
                 <FormInput
-                  label="Endpoint Ocorrencias"
+                  label={t("integrationPage.api.occurrencesEndpointLabel")}
                   value={apiOccurrencesPath}
                   onChange={e => setApiOccurrencesPath(e.target.value)}
                   disabled={!canEdit}
                   placeholder="ocorrencias?data={date}"
                 />
                 <FormSelect
-                  label="Autenticacao"
+                  label={t("integrationPage.api.authLabel")}
                   value={apiAuthScheme}
                   onChange={e => setApiAuthScheme(e.target.value)}
                   disabled={!canEdit}
                 >
                   <option value="Bearer">Bearer</option>
-                  <option value="None">Sem autenticacao</option>
+                  <option value="None">{t("integrationPage.api.authNone")}</option>
                 </FormSelect>
                 <FormInput
-                  label={apiHasToken ? "Token (deixe vazio para manter)" : "Token"}
+                  label={apiHasToken ? t("integrationPage.api.tokenKeepLabel") : t("integrationPage.api.tokenLabel")}
                   type="password"
                   value={apiToken}
                   onChange={e => setApiToken(e.target.value)}
                   disabled={!canEdit}
-                  placeholder={apiHasToken ? "••••••••••••" : "Cole o token da API"}
+                  placeholder={apiHasToken ? "••••••••••••" : t("integrationPage.api.tokenPlaceholder")}
                 />
               </div>
 
@@ -699,17 +748,17 @@ export const PageIntegration = ({
                     checked={clearApiToken}
                     onChange={e => setClearApiToken(e.target.checked)}
                   />
-                  Remover token salvo
+                  {t("integrationPage.api.clearToken")}
                 </label>
               )}
 
               <div className="bg-surface-2 rounded-[10px] px-[18px] py-4 font-mono text-[12.5px] leading-[2.2] border border-white/[0.06] mb-4">
                 {([
-                  ["Base URL:", syncHealth?.baseUrl ?? "N/A", colors.accent],
-                  ["Endpoint 1:", syncHealth?.endpoints.pendingTitles ?? "N/A", colors.text3],
-                  ["Endpoint 2:", syncHealth?.endpoints.occurrences ?? "N/A", colors.text3],
-                  ["Documentacao:", syncHealth?.docsUrl ?? "N/A", colors.text2],
-                  ["Autenticacao:", syncHealth?.authentication ?? "N/A", colors.text2],
+                  [t("integrationPage.api.summaryBaseUrl"), syncHealth?.baseUrl ?? "N/A", colors.accent],
+                  [t("integrationPage.api.summaryEndpoint1"), syncHealth?.endpoints.pendingTitles ?? "N/A", colors.text3],
+                  [t("integrationPage.api.summaryEndpoint2"), syncHealth?.endpoints.occurrences ?? "N/A", colors.text3],
+                  [t("integrationPage.api.summaryDocs"), syncHealth?.docsUrl ?? "N/A", colors.text2],
+                  [t("integrationPage.api.summaryAuth"), syncHealth?.authentication ?? "N/A", colors.text2],
                 ] as [string, string, string][]).map(([key, val, color]) => (
                   <div key={key}>
                     <span className="text-text-muted">{key}</span>{" "}
@@ -717,12 +766,12 @@ export const PageIntegration = ({
                   </div>
                 ))}
                 <div>
-                  <span className="text-text-muted">Token:</span>{" "}
-                  <span style={{ color: colors.text2 }}>{apiHasToken ? "Configurado" : "Nao configurado"}</span>
+                  <span className="text-text-muted">{t("integrationPage.api.summaryToken")}</span>{" "}
+                  <span style={{ color: colors.text2 }}>{apiHasToken ? t("integrationPage.api.tokenConfigured") : t("integrationPage.api.tokenNotConfigured")}</span>
                 </div>
                 {syncHealth?.checkedAt && (
                   <div>
-                    <span className="text-text-muted">Ultima verificacao:</span>{" "}
+                    <span className="text-text-muted">{t("integrationPage.api.summaryLastCheck")}</span>{" "}
                     <span style={{ color: colors.text2 }}>{new Date(syncHealth.checkedAt).toLocaleString("pt-BR")}</span>
                   </div>
                 )}
@@ -731,8 +780,7 @@ export const PageIntegration = ({
           )}
 
           <div className="text-[12px] text-text-muted mb-4">
-            Campos esperados no JSON (mesmo layout da planilha): nome_cliente, cnpj, codigo_titulo, valor, data_vencimento, data_emissao,
-            status, email, telefone_whatsapp, link_boleto.
+            {t("integrationPage.api.expectedFields")}
           </div>
 
           <div className="flex gap-2.5">
@@ -743,7 +791,7 @@ export const PageIntegration = ({
                 onClick={handleSaveExternalApi}
                 disabled={apiSaving || apiLoading}
               >
-                {apiSaving ? "Salvando..." : t("common.save")}
+                {apiSaving ? t("common.saving") : t("common.save")}
               </Button>
             )}
             <Button
@@ -751,7 +799,7 @@ export const PageIntegration = ({
               variant="secondary"
               onClick={() => {
                 if (!apiDocsUrl && !syncHealth?.docsUrl) {
-                  showToast(`${ICONS.warning} URL de documentação não disponível.`, "warn");
+                  showToast(`${ICONS.warning} ${t("integrationPage.api.docsUnavailable")}`, "warn");
                   return;
                 }
                 window.open(apiDocsUrl || syncHealth?.docsUrl, "_blank", "noopener,noreferrer");
@@ -765,7 +813,7 @@ export const PageIntegration = ({
               onClick={handleTestExternalApi}
               disabled={apiTesting || apiLoading}
             >
-              {apiTesting ? "Testando..." : <>{ICONS.testTube} {t("integration.testEndpoint")}</>}
+              {apiTesting ? t("integrationPage.api.testing") : <>{ICONS.testTube} {t("integration.testEndpoint")}</>}
             </Button>
           </div>
         </div>
@@ -773,23 +821,23 @@ export const PageIntegration = ({
 
       <div className="bg-surface border border-border-subtle rounded-[14px] overflow-hidden mt-4">
         <CardHeader
-          title={<>{ICONS.timer} Janela de envio automatico</>}
-          subtitle="Somente Admin pode configurar. Fora da janela, apenas envio manual e permitido."
+          title={<>{ICONS.timer} {t("integrationPage.window.title")}</>}
+          subtitle={t("integrationPage.window.subtitle")}
           right={
             <span className={`${dispatchWindowEnabled ? "bg-success/[0.12] text-success" : "bg-warn/[0.12] text-warn"} text-[11px] font-bold px-[9px] py-[3px] rounded-full`}>
-              {dispatchWindowEnabled ? "Ativa" : "Desativada"}
+              {dispatchWindowEnabled ? t("integrationPage.window.active") : t("integrationPage.window.inactive")}
             </span>
           }
         />
         <div className="p-5">
           {windowLoading ? (
-            <div className="text-sm text-text-muted py-4">Carregando configuracao...</div>
+            <div className="text-sm text-text-muted py-4">{t("integrationPage.window.loading")}</div>
           ) : (
             <>
               <div className="mb-4 rounded-xl border border-border-subtle bg-surface-2 px-4 py-3 flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-semibold text-text-primary">Ativar janela de envio automatico</div>
-                  <div className="text-xs text-text-muted mt-0.5">Fuso detectado automaticamente do navegador: {getBrowserTimeZone()}</div>
+                  <div className="text-sm font-semibold text-text-primary">{t("integrationPage.window.enableTitle")}</div>
+                  <div className="text-xs text-text-muted mt-0.5">{t("integrationPage.window.timezoneLabel")} {getBrowserTimeZone()}</div>
                 </div>
                 <button
                   type="button"
@@ -802,13 +850,13 @@ export const PageIntegration = ({
                   <span className={`h-4 w-7 rounded-full p-[2px] transition-colors ${dispatchWindowEnabled ? "bg-success/75" : "bg-text-muted/40"}`}>
                     <span className={`block h-3 w-3 rounded-full bg-white transition-transform ${dispatchWindowEnabled ? "translate-x-3" : "translate-x-0"}`} />
                   </span>
-                  <span>{dispatchWindowEnabled ? "Ativo" : "Inativo"}</span>
+                  <span>{dispatchWindowEnabled ? t("common.active") : t("common.inactive")}</span>
                 </button>
               </div>
 
               <div className="grid grid-cols-2 gap-3.5 mb-4">
                 <div>
-                  <label className="text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted mb-[5px] block">Inicio</label>
+                  <label className="text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted mb-[5px] block">{t("integrationPage.window.startLabel")}</label>
                   <input
                     type="time"
                     step={300}
@@ -820,7 +868,7 @@ export const PageIntegration = ({
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted mb-[5px] block">Fim</label>
+                  <label className="text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted mb-[5px] block">{t("integrationPage.window.endLabel")}</label>
                   <input
                     type="time"
                     step={300}
@@ -833,9 +881,9 @@ export const PageIntegration = ({
 
                 <div className="col-span-2 flex flex-wrap gap-2">
                   {[
-                    ["08:00", "18:00", "Comercial"],
-                    ["09:00", "18:00", "Padrao"],
-                    ["10:00", "19:00", "Tarde"],
+                    ["08:00", "18:00", t("integrationPage.window.presetCommercial")],
+                    ["09:00", "18:00", t("integrationPage.window.presetStandard")],
+                    ["10:00", "19:00", t("integrationPage.window.presetAfternoon")],
                   ].map(([start, end, label]) => (
                     <button
                       key={label}
@@ -854,15 +902,15 @@ export const PageIntegration = ({
               </div>
 
               <div className="text-[12px] text-text-muted mb-4">
-                Regras: automatico respeita a janela configurada. Envio manual rapido pode ocorrer fora da janela. Pausa durante upload/sincronizacao e automatica.
+                {t("integrationPage.window.rules")}
               </div>
 
               {canEditDispatchWindow ? (
                 <Button size="sm" variant="primary" onClick={handleSaveDispatchWindow}>
-                  {windowSaving ? "Salvando..." : t("common.save")}
+                  {windowSaving ? t("common.saving") : t("common.save")}
                 </Button>
               ) : (
-                <div className="text-xs text-text-muted">Apenas Admin pode alterar essa configuracao.</div>
+                <div className="text-xs text-text-muted">{t("integrationPage.window.adminOnly")}</div>
               )}
             </>
           )}

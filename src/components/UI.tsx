@@ -7,10 +7,10 @@ import { t } from "../i18n";
 import type { TitleStatus, ContactStatus, ToastType, ActivityLogEntry } from "../types";
 
 // ---- Loading ----
-export const LoadingState = ({ label = "Carregando..." }: { label?: string }) => (
+export const LoadingState = ({ label }: { label?: string }) => (
   <div className="flex items-center justify-center gap-3 py-10 text-sm text-text-muted">
     <span className="w-4 h-4 border-2 border-border-subtle-2 border-t-accent rounded-full animate-spin" />
-    <span>{label}</span>
+    <span>{label ?? t("common.loading")}</span>
   </div>
 );
 

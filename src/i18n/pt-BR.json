@@ -17,10 +17,15 @@
   },
   "common": {
     "cancel": "Cancelar",
+    "close": "Fechar",
     "save": "Salvar",
+    "saving": "Salvando...",
+    "loading": "Carregando...",
     "export": "Exportar",
     "edit": "Editar",
+    "inactive": "Inativo",
     "add": "Adicionar",
+    "delete": "Excluir",
     "actions": "Ações",
     "status": "Status",
     "allStatuses": "Todos os status",
@@ -32,7 +37,8 @@
     "online": "Online",
     "import": "Importar",
     "viewAll": "Ver todos",
-    "both": "Ambos"
+    "both": "Ambos",
+    "cnpjPlaceholder": "00.000.000/0001-00"
   },
   "nav": {
     "overview": "Visão Geral",
@@ -42,7 +48,7 @@
     "titles": "Títulos",
     "importData": "Importar Dados",
     "contactsCRM": "Contatos (CRM)",
-    "workers": "Usuários Worker",
+    "workers": "Usuários",
     "configuration": "Configuração",
     "collectionSequence": "Régua de Cobrança",
     "templates": "Templates",
@@ -92,8 +98,8 @@
       "subtitle": "Configure SMTP, WhatsApp e API externa"
     },
     "workers": {
-      "title": "Usuários Worker",
-      "subtitle": "Gerencie acesso operacional da sua empresa"
+      "title": "Usuários",
+      "subtitle": "Gerencie acessos Admin e Worker da sua empresa"
     },
     "tenants": {
       "title": "Empresas",
@@ -133,11 +139,11 @@
     "totalOverdue": "Total em Atraso",
     "totalRecovered": "Total Pago",
     "recoveryRate": "Taxa de Pagamento",
+    "recovered": "Recuperado",
     "recoveryFunnel": "Funil de Recuperação",
     "monthlyEvolution": "Evolução mensal (R$ mil)",
     "receivable": "A Receber",
     "overdue": "Em Atraso",
-    "recovered": "Recuperado",
     "agingList": "Aging List",
     "agingSubtitle": "Distribuição por vencimento",
     "dueSoon": "A Vencer",
@@ -163,6 +169,7 @@
     "statusCancelled": "Cancelado"
   },
   "analytics": {
+    "recovered": "Títulos Recuperados",
     "recoveryRate": "Taxa de Pagamento",
     "thisMonthUp": "4,1pp este mês",
     "recoveredMonth": "Total Pago",
@@ -181,10 +188,222 @@
     "titlesByStatus": "Títulos por Status",
     "sendsPerDay": "Envios por Dia – Últimas 2 Semanas"
   },
+  "dashboardPage": {
+    "errors": {
+      "load": "Falha ao carregar o dashboard.",
+      "partial": "Parte dos dados do dashboard não pôde ser carregada."
+    },
+    "master": {
+      "selectedTenant": "Visão da empresa selecionada",
+      "allTenants": "Visão agregada de todos os tenants"
+    },
+    "kpi": {
+      "receivableShare": "da carteira",
+      "overdueShare": "do a receber",
+      "paidShare": "liquidado",
+      "current": "Atual"
+    },
+    "tones": {
+      "high": "Alta",
+      "medium": "Média",
+      "monitor": "Acompanhar",
+      "low": "Baixa",
+      "neutral": "Neutra"
+    },
+    "aging": {
+      "empty": "Sem dados de aging."
+    },
+    "defaulters": {
+      "empty": "Sem inadimplentes no período."
+    }
+  },
+  "analyticsPage": {
+    "errors": {
+      "load": "Falha ao carregar analytics."
+    },
+    "master": {
+      "selectedTenant": "Analytics da empresa selecionada",
+      "allTenants": "Analytics agregado de todas as empresas"
+    },
+    "metrics": {
+      "paidOf": "pagos de",
+      "ofTotalTitles": "do total de títulos",
+      "overdueShare": "da carteira a receber",
+      "deliveredOf": "de",
+      "delivered": "entregues",
+      "reads": "Leituras",
+      "recoveredOfOverdue": "recuperados da base em atraso",
+      "criticalRule": "crítico: atraso > 10 dias"
+    }
+  },
+  "contactsPage": {
+    "errors": {
+      "load": "Erro ao carregar contatos.",
+      "updateDispatch": "Erro ao atualizar preferência de envio.",
+      "setPrimary": "Erro ao definir contato principal.",
+      "delete": "Erro ao excluir contato.",
+      "save": "Erro ao salvar contato."
+    },
+    "validation": {
+      "selectTenantDispatch": "Selecione uma empresa para atualizar as preferências de envio.",
+      "customRequiresContact": "Selecione ao menos um contato para o envio personalizado.",
+      "selectTenantContacts": "Selecione uma empresa para atualizar contatos.",
+      "selectTenantManage": "Selecione uma empresa para gerenciar contatos.",
+      "requireContactChannel": "Nome e pelo menos um canal de contato são obrigatórios.",
+      "selectOrCreateClient": "Informe o cliente ou crie um novo.",
+      "selectTenantView": "Selecione uma empresa no topo para visualizar e editar contatos."
+    },
+    "messages": {
+      "dispatchUpdated": "Regra de envio atualizada para",
+      "primaryUpdated": "Contato principal atualizado.",
+      "deleted": "Contato excluído com sucesso."
+    },
+    "confirm": {
+      "deleteContact": "Excluir o contato"
+    },
+    "table": {
+      "found": "empresas encontradas",
+      "empty": "Nenhuma empresa encontrada.",
+      "noPrimary": "Sem contato principal"
+    },
+    "actions": {
+      "viewContacts": "Ver contatos",
+      "addContact": "Adicionar contato",
+      "saveDispatch": "Salvar regra de envio",
+      "makePrimary": "Tornar principal",
+      "delete": "Excluir",
+      "deleting": "Excluindo...",
+      "saving": "Salvando..."
+    },
+    "modal": {
+      "companyContactsPrefix": "Contatos -",
+      "companyContactsTitle": "Contatos da empresa",
+      "editTitle": "Editar Contato"
+    },
+    "dispatch": {
+      "title": "Regra de envio",
+      "subtitle": "Escolha como a empresa recebe as cobranças.",
+      "currentMode": "Modo atual:",
+      "selectContacts": "Escolher contatos para envio",
+      "noContacts": "Nenhum contato disponível."
+    },
+    "dispatchModes": {
+      "primary": "Contato principal",
+      "all": "Todos os contatos",
+      "selected": "Contatos selecionados"
+    },
+    "company": {
+      "noContacts": "Esta empresa ainda não possui contatos.",
+      "primaryHelp": "Para definir o contato principal desta empresa, use o botão \"Tornar principal\" na lista abaixo."
+    },
+    "labels": {
+      "primary": "Principal",
+      "noEmail": "Sem e-mail cadastrado",
+      "noWhatsApp": "Sem WhatsApp cadastrado",
+      "company": "Empresa",
+      "newCompany": "Nova empresa...",
+      "companyNameRequired": "Razão Social *",
+      "cnpjRequired": "CNPJ *",
+      "primaryContact": "Contato principal"
+    },
+    "placeholders": {
+      "companyName": "Nome da empresa",
+      "contactEmail": "contato@empresa.com.br",
+      "whatsAppPhone": "+55 11 99999-9999"
+    },
+    "departments": {
+      "finance": "Financeiro",
+      "commercial": "Comercial",
+      "management": "Gestão",
+      "other": "Outros",
+      "purchasing": "Compras",
+      "partner": "Sócio"
+    }
+  },
   "titles": {
     "searchPlaceholder": "Buscar por cliente, CNPJ ou código...",
     "newTitle": "+ Novo Título",
     "downloadExport": "Exportar",
+    "foundCount": "títulos encontrados",
+    "boletoOverdue": "Boleto vencido",
+    "noAction": "Sem ação",
+    "noActionRecorded": "Nenhuma ação registrada",
+    "viewHistory": "Ver histórico",
+    "viewHistoryFull": "Ver histórico completo",
+    "detailsTitle": "Detalhes",
+    "manualSendTitle": "Envio manual",
+    "manualSendSend": "Enviar cobrança",
+    "manualSendSending": "Enviando...",
+    "recipientsLabel": "Destinatários",
+    "recipientOptionCompanyDefault": "Padrão da empresa (principal/todos)",
+    "recipientOptionPrimary": "Somente contato principal",
+    "recipientOptionAll": "Todos os contatos",
+    "recipientOptionCustom": "Escolher contatos",
+    "recipientHelpCompanyDefault": "Usa a configuração da empresa definida na tela de contatos.",
+    "recipientHelpPrimary": "Será usado apenas o contato principal da empresa.",
+    "recipientHelpAll": "Será enviado para todos os contatos disponíveis.",
+    "recipientHelpCustom": "Selecione manualmente os contatos abaixo.",
+    "contactsLoading": "Carregando contatos...",
+    "contactsEmpty": "Nenhum contato disponível para seleção.",
+    "contactPrimary": "Principal",
+    "contactNoEmail": "sem e-mail",
+    "contactNoWhatsapp": "sem WhatsApp",
+    "quickTemplateToggle": "Configurar template rápido para este envio",
+    "quickTemplateTypeLabel": "Tipo",
+    "quickTemplateTypeCollection": "Cobrança",
+    "quickTemplateTypeThankYou": "Agradecimento",
+    "quickTemplateChannelLabel": "Canal",
+    "quickTemplateChannelHelperThankYou": "Agradecimentos são enviados apenas por e-mail.",
+    "quickTemplateChannelHelperCollection": "Use \"Ambos\" para registrar envio multicanal no fluxo manual.",
+    "quickSubjectLabel": "Assunto",
+    "quickSubjectPlaceholder": "Cobrança do título",
+    "quickMessageLabel": "Mensagem *",
+    "quickMessagePlaceholder": "Digite a mensagem rápida...",
+    "quickVariablesLabel": "Variáveis",
+    "quickVariablesList": "{{ClienteNome}}, {{TituloCodigo}}, {{Valor}}, {{DataVencimento}}, {{Empresa}}",
+    "quickTemplateNone": "Sem template rápido, o sistema usa a régua ativa para agendar os disparos automáticos do título.",
+    "historyTitle": "Histórico",
+    "historyLoading": "Carregando histórico...",
+    "historyEmpty": "Nenhum evento encontrado para este título.",
+    "savingStatus": "Salvando status...",
+    "saveStatus": "Salvar status",
+    "resendCollection": "Reenviar cobrança",
+    "selectClientLabel": "Cliente *",
+    "selectClientPlaceholder": "Selecionar cliente...",
+    "labels": {
+      "client": "Cliente",
+      "status": "Status",
+      "changeStatus": "Alterar status",
+      "issueDate": "Emissão",
+      "dueDate": "Vencimento",
+      "amount": "Valor",
+      "boleto": "Boleto",
+      "lastAction": "Última Ação"
+    },
+    "quickTemplates": {
+      "collectionSubject": "Cobrança do título",
+      "thankYouSubject": "Pagamento confirmado",
+      "collectionBody": "Olá {{ClienteNome}},\n\nIdentificamos o título {{TituloCodigo}} no valor de {{Valor}} com vencimento em {{DataVencimento}}.\nLink para pagamento: {{LinkBoleto}}\n\nSe necessário, podemos ajudar com uma regularização.\n\nAtenciosamente,\n{{Empresa}}",
+      "thankYouBody": "Olá {{ClienteNome}},\n\nRecebemos o pagamento do título {{TituloCodigo}} no valor de {{Valor}}.\nObrigado pelo retorno.\n\nAtenciosamente,\n{{Empresa}}"
+    },
+    "validation": {
+      "requiredFields": "Preencha os campos obrigatórios.",
+      "selectTenantToCreate": "Selecione uma empresa para cadastrar títulos.",
+      "selectStatus": "Selecione um status.",
+      "statusAlreadySet": "O título já está nesse status.",
+      "quickTemplateMessage": "Informe a mensagem do template rápido.",
+      "selectContact": "Selecione ao menos um contato para este envio."
+    },
+    "messages": {
+      "statusUpdated": "Status do título atualizado."
+    },
+    "errors": {
+      "load": "Erro ao carregar títulos.",
+      "save": "Erro ao salvar título.",
+      "statusUpdate": "Erro ao atualizar status do título.",
+      "sendCollection": "Erro ao enviar cobrança.",
+      "historyLoad": "Erro ao carregar histórico."
+    },
     "col": {
       "code": "CÓDIGO",
       "clientCnpj": "CLIENTE / CNPJ",
@@ -290,8 +509,59 @@
     "saveSequence": "Salvar Régua",
     "sendTriggers": "Gatilhos de Envio",
     "triggerSubtitle": "Configure os disparos da régua",
-    "addTrigger": "+ Adicionar Gatilho",
+    "addTrigger": "Adicionar Gatilho",
     "stopRules": "Regras de Parada Automática",
+    "newRuleName": "Nova Régua",
+    "newRuleButton": "Nova Régua",
+    "loading": "Carregando régua...",
+    "selectRulePrompt": "Selecione uma régua abaixo para visualizar os gatilhos.",
+    "noRulesPrompt": "Nenhuma régua configurada ainda.",
+    "templateFallback": "Template",
+    "daysAfterDue": "dias após vencimento",
+    "daysBeforeDue": "dias antes do vencimento",
+    "allRulesTitle": "Todas as Réguas",
+    "defaultBadge": "Régua padrão",
+    "triggersCountLabel": "gatilhos",
+    "activeBadge": "Ativa",
+    "modalEditTitle": "Editar Régua",
+    "modalNewTitle": "Nova Régua",
+    "ruleNameLabel": "Nome",
+    "ruleActiveLabel": "Régua ativa",
+    "ruleDescriptionLabel": "Descrição",
+    "referenceDueDate": "Vencimento",
+    "referenceIssueDate": "Emissão",
+    "actionDelete": "Excluir",
+    "actionDefault": "Padrão",
+    "actionDeleting": "Excluindo...",
+    "actionRemove": "Remover",
+    "selectTemplatePlaceholder": "Selecione...",
+    "confirmDelete": "Excluir a régua",
+    "confirmDeleteWarn": "Esta ação não pode ser desfeita.",
+    "table": {
+      "template": "Template",
+      "channel": "Canal",
+      "reference": "Referência",
+      "offset": "Offset",
+      "actions": "Ações"
+    },
+    "validation": {
+      "selectTenant": "Selecione uma empresa para gerenciar régua de cobrança.",
+      "selectTenantDelete": "Selecione uma empresa para excluir regras.",
+      "nameRequired": "Nome da régua é obrigatório.",
+      "addTrigger": "Adicione ao menos um gatilho.",
+      "triggerNeedsTemplate": "Todo gatilho precisa de um template.",
+      "cannotDeleteDefault": "Esta é uma régua padrão e não pode ser excluída."
+    },
+    "messages": {
+      "updated": "Régua atualizada com sucesso!",
+      "created": "Régua criada com sucesso!",
+      "deleted": "Régua excluída com sucesso!"
+    },
+    "errors": {
+      "load": "Erro ao carregar régua.",
+      "save": "Erro ao salvar régua.",
+      "delete": "Erro ao excluir régua."
+    },
     "rule": {
       "paidTitle": "Título Pago",
       "paidDesc": "Excluído imediatamente da fila. Se template de agradecimento ativo, dispara mensagem de confirmação.",
@@ -310,17 +580,158 @@
     "availableVars": "Variáveis Disponíveis",
     "availableVarsSubtitle": "Use nas mensagens para personalizar automaticamente",
     "modalTitle": "Criar Template de Mensagem",
+    "editTitle": "Editar Template",
     "saveTemplate": "Salvar Template",
     "templateName": "Nome do Template",
     "templateNamePlaceholder": "Ex: Lembrete D-3",
     "channel": "Canal",
+    "typeLabel": "Tipo",
+    "typeCollection": "Cobrança",
+    "typeReminder": "Lembrete",
+    "typeThankYou": "Agradecimento",
     "emailSubject": "Assunto (para e-mail)",
     "emailSubjectPlaceholder": "Lembrete de vencimento – {{NomeEmpresa}}",
     "message": "Mensagem",
     "messagePlaceholder": "Olá {{NomeCliente}}, seu título de {{Valor}} vence em {{DataVencimento}}...",
     "varsClickToInsert": "Variáveis disponíveis (clique para inserir)",
     "channelEmail": "E-mail",
-    "channelWhatsapp": "WhatsApp"
+    "channelWhatsapp": "WhatsApp",
+    "loading": "Carregando templates...",
+    "validation": {
+      "selectTenant": "Selecione uma empresa no topo para visualizar e editar templates.",
+      "requiredFields": "Nome e mensagem são obrigatórios.",
+      "subjectRequired": "Templates de e-mail exigem assunto."
+    },
+    "errors": {
+      "load": "Erro ao carregar templates.",
+      "save": "Erro ao salvar template."
+    }
+  },
+  "tenants": {
+    "newCompany": "Nova Empresa",
+    "loading": "Carregando empresas...",
+    "empty": "Nenhuma empresa cadastrada.",
+    "statusActive": "Ativa",
+    "statusInactive": "Inativa",
+    "modalCreateTitle": "Cadastrar Empresa",
+    "modalEditTitle": "Editar Empresa",
+    "createAction": "Cadastrar Empresa",
+    "saveChanges": "Salvar Alterações",
+    "loadingDetails": "Carregando dados da empresa...",
+    "adminNotInformed": "Não informado",
+    "confirmTogglePrefix": "Deseja",
+    "confirmToggleSuffix": "o acesso da empresa",
+    "table": {
+      "company": "Empresa",
+      "cnpj": "CNPJ",
+      "plan": "Plano",
+      "users": "Usuários",
+      "titles": "Títulos",
+      "status": "Status",
+      "edit": "Editar",
+      "active": "Ativo"
+    },
+    "labels": {
+      "companyName": "Razão Social",
+      "taxId": "CNPJ",
+      "emailDomain": "Domínio de E-mail",
+      "createAdminNow": "Criar administrador agora",
+      "adminName": "Nome do Admin",
+      "adminEmail": "E-mail do Admin",
+      "adminPassword": "Senha Inicial do Admin",
+      "adminPasswordOptional": "Nova senha do Admin (opcional)",
+      "currentAdmin": "Admin atual",
+      "editAdminLogin": "Editar dados de login do Admin"
+    },
+    "placeholders": {
+      "emailDomain": "empresa.com.br",
+      "keepBlank": "Deixe em branco para manter"
+    },
+    "actions": {
+      "reactivate": "reativar",
+      "remove": "remover"
+    },
+    "messages": {
+      "created": "Empresa cadastrada com sucesso.",
+      "updated": "Empresa atualizada com sucesso.",
+      "accessReactivated": "Acesso da empresa reativado com sucesso.",
+      "accessRemoved": "Acesso da empresa removido com sucesso."
+    },
+    "validation": {
+      "companyRequired": "Preencha os dados obrigatórios da empresa.",
+      "adminRequired": "Preencha nome, e-mail e senha do administrador.",
+      "adminEditRequired": "Preencha nome e e-mail do administrador."
+    },
+    "errors": {
+      "load": "Erro ao carregar empresas.",
+      "create": "Erro ao criar empresa.",
+      "update": "Erro ao atualizar empresa.",
+      "accessUpdate": "Erro ao atualizar acesso da empresa.",
+      "loadDetails": "Erro ao carregar dados da empresa."
+    }
+  },
+  "workers": {
+    "newUser": "Novo Usuário",
+    "loading": "Carregando usuários...",
+    "empty": "Nenhum usuário cadastrado.",
+    "neverLogged": "Nunca acessou",
+    "modalCreateTitle": "Novo Usuário",
+    "modalEditTitle": "Editar Usuário",
+    "createAction": "Cadastrar",
+    "saveChanges": "Salvar Alterações",
+    "actionDelete": "Excluir",
+    "actionDeleting": "Excluindo...",
+    "confirmDelete": "Tem certeza que deseja excluir definitivamente o usuário",
+    "confirmTogglePrefix": "Deseja",
+    "confirmToggleSuffix": "o acesso de",
+    "roles": {
+      "admin": "Admin",
+      "worker": "Worker"
+    },
+    "labels": {
+      "name": "Nome",
+      "email": "E-mail",
+      "password": "Senha",
+      "passwordOptional": "Nova senha (opcional)",
+      "role": "Perfil"
+    },
+    "placeholders": {
+      "keepBlank": "Deixe em branco para manter"
+    },
+    "table": {
+      "email": "E-mail",
+      "role": "Perfil",
+      "status": "Status",
+      "lastLogin": "Último Login",
+      "actions": "Ações"
+    },
+    "actions": {
+      "reactivate": "reativar",
+      "deactivate": "inativar"
+    },
+    "messages": {
+      "created": "Usuário cadastrado com sucesso.",
+      "updated": "Usuário atualizado com sucesso.",
+      "deleted": "Usuário excluído com sucesso.",
+      "accessReactivated": "Acesso do usuário reativado com sucesso.",
+      "accessDeactivated": "Acesso do usuário inativado com sucesso."
+    },
+    "validation": {
+      "requiredFields": "Preencha nome, e-mail e senha.",
+      "nameRequired": "Nome do usuário é obrigatório.",
+      "emailRequired": "E-mail do usuário é obrigatório.",
+      "selectTenantCreate": "Selecione uma empresa para cadastrar usuários.",
+      "selectTenantUpdate": "Selecione uma empresa para atualizar usuários.",
+      "selectTenantDelete": "Selecione uma empresa para excluir usuários.",
+      "selectTenantManage": "Selecione uma empresa no topo para gerenciar usuários."
+    },
+    "errors": {
+      "load": "Erro ao carregar usuários.",
+      "create": "Erro ao cadastrar usuário.",
+      "update": "Erro ao atualizar usuário.",
+      "delete": "Erro ao excluir usuário.",
+      "accessUpdate": "Erro ao atualizar acesso do usuário."
+    }
   },
   "integration": {
     "smtpTitle": "SMTP Próprio (White-label)",
@@ -349,6 +760,163 @@
     "bearerToken": "Bearer Token",
     "viewDocs": "Ver Documentação",
     "testEndpoint": "Testar Endpoint"
+  },
+  "integrationPage": {
+    "errors": {
+      "loadSmtp": "Erro ao carregar config SMTP.",
+      "loadWhatsApp": "Erro ao carregar config WhatsApp.",
+      "validateExternal": "Falha ao validar integração externa.",
+      "loadApiConfig": "Falha ao carregar configuracao da API externa.",
+      "loadDispatchWindow": "Falha ao carregar janela de envio.",
+      "saveSmtp": "Erro ao salvar SMTP.",
+      "saveWhatsApp": "Erro ao salvar configuração WhatsApp.",
+      "testWhatsApp": "Falha ao validar configuração WhatsApp.",
+      "testSmtp": "Falha no teste SMTP.",
+      "saveApiConfig": "Falha ao salvar configuracao da API externa.",
+      "testExternalApi": "Falha ao testar API externa.",
+      "saveDispatchWindow": "Falha ao salvar janela de envio."
+    },
+    "validation": {
+      "smtpRequired": "Host, porta e usuário são obrigatórios.",
+      "apiRequired": "Base URL e endpoints sao obrigatorios.",
+      "windowRequired": "Informe horario inicial e horario final.",
+      "selectTenant": "Selecione uma empresa no topo para visualizar e editar integrações.",
+      "required": "é obrigatório.",
+      "waTwilioAccountRequired": "Account SID (Twilio) é obrigatório.",
+      "waEvolutionBaseRequired": "Base URL da Evolution API é obrigatória.",
+      "smtpTestBeforeSave": "Salve a configuração SMTP antes de testar."
+    },
+    "messages": {
+      "waSaved": "Configuração WhatsApp salva com sucesso.",
+      "apiSaved": "Configuracao da API externa salva."
+    },
+    "smtp": {
+      "securityLabel": "Segurança SMTP",
+      "securityTls": "TLS (STARTTLS)",
+      "securitySsl": "SSL/TLS",
+      "passwordPlaceholder": "Senha SMTP",
+      "passwordHide": "Ocultar senha SMTP",
+      "passwordShow": "Exibir senha SMTP",
+      "senderLabel": "Remetente:",
+      "senderFallback": "SmartCollect",
+      "testing": "Testando..."
+    },
+    "wa": {
+      "numberLabelTwilio": "Número remetente (E.164)",
+      "numberLabelZApi": "ID da instância",
+      "numberLabelEvolution": "Nome da instância",
+      "numberLabelDefault": "Phone Number ID",
+      "baseLabelTwilio": "Account SID (Twilio)",
+      "baseLabelEvolution": "Base URL API (Evolution)",
+      "basePlaceholderTwilio": "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "basePlaceholderEvolution": "https://evolution.seudominio.com",
+      "basePlaceholderDefault": "https://api.provedor.com",
+      "tokenLabelTwilioKeep": "Auth Token (deixe vazio para manter)",
+      "tokenLabelTwilio": "Auth Token (Twilio)",
+      "tokenLabel360Keep": "API Key (deixe vazio para manter)",
+      "tokenLabel360": "API Key (360dialog)",
+      "tokenLabelKeep": "Token de acesso (deixe vazio para manter)",
+      "tokenLabel": "Token de acesso",
+      "numberPlaceholderTwilio": "+14155238886 (sandbox) ou +55DDDNÚMERO",
+      "numberPlaceholderZApi": "instance-id",
+      "numberPlaceholderEvolution": "instance-name",
+      "numberPlaceholderDefault": "Phone Number ID",
+      "tokenPlaceholder": "Token de acesso",
+      "clearToken": "Limpar token salvo",
+      "validate": "Validar",
+      "testing": "Validando..."
+    },
+    "api": {
+      "title": "API Externa - Atos (JSON)",
+      "subtitle": "A API deve enviar JSON com o mesmo formato da planilha de importacao",
+      "checking": "Verificando",
+      "offline": "Offline",
+      "loading": "Carregando configuracao...",
+      "baseUrlLabel": "Base URL",
+      "docsLabel": "URL Documentacao",
+      "pendingEndpointLabel": "Endpoint Titulos Pendentes",
+      "occurrencesEndpointLabel": "Endpoint Ocorrencias",
+      "authLabel": "Autenticacao",
+      "authNone": "Sem autenticacao",
+      "tokenKeepLabel": "Token (deixe vazio para manter)",
+      "tokenLabel": "Token",
+      "tokenPlaceholder": "Cole o token da API",
+      "clearToken": "Remover token salvo",
+      "summaryBaseUrl": "Base URL:",
+      "summaryEndpoint1": "Endpoint 1:",
+      "summaryEndpoint2": "Endpoint 2:",
+      "summaryDocs": "Documentacao:",
+      "summaryAuth": "Autenticacao:",
+      "summaryToken": "Token:",
+      "tokenConfigured": "Configurado",
+      "tokenNotConfigured": "Nao configurado",
+      "summaryLastCheck": "Ultima verificacao:",
+      "expectedFields": "Campos esperados no JSON (mesmo layout da planilha): nome_cliente, cnpj, codigo_titulo, valor, data_vencimento, data_emissao, status, email, telefone_whatsapp, link_boleto.",
+      "docsUnavailable": "URL de documentação não disponível.",
+      "testing": "Testando..."
+    },
+    "window": {
+      "title": "Janela de envio automatico",
+      "subtitle": "Somente Admin pode configurar. Fora da janela, apenas envio manual e permitido.",
+      "active": "Ativa",
+      "inactive": "Desativada",
+      "loading": "Carregando configuracao...",
+      "enableTitle": "Ativar janela de envio automatico",
+      "timezoneLabel": "Fuso detectado automaticamente do navegador:",
+      "startLabel": "Inicio",
+      "endLabel": "Fim",
+      "presetCommercial": "Comercial",
+      "presetStandard": "Padrao",
+      "presetAfternoon": "Tarde",
+      "rules": "Regras: automatico respeita a janela configurada. Envio manual rapido pode ocorrer fora da janela. Pausa durante upload/sincronizacao e automatica.",
+      "adminOnly": "Apenas Admin pode alterar essa configuracao."
+    }
+  },
+  "importPage": {
+    "errors": {
+      "invalidFormat": "Formato inválido. Use .xlsx ou .csv",
+      "uploadFailed": "Falha no upload.",
+      "syncFailed": "Falha na sincronização.",
+      "checkFailed": "Falha ao verificar ocorrências."
+    },
+    "messages": {
+      "uploading": "Enviando arquivo",
+      "imported": "importados",
+      "errors": "erros",
+      "processing": "Processando arquivo..."
+    },
+    "summary": {
+      "totalRows": "Total de linhas",
+      "imported": "Importados",
+      "errors": "Erros"
+    },
+    "required": "Obrigatorio",
+    "optional": "Opcional",
+    "api": {
+      "noticeTitle": "Esta aba e operacional.",
+      "noticeBody": "Aqui voce acompanha status e executa sincronizacoes. A configuracao da API externa (URL, token e endpoints) e feita na tela Integracao.",
+      "checking": "Verificando",
+      "online": "Online",
+      "offline": "Offline",
+      "baseUrl": "Base URL:",
+      "notAvailable": "Nao disponivel",
+      "frequency": "Frequencia:",
+      "frequencyTwiceDaily": "2x por dia",
+      "frequencyDaily": "1x por dia",
+      "operation": "Operacao:",
+      "operationUpsert": "Upsert por codigo unico",
+      "noContactStatus": "Titulos sem contato:",
+      "pendingData": "Pendente de Dados",
+      "lastCheck": "Ultima verificacao:",
+      "syncing": "Sincronizando...",
+      "parameters": "Parametros:",
+      "parametersD1D0": "D-1 e D-0",
+      "action": "Acao:",
+      "actionImmediateStop": "Corte imediato da regua",
+      "authentication": "Autenticacao:",
+      "authDefault": "Bearer",
+      "checkingOccurrences": "Verificando..."
+    }
   },
   "step": {
     "preExpiration": "Lembrete pré-vencimento",

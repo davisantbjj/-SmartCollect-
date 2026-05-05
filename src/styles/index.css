@@ -8,8 +8,8 @@
   --color-surface: #F9FAFB;
   --color-surface-2: #F3F4F6;
   --color-surface-3: #E5E7EB;
-  --color-border-subtle: rgba(220, 38, 38, 0.08);
-  --color-border-subtle-2: rgba(220, 38, 38, 0.12);
+  --color-border-subtle: rgba(31, 41, 55, 0.16);
+  --color-border-subtle-2: rgba(31, 41, 55, 0.24);
   --color-accent: #DC2626;
   --color-danger: #DC2626;
   --color-warn: #EA580C;
@@ -25,8 +25,8 @@
     --color-surface: #F9FAFB;
     --color-surface-2: #F3F4F6;
     --color-surface-3: #E5E7EB;
-    --color-border-subtle: rgba(220, 38, 38, 0.08);
-    --color-border-subtle-2: rgba(220, 38, 38, 0.12);
+    --color-border-subtle: rgba(31, 41, 55, 0.16);
+    --color-border-subtle-2: rgba(31, 41, 55, 0.24);
     --color-text-primary: #1F2937;
     --color-text-secondary: #4B5563;
     --color-text-muted: #6B7280;

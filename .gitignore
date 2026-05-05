@@ -37,3 +37,6 @@ Thumbs.db
 # Editors
 .idea/
 .vscode/
+
+# Local AI context
+AI_CONTEXT.local.md

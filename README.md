@@ -51,7 +51,7 @@ Para parar os servicos Docker:
 - Frontend: http://localhost:5173
 - API: http://localhost:5013
 - Swagger: http://localhost:5013/swagger
-- PostgreSQL: localhost:55432
+- PostgreSQL: localhost:5432
 - pgAdmin: http://localhost:8080
 
 ## Validacoes Recomendadas Antes de Publicar

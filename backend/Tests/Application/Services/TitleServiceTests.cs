@@ -1,6 +1,7 @@
 using SmartCollect.Tests;
 namespace SmartCollect.Tests.Application.Services;
 
+using Microsoft.EntityFrameworkCore;
 using SmartCollect.Application.DTOs.Common;
 using SmartCollect.Application.DTOs.Titles;
 using SmartCollect.Application.Interfaces;
@@ -10,6 +11,84 @@ using SmartCollect.Domain.Enums;
 
 public class TitleServiceTests
 {
+    [Fact]
+    public async Task CreateAsync_WithUnspecifiedDates_NormalizesToUtc()
+    {
+        var db = TestDbContextFactory.Create();
+
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+
+        db.Tenants.Add(new Tenant { Id = tenantId, CompanyName = "Tenant A", TaxId = "111" });
+        db.Users.Add(new User { Id = userId, TenantId = tenantId, Name = "User", Email = "user@test.com", PasswordHash = "x" });
+        db.Clients.Add(new Client { Id = clientId, TenantId = tenantId, UserId = userId, LegalName = "Cliente", TaxId = "123" });
+        await db.SaveChangesAsync();
+
+        var due = new DateTime(2026, 5, 10, 0, 0, 0, DateTimeKind.Unspecified);
+        var issue = new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Unspecified);
+
+        var service = new TitleService(db);
+        var created = await service.CreateAsync(tenantId, new CreateTitleRequest(
+            clientId,
+            "TIT-UTC-001",
+            100m,
+            due,
+            issue,
+            null));
+
+        var persisted = await db.Titles.FirstAsync(t => t.Id == created.Id);
+        Assert.Equal(DateTimeKind.Utc, persisted.DueDate.Kind);
+        Assert.Equal(DateTimeKind.Utc, persisted.IssueDate.Kind);
+        Assert.Equal(due.Date, persisted.DueDate.Date);
+        Assert.Equal(issue.Date, persisted.IssueDate.Date);
+    }
+
+    [Fact]
+    public async Task CreateAsync_UpsertWithUnspecifiedDates_NormalizesToUtcOnUpdate()
+    {
+        var db = TestDbContextFactory.Create();
+
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+
+        db.Tenants.Add(new Tenant { Id = tenantId, CompanyName = "Tenant A", TaxId = "111" });
+        db.Users.Add(new User { Id = userId, TenantId = tenantId, Name = "User", Email = "user@test.com", PasswordHash = "x" });
+        db.Clients.Add(new Client { Id = clientId, TenantId = tenantId, UserId = userId, LegalName = "Cliente", TaxId = "123" });
+
+        db.Titles.Add(new Title
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            ClientId = clientId,
+            UniqueCode = "TIT-UTC-002",
+            Amount = 50m,
+            DueDate = DateTime.UtcNow.Date,
+            IssueDate = DateTime.UtcNow.Date,
+            Status = TitleStatus.Open
+        });
+        await db.SaveChangesAsync();
+
+        var due = new DateTime(2026, 6, 15, 0, 0, 0, DateTimeKind.Unspecified);
+        var issue = new DateTime(2026, 6, 2, 0, 0, 0, DateTimeKind.Unspecified);
+
+        var service = new TitleService(db);
+        await service.CreateAsync(tenantId, new CreateTitleRequest(
+            clientId,
+            "TIT-UTC-002",
+            75m,
+            due,
+            issue,
+            "https://boleto.local"));
+
+        var persisted = await db.Titles.FirstAsync(t => t.TenantId == tenantId && t.UniqueCode == "TIT-UTC-002");
+        Assert.Equal(DateTimeKind.Utc, persisted.DueDate.Kind);
+        Assert.Equal(DateTimeKind.Utc, persisted.IssueDate.Kind);
+        Assert.Equal(due.Date, persisted.DueDate.Date);
+        Assert.Equal(issue.Date, persisted.IssueDate.Date);
+    }
+
     [Fact]
     public async Task Create_WithClientFromAnotherTenant_ThrowsInvalidOperationException()
     {

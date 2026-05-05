@@ -87,8 +87,26 @@ const PAGE_META: Record<string, [string, string]> = {
   tenants: [t("pageMeta.tenants.title"), t("pageMeta.tenants.subtitle")],
 };
 
-function navByRole(role: string) {
+function navByRole(role: string, hasOperationalTenantScope = false) {
   if (role === "Master") {
+    if (!hasOperationalTenantScope) {
+      return [
+        {
+          section: t("nav.overview"),
+          items: [
+            { id: "dashboard", icon: "dashboard", label: t("nav.dashboard") },
+            { id: "analytics", icon: "analytics", label: t("nav.analytics") },
+          ],
+        },
+        {
+          section: t("nav.configuration"),
+          items: [
+            { id: "tenants", icon: "users", label: t("nav.tenants") },
+          ],
+        },
+      ];
+    }
+
     return [
       {
         section: t("nav.overview"),
@@ -98,8 +116,20 @@ function navByRole(role: string) {
         ],
       },
       {
+        section: t("nav.collection"),
+        items: [
+          { id: "titles", icon: "document", label: t("nav.titles") },
+          { id: "import", icon: "upload", label: t("nav.importData") },
+          { id: "contacts", icon: "users", label: t("nav.contactsCRM") },
+          { id: "workers", icon: "users", label: t("nav.workers") },
+        ],
+      },
+      {
         section: t("nav.configuration"),
         items: [
+          { id: "sequence", icon: "settings", label: t("nav.collectionSequence") },
+          { id: "templates", icon: "mail", label: t("nav.templates") },
+          { id: "integration", icon: "link", label: t("nav.integrationSMTP") },
           { id: "tenants", icon: "users", label: t("nav.tenants") },
         ],
       },
@@ -168,6 +198,7 @@ export const Sidebar = ({
   isDark,
   toggleTheme,
   session,
+  selectedTenantId,
   showToast,
   onSessionUpdate,
   onLogout,
@@ -177,11 +208,12 @@ export const Sidebar = ({
   isDark: boolean;
   toggleTheme: () => void;
   session: StoredSession;
+  selectedTenantId?: string;
   showToast: ShowToast;
   onSessionUpdate: (session: StoredSession) => void;
   onLogout: () => void;
 }) => {
-  const nav = navByRole(session.role);
+  const nav = navByRole(session.role, session.role === "Master" && Boolean(selectedTenantId));
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileName, setProfileName] = useState(session.userName);
@@ -463,7 +495,7 @@ export const Topbar = ({
   onClearToastLogs: () => void;
 }) => {
   const [title, subtitle] = PAGE_META[page] || ["SmartCollect", ""];
-  const showTenantSelector = session.role === "Master" && (page === "dashboard" || page === "analytics");
+  const showTenantSelector = session.role === "Master";
   const isMaster = session.role === "Master";
 
   const [isApiConnected, setIsApiConnected] = useState(false);
@@ -671,8 +703,17 @@ export const Topbar = ({
 
     if (page === "titles") {
       const loadTitleCount = async () => {
+        if (isMaster && !selectedTenantId) {
+          if (!cancelled) setTitlesSubtitle("Selecione uma empresa");
+          return;
+        }
+
         try {
-          const response = await getTitles({ page: 1, pageSize: 1 });
+          const response = await getTitles({
+            tenantId: isMaster ? selectedTenantId || undefined : undefined,
+            page: 1,
+            pageSize: 1,
+          });
           if (!cancelled) {
             setTitlesSubtitle(`${response.totalCount} titulos`);
           }
@@ -703,7 +744,7 @@ export const Topbar = ({
     return () => {
       cancelled = true;
     };
-  }, [page, session.token]);
+  }, [isMaster, page, selectedTenantId, session.token]);
 
   const displayTitle = page === "titles" ? t("nav.titles") : page === "templates" ? t("nav.templates") : title;
   const displaySubtitle = page === "titles"
@@ -727,7 +768,7 @@ export const Topbar = ({
             className="bg-surface-2 border border-border-subtle-2 rounded-lg px-[10px] py-[8px] text-[12px] text-text-primary outline-none min-w-[220px]"
             title="Selecionar empresa"
           >
-            <option value="">Todas as empresas</option>
+            <option value="">Todas as empresas (visao global)</option>
             {tenants.map(tenant => (
               <option key={tenant.id} value={tenant.id}>
                 {tenant.companyName}
@@ -863,7 +904,7 @@ export const Topbar = ({
         )}
 
         {/* Only show Import button for Admin/Worker on operational pages */}
-        {!isMaster && page !== "workers" && (
+        {(session.role === "Admin" || session.role === "Worker" || (session.role === "Master" && Boolean(selectedTenantId))) && page !== "workers" && (
           <Button variant="primary" onClick={onImport}>
             {ICONS.upload} {t("common.import")}
           </Button>

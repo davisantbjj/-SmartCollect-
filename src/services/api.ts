@@ -90,6 +90,21 @@ export interface DefaulterItem {
 
 export interface TopDefaultersResponse { items: DefaulterItem[] }
 
+export interface RecoveryRatePointResponse {
+  month: string;
+  overdueBaseTitles: number;
+  recoveredTitles: number;
+  recoveryRate: number;
+}
+
+export interface CriticalMetricsResponse {
+  criticalTitles: number;
+  overdueBaseTitles: number;
+  recoveredTitles: number;
+  recoveryRate: number;
+  trend: RecoveryRatePointResponse[];
+}
+
 export interface SendsDayItem {
   day: string;
   emailCount: number;
@@ -292,7 +307,7 @@ export interface MessageTemplateResponse {
 
 export interface CreateTemplateRequest {
   name: string;
-  channel: string;
+  channel?: string;
   subject?: string;
   body: string;
   type: string;
@@ -300,7 +315,7 @@ export interface CreateTemplateRequest {
 
 export interface UpdateTemplateRequest {
   name: string;
-  channel: string;
+  channel?: string;
   subject?: string;
   body: string;
   type: string;
@@ -396,9 +411,9 @@ export interface CreateTenantRequest {
   companyName: string;
   taxId: string;
   emailDomain: string;
-  adminName: string;
-  adminEmail: string;
-  adminPassword: string;
+  adminName?: string;
+  adminEmail?: string;
+  adminPassword?: string;
 }
 
 export interface UpdateTenantRequest {
@@ -411,6 +426,8 @@ export interface UpdateTenantRequest {
   adminPassword?: string;
 }
 
+export type TenantUserRole = "Admin" | "Worker";
+
 export interface UpdateTenantAccessRequest {
   active: boolean;
 }
@@ -419,6 +436,7 @@ export interface WorkerResponse {
   id: string;
   name: string;
   email: string;
+  role: TenantUserRole;
   active: boolean;
   createdAt: string;
   lastLogin?: string | null;
@@ -426,6 +444,7 @@ export interface WorkerResponse {
 
 export interface UpdateWorkerRequest {
   name: string;
+  email: string;
   active: boolean;
   password?: string;
 }
@@ -556,9 +575,20 @@ export async function registerWorker(
   email: string,
   password: string
 ): Promise<AuthResponse> {
-  return request<AuthResponse>("/api/auth/register", {
+  return registerTenantUser(name, email, password, "Worker");
+}
+
+export async function registerTenantUser(
+  name: string,
+  email: string,
+  password: string,
+  role: TenantUserRole,
+  tenantId?: string,
+): Promise<AuthResponse> {
+  const query = tenantId ? `?tenantId=${tenantId}` : "";
+  return request<AuthResponse>(`/api/auth/register${query}`, {
     method: "POST",
-    body: JSON.stringify({ name, email, password }),
+    body: JSON.stringify({ name, email, password, role }),
   });
 }
 
@@ -649,6 +679,10 @@ export async function getDashboardTopDefaulters(tenantId?: string) {
   return request<TopDefaultersResponse>(`/api/dashboard/top-defaulters${tenantParam(tenantId)}`);
 }
 
+export async function getDashboardCriticalMetrics(tenantId?: string) {
+  return request<CriticalMetricsResponse>(`/api/dashboard/critical-metrics${tenantParam(tenantId)}`);
+}
+
 export async function getDashboardSendsPerDay(tenantId?: string) {
   return request<SendsPerDayResponse>(`/api/dashboard/sends-per-day${tenantParam(tenantId)}`);
 }
@@ -664,12 +698,14 @@ export async function getDashboardActivityLog(tenantId?: string, startDate?: str
 // ── Titles ────────────────────────────────────────────────────────────────
 
 export async function getTitles(params: {
+  tenantId?: string;
   status?: string;
   search?: string;
   page?: number;
   pageSize?: number;
 }) {
   const q = new URLSearchParams();
+  if (params.tenantId) q.set("tenantId", params.tenantId);
   if (params.status) q.set("status", params.status);
   if (params.search) q.set("search", params.search);
   q.set("page", String(params.page ?? 1));
@@ -681,26 +717,26 @@ export async function getTitleById(id: string) {
   return request<TitleResponse>(`/api/titles/${id}`);
 }
 
-export async function getTitleHistory(id: string) {
-  return request<TitleHistoryResponse[]>(`/api/titles/${id}/history`);
+export async function getTitleHistory(id: string, tenantId?: string) {
+  return request<TitleHistoryResponse[]>(`/api/titles/${id}/history${tenantParam(tenantId)}`);
 }
 
-export async function createTitle(payload: CreateTitleRequest) {
-  return request<TitleResponse>("/api/titles", {
+export async function createTitle(payload: CreateTitleRequest, tenantId?: string) {
+  return request<TitleResponse>(`/api/titles${tenantParam(tenantId)}`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
-export async function updateTitleStatus(id: string, payload: UpdateTitleStatusRequest) {
-  return request<TitleResponse>(`/api/titles/${id}/status`, {
+export async function updateTitleStatus(id: string, payload: UpdateTitleStatusRequest, tenantId?: string) {
+  return request<TitleResponse>(`/api/titles/${id}/status${tenantParam(tenantId)}`, {
     method: "PATCH",
     body: JSON.stringify(payload),
   });
 }
 
-export async function sendCollection(titleId: string, payload?: SendCollectionRequest) {
-  return request<{ message: string }>(`/api/titles/${titleId}/collect`, {
+export async function sendCollection(titleId: string, payload?: SendCollectionRequest, tenantId?: string) {
+  return request<{ message: string }>(`/api/titles/${titleId}/collect${tenantParam(tenantId)}`, {
     method: "POST",
     body: payload ? JSON.stringify(payload) : undefined,
   });
@@ -708,19 +744,19 @@ export async function sendCollection(titleId: string, payload?: SendCollectionRe
 
 // ── Clients ───────────────────────────────────────────────────────────────
 
-export async function getClients() {
-  return request<ClientResponse[]>("/api/clients");
+export async function getClients(tenantId?: string) {
+  return request<ClientResponse[]>(`/api/clients${tenantParam(tenantId)}`);
 }
 
-export async function createClient(payload: CreateClientRequest) {
-  return request<ClientResponse>("/api/clients", {
+export async function createClient(payload: CreateClientRequest, tenantId?: string) {
+  return request<ClientResponse>(`/api/clients${tenantParam(tenantId)}`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
-export async function updateClientDispatchPreference(clientId: string, payload: UpdateClientDispatchPreferenceRequest) {
-  return request<ClientResponse>(`/api/clients/${clientId}/dispatch-preference`, {
+export async function updateClientDispatchPreference(clientId: string, payload: UpdateClientDispatchPreferenceRequest, tenantId?: string) {
+  return request<ClientResponse>(`/api/clients/${clientId}/dispatch-preference${tenantParam(tenantId)}`, {
     method: "PATCH",
     body: JSON.stringify(payload),
   });
@@ -728,12 +764,12 @@ export async function updateClientDispatchPreference(clientId: string, payload: 
 
 // ── Contacts ──────────────────────────────────────────────────────────────
 
-export async function getContactsByClient(clientId: string) {
-  return request<ContactResponse[]>(`/api/clients/${clientId}/contacts`);
+export async function getContactsByClient(clientId: string, tenantId?: string) {
+  return request<ContactResponse[]>(`/api/clients/${clientId}/contacts${tenantParam(tenantId)}`);
 }
 
-export async function createContact(clientId: string, payload: UpsertContactRequest) {
-  return request<ContactResponse>(`/api/clients/${clientId}/contacts`, {
+export async function createContact(clientId: string, payload: UpsertContactRequest, tenantId?: string) {
+  return request<ContactResponse>(`/api/clients/${clientId}/contacts${tenantParam(tenantId)}`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -742,16 +778,17 @@ export async function createContact(clientId: string, payload: UpsertContactRequ
 export async function updateContact(
   clientId: string,
   contactId: string,
-  payload: UpsertContactRequest
+  payload: UpsertContactRequest,
+  tenantId?: string,
 ) {
-  return request<ContactResponse>(`/api/clients/${clientId}/contacts/${contactId}`, {
+  return request<ContactResponse>(`/api/clients/${clientId}/contacts/${contactId}${tenantParam(tenantId)}`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });
 }
 
-export async function deleteContact(clientId: string, contactId: string) {
-  return request<void>(`/api/clients/${clientId}/contacts/${contactId}`, {
+export async function deleteContact(clientId: string, contactId: string, tenantId?: string) {
+  return request<void>(`/api/clients/${clientId}/contacts/${contactId}${tenantParam(tenantId)}`, {
     method: "DELETE",
   });
 }
@@ -769,33 +806,33 @@ export async function uploadImportFile(file: File) {
 
 // ── Sync ──────────────────────────────────────────────────────────────────
 
-export async function syncPendingTitles() {
-  return request<SyncResponse>("/api/sync/pending-titles", { method: "POST" });
+export async function syncPendingTitles(tenantId?: string) {
+  return request<SyncResponse>(`/api/sync/pending-titles${tenantParam(tenantId)}`, { method: "POST" });
 }
 
-export async function syncOccurrences() {
-  return request<SyncResponse>("/api/sync/occurrences", { method: "POST" });
+export async function syncOccurrences(tenantId?: string) {
+  return request<SyncResponse>(`/api/sync/occurrences${tenantParam(tenantId)}`, { method: "POST" });
 }
 
-export async function getSyncHealth() {
-  return request<SyncHealthResponse>("/api/sync/health");
+export async function getSyncHealth(tenantId?: string) {
+  return request<SyncHealthResponse>(`/api/sync/health${tenantParam(tenantId)}`);
 }
 
 // ── Templates ─────────────────────────────────────────────────────────────
 
-export async function getTemplates() {
-  return request<MessageTemplateResponse[]>("/api/templates");
+export async function getTemplates(tenantId?: string) {
+  return request<MessageTemplateResponse[]>(`/api/templates${tenantParam(tenantId)}`);
 }
 
-export async function createTemplate(payload: CreateTemplateRequest) {
-  return request<MessageTemplateResponse>("/api/templates", {
+export async function createTemplate(payload: CreateTemplateRequest, tenantId?: string) {
+  return request<MessageTemplateResponse>(`/api/templates${tenantParam(tenantId)}`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
-export async function updateTemplate(id: string, payload: UpdateTemplateRequest) {
-  return request<MessageTemplateResponse>(`/api/templates/${id}`, {
+export async function updateTemplate(id: string, payload: UpdateTemplateRequest, tenantId?: string) {
+  return request<MessageTemplateResponse>(`/api/templates/${id}${tenantParam(tenantId)}`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });
@@ -803,83 +840,83 @@ export async function updateTemplate(id: string, payload: UpdateTemplateRequest)
 
 // ── Collection Rules ──────────────────────────────────────────────────────
 
-export async function getCollectionRules() {
-  return request<CollectionRuleResponse[]>("/api/collection-rules");
+export async function getCollectionRules(tenantId?: string) {
+  return request<CollectionRuleResponse[]>(`/api/collection-rules${tenantParam(tenantId)}`);
 }
 
-export async function createCollectionRule(payload: CreateCollectionRuleRequest) {
-  return request<CollectionRuleResponse>("/api/collection-rules", {
+export async function createCollectionRule(payload: CreateCollectionRuleRequest, tenantId?: string) {
+  return request<CollectionRuleResponse>(`/api/collection-rules${tenantParam(tenantId)}`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
-export async function updateCollectionRule(id: string, payload: CreateCollectionRuleRequest) {
-  return request<CollectionRuleResponse>(`/api/collection-rules/${id}`, {
+export async function updateCollectionRule(id: string, payload: CreateCollectionRuleRequest, tenantId?: string) {
+  return request<CollectionRuleResponse>(`/api/collection-rules/${id}${tenantParam(tenantId)}`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });
 }
 
-export async function deleteCollectionRule(id: string) {
-  return request<void>(`/api/collection-rules/${id}`, {
+export async function deleteCollectionRule(id: string, tenantId?: string) {
+  return request<void>(`/api/collection-rules/${id}${tenantParam(tenantId)}`, {
     method: "DELETE",
   });
 }
 
 // ── SMTP Config ───────────────────────────────────────────────────────────
 
-export async function getSmtpConfig() {
-  return request<SmtpConfigResponse>("/api/config/smtp");
+export async function getSmtpConfig(tenantId?: string) {
+  return request<SmtpConfigResponse>(`/api/config/smtp${tenantParam(tenantId)}`);
 }
 
-export async function saveSmtpConfig(payload: SmtpConfigRequest) {
-  return request<{ message: string }>("/api/config/smtp", {
+export async function saveSmtpConfig(payload: SmtpConfigRequest, tenantId?: string) {
+  return request<{ message: string }>(`/api/config/smtp${tenantParam(tenantId)}`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
-export async function testSmtpConfig() {
-  return request<{ message: string }>("/api/config/smtp/test", { method: "POST" });
+export async function testSmtpConfig(tenantId?: string) {
+  return request<{ message: string }>(`/api/config/smtp/test${tenantParam(tenantId)}`, { method: "POST" });
 }
 
-export async function getWhatsAppConfig() {
-  return request<WhatsAppConfigResponse>("/api/config/whatsapp");
+export async function getWhatsAppConfig(tenantId?: string) {
+  return request<WhatsAppConfigResponse>(`/api/config/whatsapp${tenantParam(tenantId)}`);
 }
 
-export async function saveWhatsAppConfig(payload: WhatsAppConfigRequest) {
-  return request<{ message: string }>("/api/config/whatsapp", {
+export async function saveWhatsAppConfig(payload: WhatsAppConfigRequest, tenantId?: string) {
+  return request<{ message: string }>(`/api/config/whatsapp${tenantParam(tenantId)}`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
-export async function testWhatsAppConfig() {
-  return request<{ message: string }>("/api/config/whatsapp/test", { method: "POST" });
+export async function testWhatsAppConfig(tenantId?: string) {
+  return request<{ message: string }>(`/api/config/whatsapp/test${tenantParam(tenantId)}`, { method: "POST" });
 }
 
-export async function getExternalApiConfig() {
-  return request<ExternalApiConfigResponse>("/api/config/external-api");
+export async function getExternalApiConfig(tenantId?: string) {
+  return request<ExternalApiConfigResponse>(`/api/config/external-api${tenantParam(tenantId)}`);
 }
 
-export async function saveExternalApiConfig(payload: ExternalApiConfigRequest) {
-  return request<{ message: string }>("/api/config/external-api", {
+export async function saveExternalApiConfig(payload: ExternalApiConfigRequest, tenantId?: string) {
+  return request<{ message: string }>(`/api/config/external-api${tenantParam(tenantId)}`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
-export async function testExternalApiConfig() {
-  return request<{ message: string }>("/api/config/external-api/test", { method: "POST" });
+export async function testExternalApiConfig(tenantId?: string) {
+  return request<{ message: string }>(`/api/config/external-api/test${tenantParam(tenantId)}`, { method: "POST" });
 }
 
-export async function getDispatchWindowConfig() {
-  return request<DispatchWindowConfigResponse>("/api/config/dispatch-window");
+export async function getDispatchWindowConfig(tenantId?: string) {
+  return request<DispatchWindowConfigResponse>(`/api/config/dispatch-window${tenantParam(tenantId)}`);
 }
 
-export async function saveDispatchWindowConfig(payload: DispatchWindowConfigRequest) {
-  return request<{ message: string }>("/api/config/dispatch-window", {
+export async function saveDispatchWindowConfig(payload: DispatchWindowConfigRequest, tenantId?: string) {
+  return request<{ message: string }>(`/api/config/dispatch-window${tenantParam(tenantId)}`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -887,13 +924,19 @@ export async function saveDispatchWindowConfig(payload: DispatchWindowConfigRequ
 
 // ── Workers (Admin only) ──────────────────────────────────────────────────
 
-export async function getWorkers() {
-  return request<WorkerResponse[]>("/api/workers");
+export async function getWorkers(tenantId?: string) {
+  return request<WorkerResponse[]>(`/api/workers${tenantParam(tenantId)}`);
 }
 
-export async function updateWorker(id: string, payload: UpdateWorkerRequest) {
-  return request<WorkerResponse>(`/api/workers/${id}`, {
+export async function updateWorker(id: string, payload: UpdateWorkerRequest, tenantId?: string) {
+  return request<WorkerResponse>(`/api/workers/${id}${tenantParam(tenantId)}`, {
     method: "PUT",
     body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteWorker(id: string, tenantId?: string) {
+  return request<void>(`/api/workers/${id}${tenantParam(tenantId)}`, {
+    method: "DELETE",
   });
 }

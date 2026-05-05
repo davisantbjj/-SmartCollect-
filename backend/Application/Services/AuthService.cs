@@ -25,29 +25,21 @@ public class AuthService : IAuthService
     {
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
 
-        // Find all users with this email (same email can exist in multiple tenants)
         var candidates = await _db.Users
             .Include(u => u.Tenant)
             .Where(u => u.Email == normalizedEmail)
             .ToListAsync();
 
         if (candidates.Count == 0) return null;
+        if (candidates.Count > 1)
+            throw new InvalidOperationException("Este e-mail está vinculado a múltiplas empresas. Regularize o cadastro antes de entrar.");
 
-        var passwordMatchedCandidates = new List<Domain.Entities.User>();
-        foreach (var candidate in candidates)
-        {
-            if (BCrypt.Net.BCrypt.Verify(request.Password, candidate.PasswordHash))
-                passwordMatchedCandidates.Add(candidate);
-        }
+        var user = candidates[0];
+        if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+            return null;
 
-        if (passwordMatchedCandidates.Count == 0) return null;
-
-        var user = passwordMatchedCandidates.FirstOrDefault(candidate =>
-            candidate.Active &&
-            (candidate.Role == UserRole.Master || (candidate.Tenant is not null && candidate.Tenant.Active)));
-
-        if (user is null)
-            throw new InvalidOperationException(GetBlockedAccessMessage(passwordMatchedCandidates[0].Role));
+        if (!user.Active || (user.Role != UserRole.Master && (user.Tenant is null || !user.Tenant.Active)))
+            throw new InvalidOperationException(GetBlockedAccessMessage(user.Role));
 
         user.LastLogin = DateTime.UtcNow;
         await _db.SaveChangesAsync();
@@ -62,14 +54,29 @@ public class AuthService : IAuthService
         _ => "Acesso bloqueado."
     };
 
+    private static UserRole ResolveTenantUserRole(string? role)
+    {
+        if (string.IsNullOrWhiteSpace(role))
+            return UserRole.Worker;
+
+        if (role.Equals(nameof(UserRole.Worker), StringComparison.OrdinalIgnoreCase))
+            return UserRole.Worker;
+
+        if (role.Equals(nameof(UserRole.Admin), StringComparison.OrdinalIgnoreCase))
+            return UserRole.Admin;
+
+        throw new InvalidOperationException("Perfil inválido. Use Admin ou Worker.");
+    }
+
     public async Task<AuthResponse?> RegisterAsync(Guid tenantId, RegisterRequest request)
     {
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+        var role = ResolveTenantUserRole(request.Role);
 
         var tenantExists = await _db.Tenants.AnyAsync(t => t.Id == tenantId && t.Active);
         if (!tenantExists) return null;
 
-        var exists = await _db.Users.AnyAsync(u => u.TenantId == tenantId && u.Email == normalizedEmail);
+        var exists = await _db.Users.AnyAsync(u => u.Email == normalizedEmail);
         if (exists) return null;
 
         var user = new Domain.Entities.User
@@ -79,7 +86,7 @@ public class AuthService : IAuthService
             Name = request.Name,
             Email = normalizedEmail,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-            Role = UserRole.Worker,
+            Role = role,
             Active = true
         };
 
@@ -95,8 +102,7 @@ public class AuthService : IAuthService
     {
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
 
-        // Master users are unique by email globally (no TenantId)
-        var exists = await _db.Users.AnyAsync(u => u.TenantId == null && u.Email == normalizedEmail);
+        var exists = await _db.Users.AnyAsync(u => u.Email == normalizedEmail);
         if (exists) return null;
 
         var user = new Domain.Entities.User
@@ -133,26 +139,12 @@ public class AuthService : IAuthService
         if (string.IsNullOrWhiteSpace(normalizedEmail))
             throw new InvalidOperationException("E-mail é obrigatório.");
 
-        if (user.Role == UserRole.Master)
-        {
-            var emailExistsForMaster = await _db.Users.AnyAsync(u =>
-                u.Id != user.Id &&
-                u.TenantId == null &&
-                u.Email == normalizedEmail);
+        var emailExists = await _db.Users.AnyAsync(u =>
+            u.Id != user.Id &&
+            u.Email == normalizedEmail);
 
-            if (emailExistsForMaster)
-                throw new InvalidOperationException("E-mail já cadastrado para usuário Master.");
-        }
-        else
-        {
-            var emailExistsForTenant = await _db.Users.AnyAsync(u =>
-                u.Id != user.Id &&
-                u.TenantId == user.TenantId &&
-                u.Email == normalizedEmail);
-
-            if (emailExistsForTenant)
-                throw new InvalidOperationException("E-mail já cadastrado neste tenant.");
-        }
+        if (emailExists)
+            throw new InvalidOperationException("E-mail já cadastrado no sistema.");
 
         if (!string.IsNullOrWhiteSpace(request.NewPassword))
         {
@@ -209,7 +201,6 @@ public class AuthService : IAuthService
             new(ClaimTypes.Role, user.Role.ToString()),
         };
 
-        // TenantId claim only for non-Master users
         if (user.TenantId.HasValue)
             claims.Add(new Claim("TenantId", user.TenantId.Value.ToString()));
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart, Line
 } from "recharts";
 import { ICONS } from "../utils/icons";
 import { colors } from "../utils/colors";
@@ -13,6 +13,7 @@ import {
   getDashboardStatusBreakdown,
   getDashboardSendsPerDay,
   getDashboardChannelMetrics,
+  getDashboardCriticalMetrics,
   type StoredSession,
 } from "../services/api";
 import type { ShowToast } from "../types";
@@ -42,8 +43,12 @@ export const PageAnalytics = ({
   const [statusBreakdown, setStatusBreakdown] = useState({ open: 0, pendingData: 0, overdue: 0, paid: 0, cancelled: 0 });
   const [sends, setSends] = useState<{ day: string; email: number; wa: number }[]>([]);
   const [channel, setChannel] = useState({ emailSent: 0, emailDelivered: 0, emailViewed: 0, whatsAppSent: 0, whatsAppDelivered: 0, whatsAppViewed: 0 });
+  const [critical, setCritical] = useState({ criticalTitles: 0, overdueBaseTitles: 0, recoveredTitles: 0, recoveryRate: 0, trend: [] as { month: string; recoveryRate: number; recoveredTitles: number; overdueBaseTitles: number }[] });
   const receivableColor = "#FDE047";
+  const paymentColor = "#00E676";
   const overdueColor = colors.accent;
+  const deliveryColor = "#4FC3F7";
+  const recoveredColor = paymentColor;
 
   const isMaster = session.role === "Master";
 
@@ -54,11 +59,12 @@ export const PageAnalytics = ({
       try {
         setLoading(true);
         const tenantId = isMaster ? (selectedTenantId || undefined) : (session.tenantId || undefined);
-        const [s, sb, snd, ch] = await Promise.all([
+        const [s, sb, snd, ch, cm] = await Promise.all([
           getDashboardSummary(tenantId),
           getDashboardStatusBreakdown(tenantId),
           getDashboardSendsPerDay(tenantId),
           getDashboardChannelMetrics(tenantId),
+          getDashboardCriticalMetrics(tenantId),
         ]);
 
         if (cancelled) return;
@@ -67,8 +73,15 @@ export const PageAnalytics = ({
         setStatusBreakdown(sb);
         setSends(snd.items.map(i => ({ day: toBrDayLabel(i.day), email: i.emailCount, wa: i.whatsAppCount })));
         setChannel(ch);
+        setCritical({
+          ...cm,
+          trend: cm.trend.map(item => ({
+            ...item,
+            month: `${item.month.slice(5, 7)}/${item.month.slice(2, 4)}`,
+          })),
+        });
       } catch (err) {
-        const msg = err instanceof ApiError ? err.message : "Falha ao carregar analytics.";
+        const msg = err instanceof ApiError ? err.message : t("analyticsPage.errors.load");
         if (!cancelled) showToast(`${ICONS.cross} ${msg}`, "error");
       } finally {
         if (!cancelled) setLoading(false);
@@ -92,7 +105,9 @@ export const PageAnalytics = ({
 
   const totalOperational = statusBreakdown.open + statusBreakdown.pendingData + statusBreakdown.overdue + statusBreakdown.paid;
   const totalTitles = totalOperational + statusBreakdown.cancelled;
-  const criticalTitles = statusBreakdown.overdue + statusBreakdown.pendingData;
+  const criticalTitles = critical.criticalTitles;
+  const criticalShare = safePercent(criticalTitles, totalTitles || 1);
+  const criticalColor = criticalShare >= 30 ? "#FDD835" : "#FF9800";
   const overduePortfolioRate = safePercent(summary.totalOverdue, summary.totalReceivable || 1);
   const totalSent = channel.emailSent + channel.whatsAppSent;
   const totalDelivered = channel.emailDelivered + channel.whatsAppDelivered;
@@ -109,16 +124,17 @@ export const PageAnalytics = ({
     <div className="animate-fade-up">
       {isMaster && (
         <div className="mb-4 px-4 py-2.5 bg-accent/8 border border-accent/20 rounded-[10px] text-sm text-accent font-semibold flex items-center gap-2">
-          {ICONS.analytics} {selectedTenantId ? "Analytics da empresa selecionada" : "Analytics agregado de todas as empresas"}
+          {ICONS.analytics} {selectedTenantId ? t("analyticsPage.master.selectedTenant") : t("analyticsPage.master.allTenants")}
         </div>
       )}
 
-      <div className="grid grid-cols-4 gap-3.5 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3.5 mb-6">
         {[
-          { value: `${paymentRate.toFixed(1)}%`, label: t("analytics.recoveryRate"), subtitle: `${statusBreakdown.paid.toLocaleString("pt-BR")} pagos de ${totalOperational.toLocaleString("pt-BR")}`, color: colors.success },
-          { value: `${criticalTitles.toLocaleString("pt-BR")}`, label: t("analytics.criticalTitles"), subtitle: `${safePercent(criticalTitles, totalTitles || 1)}% do total de títulos`, color: overdueColor },
-          { value: new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(summary.totalOverdue), label: t("analytics.overdueAmount"), subtitle: `${overduePortfolioRate}% da carteira a receber`, color: overdueColor },
-          { value: `${avgDeliveryRate.toFixed(1)}%`, label: t("analytics.avgDeliveryRate"), subtitle: `${totalDelivered.toLocaleString("pt-BR")} de ${totalSent.toLocaleString("pt-BR")} entregues`, color: colors.accent },
+          { value: `${paymentRate.toFixed(1)}%`, label: t("analytics.recoveryRate"), subtitle: `${statusBreakdown.paid.toLocaleString("pt-BR")} ${t("analyticsPage.metrics.paidOf")} ${totalOperational.toLocaleString("pt-BR")}`, color: paymentColor },
+          { value: `${criticalTitles.toLocaleString("pt-BR")}`, label: t("analytics.criticalTitles"), subtitle: `${criticalShare}% ${t("analyticsPage.metrics.ofTotalTitles")} • ${t("analyticsPage.metrics.criticalRule")}`, color: criticalColor },
+          { value: new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(summary.totalOverdue), label: t("analytics.overdueAmount"), subtitle: `${overduePortfolioRate}% ${t("analyticsPage.metrics.overdueShare")}`, color: overdueColor },
+          { value: `${critical.recoveredTitles.toLocaleString("pt-BR")}`, label: t("analytics.recovered"), subtitle: `${critical.overdueBaseTitles.toLocaleString("pt-BR")} ${t("analyticsPage.metrics.recoveredOfOverdue")}`, color: recoveredColor },
+          { value: `${avgDeliveryRate.toFixed(1)}%`, label: t("analytics.avgDeliveryRate"), subtitle: `${totalDelivered.toLocaleString("pt-BR")} ${t("analyticsPage.metrics.deliveredOf")} ${totalSent.toLocaleString("pt-BR")} ${t("analyticsPage.metrics.delivered")}`, color: deliveryColor },
         ].map((metric, index) => (
           <div key={index} className="bg-surface border border-border-subtle rounded-[14px] overflow-hidden p-[22px] text-center">
             <div className="font-extrabold text-[30px] tracking-[-1px] mb-[5px]" style={{ color: metric.color }}>{metric.value}</div>
@@ -133,17 +149,17 @@ export const PageAnalytics = ({
           <CardHeader title={t("dashboard.channelEffectiveness")} subtitle={t("dashboard.engagementMetrics")} />
           <div className="p-5 grid grid-cols-2 gap-3">
             {[
-              { label: "E-mail", sent: channel.emailSent, delivery: emailDeliveryRate, read: emailReadRate, color: colors.accent },
-              { label: "WhatsApp", sent: channel.whatsAppSent, delivery: waDeliveryRate, read: waReadRate, color: colors.wa },
+              { label: t("channel.email"), sent: channel.emailSent, delivery: emailDeliveryRate, read: emailReadRate, color: colors.accent },
+              { label: t("channel.whatsapp"), sent: channel.whatsAppSent, delivery: waDeliveryRate, read: waReadRate, color: colors.wa },
             ].map(ch => (
               <div key={ch.label} className="bg-surface-2 border border-border-subtle rounded-[10px] p-3">
                 <div className="font-bold text-sm mb-2">{ch.label}</div>
-                <div className="text-xs text-text-muted mb-1">Enviados: <strong className="text-text-primary">{ch.sent.toLocaleString("pt-BR")}</strong></div>
-                <div className="text-xs text-text-muted mb-1">Entregues: <strong style={{ color: ch.color }}>{ch.delivery}%</strong></div>
+                <div className="text-xs text-text-muted mb-1">{t("dashboard.sent")}: <strong className="text-text-primary">{ch.sent.toLocaleString("pt-BR")}</strong></div>
+                <div className="text-xs text-text-muted mb-1">{t("dashboard.delivered")}: <strong style={{ color: ch.color }}>{ch.delivery}%</strong></div>
                 <div className="h-[3px] bg-surface-3 rounded-sm mb-2">
                   <div className="h-full rounded-sm" style={{ width: `${Math.min(ch.delivery, 100)}%`, background: ch.color }} />
                 </div>
-                <div className="text-xs text-text-muted">Leituras: <strong style={{ color: ch.color }}>{ch.read}%</strong></div>
+                <div className="text-xs text-text-muted">{t("analyticsPage.metrics.reads")}: <strong style={{ color: ch.color }}>{ch.read}%</strong></div>
               </div>
             ))}
           </div>
@@ -186,6 +202,25 @@ export const PageAnalytics = ({
               <Bar dataKey="email" name={t("channel.email")} stackId="a" fill={`${colors.accent}cc`} radius={[0, 0, 0, 0]} />
               <Bar dataKey="wa" name={t("channel.whatsapp")} stackId="a" fill="#25d36699" radius={[4, 4, 0, 0]} />
             </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="bg-surface border border-border-subtle rounded-[14px] overflow-hidden mt-4">
+        <CardHeader title={t("analytics.recoveryByAging")} subtitle={`${critical.recoveredTitles.toLocaleString("pt-BR")} / ${critical.overdueBaseTitles.toLocaleString("pt-BR")} • ${critical.recoveryRate.toFixed(1)}%`} />
+        <div className="p-5">
+          <ResponsiveContainer width="100%" height={180}>
+            <ComposedChart data={critical.trend}>
+              <CartesianGrid strokeDasharray="3 3" stroke={colors.border} />
+              <XAxis dataKey="month" tick={{ fill: colors.text3, fontSize: 10 }} axisLine={false} tickLine={false} />
+              <YAxis yAxisId="left" tick={{ fill: colors.text3, fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fill: colors.text3, fontSize: 11 }} axisLine={false} tickLine={false} />
+              <Tooltip content={<ChartTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+              <Bar yAxisId="left" dataKey="overdueBaseTitles" name="Base em atraso" fill={`${colors.warn}66`} radius={[3, 3, 0, 0]} />
+              <Bar yAxisId="left" dataKey="recoveredTitles" name={t("analytics.recovered")} fill={`${recoveredColor}cc`} radius={[3, 3, 0, 0]} />
+              <Line yAxisId="right" type="monotone" dataKey="recoveryRate" name={t("analytics.recoveryRate")} stroke={recoveredColor} strokeWidth={2.2} dot={{ r: 3 }} />
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       </div>

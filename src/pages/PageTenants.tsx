@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Button, FormInput, Modal } from "../components/UI";
 import { ICONS } from "../utils/icons";
 import { formatCnpj, onlyDigits } from "../utils/formatters";
+import { t } from "../i18n";
 import {
   ApiError,
   createTenant,
@@ -42,6 +43,7 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
   const [editSaving, setEditSaving] = useState(false);
   const [editingTenantId, setEditingTenantId] = useState<string | null>(null);
   const [editAdminLogin, setEditAdminLogin] = useState(false);
+  const [createAdminLogin, setCreateAdminLogin] = useState(true);
   const [currentAdmin, setCurrentAdmin] = useState<{ name: string; email: string } | null>(null);
   const [form, setForm] = useState<TenantForm>(defaultForm);
   const [editForm, setEditForm] = useState<TenantForm>(defaultForm);
@@ -51,7 +53,7 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
       setLoading(true);
       setTenants(await getTenants());
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao carregar empresas.";
+      const msg = err instanceof ApiError ? err.message : t("tenants.errors.load");
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setLoading(false);
@@ -63,8 +65,13 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
   }, []);
 
   const handleCreate = async () => {
-    if (!form.companyName || !form.taxId || !form.emailDomain || !form.adminName || !form.adminEmail || !form.adminPassword) {
-      showToast(`${ICONS.warning} Preencha todos os campos obrigatórios.`, "warn");
+    if (!form.companyName || !form.taxId || !form.emailDomain) {
+      showToast(`${ICONS.warning} ${t("tenants.validation.companyRequired")}`, "warn");
+      return;
+    }
+
+    if (createAdminLogin && (!form.adminName || !form.adminEmail || !form.adminPassword)) {
+      showToast(`${ICONS.warning} ${t("tenants.validation.adminRequired")}`, "warn");
       return;
     }
 
@@ -74,16 +81,17 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
         companyName: form.companyName.trim(),
         taxId: onlyDigits(form.taxId),
         emailDomain: form.emailDomain.trim(),
-        adminName: form.adminName.trim(),
-        adminEmail: form.adminEmail.trim(),
-        adminPassword: form.adminPassword,
+        adminName: createAdminLogin ? form.adminName.trim() : undefined,
+        adminEmail: createAdminLogin ? form.adminEmail.trim() : undefined,
+        adminPassword: createAdminLogin ? form.adminPassword : undefined,
       });
-      showToast(`${ICONS.checkmark} Empresa cadastrada com sucesso.`, "success");
+      showToast(`${ICONS.checkmark} ${t("tenants.messages.created")}`, "success");
       setOpen(false);
       setForm(defaultForm);
+      setCreateAdminLogin(true);
       await load();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao criar empresa.";
+      const msg = err instanceof ApiError ? err.message : t("tenants.errors.create");
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setSaving(false);
@@ -92,9 +100,9 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
 
   const handleToggleAccess = async (tenant: TenantResponse) => {
     const nextActive = !tenant.active;
-    const actionText = nextActive ? "reativar" : "remover";
+    const actionText = nextActive ? t("tenants.actions.reactivate") : t("tenants.actions.remove");
     const confirmed = window.confirm(
-      `Deseja ${actionText} o acesso da empresa \"${tenant.companyName}\"?`
+      `${t("tenants.confirmTogglePrefix")} ${actionText} ${t("tenants.confirmToggleSuffix")} "${tenant.companyName}"?`
     );
     if (!confirmed) return;
 
@@ -102,12 +110,12 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
       setUpdatingTenantId(tenant.id);
       await updateTenantAccess(tenant.id, { active: nextActive });
       showToast(
-        `${ICONS.checkmark} Acesso da empresa ${nextActive ? "reativado" : "removido"} com sucesso.`,
+        `${ICONS.checkmark} ${nextActive ? t("tenants.messages.accessReactivated") : t("tenants.messages.accessRemoved")}`,
         "success"
       );
       await load();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao atualizar acesso da empresa.";
+      const msg = err instanceof ApiError ? err.message : t("tenants.errors.accessUpdate");
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setUpdatingTenantId(null);
@@ -122,8 +130,8 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
       setEditAdminLogin(false);
 
       const tenant = await getTenantById(tenantId);
-      const adminName = tenant.adminName ?? "Não informado";
-      const adminEmail = tenant.adminEmail ?? "Não informado";
+      const adminName = tenant.adminName ?? t("tenants.adminNotInformed");
+      const adminEmail = tenant.adminEmail ?? t("tenants.adminNotInformed");
 
       setEditForm({
         companyName: tenant.companyName,
@@ -135,7 +143,7 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
       });
       setCurrentAdmin({ name: adminName, email: adminEmail });
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao carregar dados da empresa.";
+      const msg = err instanceof ApiError ? err.message : t("tenants.errors.loadDetails");
       showToast(`${ICONS.cross} ${msg}`, "error");
       setEditOpen(false);
       setEditingTenantId(null);
@@ -149,12 +157,12 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
     if (!editingTenantId) return;
 
     if (!editForm.companyName || !editForm.taxId || !editForm.emailDomain) {
-      showToast(`${ICONS.warning} Preencha os dados obrigatórios da empresa.`, "warn");
+      showToast(`${ICONS.warning} ${t("tenants.validation.companyRequired")}`, "warn");
       return;
     }
 
     if (editAdminLogin && (!editForm.adminName || !editForm.adminEmail)) {
-      showToast(`${ICONS.warning} Preencha nome e e-mail do administrador.`, "warn");
+      showToast(`${ICONS.warning} ${t("tenants.validation.adminEditRequired")}`, "warn");
       return;
     }
 
@@ -170,13 +178,13 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
         adminPassword: editAdminLogin && editForm.adminPassword.trim() ? editForm.adminPassword : undefined,
       });
 
-      showToast(`${ICONS.checkmark} Empresa atualizada com sucesso.`, "success");
+      showToast(`${ICONS.checkmark} ${t("tenants.messages.updated")}`, "success");
       setEditOpen(false);
       setEditingTenantId(null);
       setCurrentAdmin(null);
       await load();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Erro ao atualizar empresa.";
+      const msg = err instanceof ApiError ? err.message : t("tenants.errors.update");
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setEditSaving(false);
@@ -187,7 +195,7 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
     <div className="animate-fade-up">
       <div className="flex justify-end mb-4">
         <Button variant="primary" onClick={() => setOpen(true)}>
-          {ICONS.plus} Nova Empresa
+          {ICONS.plus} {t("tenants.newCompany")}
         </Button>
       </div>
 
@@ -195,21 +203,21 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
         <table className="w-full border-collapse text-[13px]">
           <thead>
             <tr className="bg-surface-2">
-              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">Empresa</th>
-              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">CNPJ</th>
-              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">Plano</th>
-              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">Usuários</th>
-              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">Títulos</th>
-              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">Status</th>
-              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">Editar</th>
-              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">Ativo</th>
+              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">{t("tenants.table.company")}</th>
+              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">{t("tenants.table.cnpj")}</th>
+              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">{t("tenants.table.plan")}</th>
+              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">{t("tenants.table.users")}</th>
+              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">{t("tenants.table.titles")}</th>
+              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">{t("tenants.table.status")}</th>
+              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">{t("tenants.table.edit")}</th>
+              <th className="px-4 py-[11px] text-left text-[10.5px] font-bold tracking-[0.5px] uppercase text-text-muted border-b border-border-subtle">{t("tenants.table.active")}</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={8} className="text-center py-12 text-sm text-text-muted">Carregando empresas...</td></tr>
+              <tr><td colSpan={8} className="text-center py-12 text-sm text-text-muted">{t("tenants.loading")}</td></tr>
             ) : tenants.length === 0 ? (
-              <tr><td colSpan={8} className="text-center py-12 text-sm text-text-muted">Nenhuma empresa cadastrada.</td></tr>
+              <tr><td colSpan={8} className="text-center py-12 text-sm text-text-muted">{t("tenants.empty")}</td></tr>
             ) : tenants.map(tenant => (
               <tr key={tenant.id} className="border-b border-border-subtle hover:bg-surface-2/50 transition-colors">
                 <td className="px-4 py-[13px] font-semibold">{tenant.companyName}</td>
@@ -219,12 +227,12 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
                 <td className="px-4 py-[13px] text-text-secondary">{tenant.titleCount}</td>
                 <td className="px-4 py-[13px]">
                   <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${tenant.active ? "bg-success/10 text-success" : "bg-text-muted/12 text-text-muted"}`}>
-                    {tenant.active ? "Ativa" : "Inativa"}
+                    {tenant.active ? t("tenants.statusActive") : t("tenants.statusInactive")}
                   </span>
                 </td>
                 <td className="px-4 py-[13px]">
                   <Button size="sm" variant="secondary" onClick={() => void openEdit(tenant.id)}>
-                    {ICONS.pencil} Editar
+                    {ICONS.pencil} {t("common.edit")}
                   </Button>
                 </td>
                 <td className="px-4 py-[13px]">
@@ -241,7 +249,7 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
                     >
                       <span className={`block h-3 w-3 rounded-full bg-white transition-transform ${tenant.active ? "translate-x-3" : "translate-x-0"}`} />
                     </span>
-                    <span>{tenant.active ? "Ativo" : "Inativo"}</span>
+                    <span>{tenant.active ? t("common.active") : t("common.inactive")}</span>
                   </button>
                 </td>
               </tr>
@@ -253,23 +261,44 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title="Cadastrar Empresa"
+        title={t("tenants.modalCreateTitle")}
         maxWidth={680}
         footer={<>
-          <Button variant="secondary" onClick={() => setOpen(false)}>Cancelar</Button>
-          <Button variant="primary" onClick={handleCreate}>{saving ? "Salvando..." : "Cadastrar Empresa"}</Button>
+          <Button variant="secondary" onClick={() => setOpen(false)}>{t("common.cancel")}</Button>
+          <Button variant="primary" onClick={handleCreate}>{saving ? t("common.saving") : t("tenants.createAction")}</Button>
         </>}
       >
         <div className="grid grid-cols-2 gap-3">
-          <FormInput label="Razão Social" value={form.companyName} onChange={e => setForm(f => ({ ...f, companyName: e.target.value }))} />
-          <FormInput label="CNPJ" value={form.taxId} onChange={e => setForm(f => ({ ...f, taxId: formatCnpj(e.target.value) }))} placeholder="00.000.000/0001-00" />
-          <FormInput label="Domínio de E-mail" value={form.emailDomain} onChange={e => setForm(f => ({ ...f, emailDomain: e.target.value }))} placeholder="empresa.com.br" />
+          <FormInput label={t("tenants.labels.companyName")} value={form.companyName} onChange={e => setForm(f => ({ ...f, companyName: e.target.value }))} />
+          <FormInput label={t("tenants.labels.taxId")} value={form.taxId} onChange={e => setForm(f => ({ ...f, taxId: formatCnpj(e.target.value) }))} placeholder={t("common.cnpjPlaceholder")} />
+          <FormInput label={t("tenants.labels.emailDomain")} value={form.emailDomain} onChange={e => setForm(f => ({ ...f, emailDomain: e.target.value }))} placeholder={t("tenants.placeholders.emailDomain")} />
           <div />
-          <FormInput label="Nome do Admin" value={form.adminName} onChange={e => setForm(f => ({ ...f, adminName: e.target.value }))} />
-          <FormInput label="E-mail do Admin" type="email" value={form.adminEmail} onChange={e => setForm(f => ({ ...f, adminEmail: e.target.value }))} />
-          <div className="col-span-2">
-            <FormInput label="Senha Inicial do Admin" type="password" value={form.adminPassword} onChange={e => setForm(f => ({ ...f, adminPassword: e.target.value }))} />
+          <div className="col-span-2 flex items-center gap-2 mt-1">
+            <input
+              type="checkbox"
+              id="create-admin"
+              checked={createAdminLogin}
+              onChange={e => setCreateAdminLogin(e.target.checked)}
+              className="accent-accent"
+            />
+            <label htmlFor="create-admin" className="text-sm text-text-secondary">
+              {t("tenants.labels.createAdminNow")}
+            </label>
           </div>
+          {createAdminLogin && (
+            <>
+              <FormInput label={t("tenants.labels.adminName")} value={form.adminName} onChange={e => setForm(f => ({ ...f, adminName: e.target.value }))} />
+              <FormInput label={t("tenants.labels.adminEmail")} type="email" value={form.adminEmail} onChange={e => setForm(f => ({ ...f, adminEmail: e.target.value }))} />
+              <div className="col-span-2">
+                <FormInput
+                  label={t("tenants.labels.adminPassword")}
+                  type="password"
+                  value={form.adminPassword}
+                  onChange={e => setForm(f => ({ ...f, adminPassword: e.target.value }))} 
+                />
+              </div>
+            </>
+          )}
         </div>
       </Modal>
 
@@ -281,7 +310,7 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
           setCurrentAdmin(null);
           setEditAdminLogin(false);
         }}
-        title="Editar Empresa"
+        title={t("tenants.modalEditTitle")}
         maxWidth={680}
         footer={<>
           <Button variant="secondary" onClick={() => {
@@ -289,22 +318,22 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
             setEditingTenantId(null);
             setCurrentAdmin(null);
             setEditAdminLogin(false);
-          }}>Cancelar</Button>
-          <Button variant="primary" onClick={handleUpdate}>{editSaving ? "Salvando..." : "Salvar Alterações"}</Button>
+          }}>{t("common.cancel")}</Button>
+          <Button variant="primary" onClick={handleUpdate}>{editSaving ? t("common.saving") : t("tenants.saveChanges")}</Button>
         </>}
       >
         {editLoading ? (
-          <div className="text-sm text-text-muted py-4">Carregando dados da empresa...</div>
+          <div className="text-sm text-text-muted py-4">{t("tenants.loadingDetails")}</div>
         ) : (
           <div className="grid grid-cols-2 gap-3">
-            <FormInput label="Razão Social" value={editForm.companyName} onChange={e => setEditForm(f => ({ ...f, companyName: e.target.value }))} />
-            <FormInput label="CNPJ" value={editForm.taxId} onChange={e => setEditForm(f => ({ ...f, taxId: formatCnpj(e.target.value) }))} placeholder="00.000.000/0001-00" />
-            <FormInput label="Domínio de E-mail" value={editForm.emailDomain} onChange={e => setEditForm(f => ({ ...f, emailDomain: e.target.value }))} placeholder="empresa.com.br" />
+            <FormInput label={t("tenants.labels.companyName")} value={editForm.companyName} onChange={e => setEditForm(f => ({ ...f, companyName: e.target.value }))} />
+            <FormInput label={t("tenants.labels.taxId")} value={editForm.taxId} onChange={e => setEditForm(f => ({ ...f, taxId: formatCnpj(e.target.value) }))} placeholder={t("common.cnpjPlaceholder")} />
+            <FormInput label={t("tenants.labels.emailDomain")} value={editForm.emailDomain} onChange={e => setEditForm(f => ({ ...f, emailDomain: e.target.value }))} placeholder={t("tenants.placeholders.emailDomain")} />
             <div />
 
             {currentAdmin && (
               <div className="col-span-2 rounded-lg border border-border-subtle-2 bg-surface-2 px-3 py-2 text-sm">
-                <div className="text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted mb-1">Admin atual</div>
+                <div className="text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted mb-1">{t("tenants.labels.currentAdmin")}</div>
                 <div className="text-text-primary font-semibold">{currentAdmin.name}</div>
                 <div className="text-text-secondary text-xs mt-0.5">{currentAdmin.email}</div>
               </div>
@@ -318,20 +347,20 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
                 onChange={e => setEditAdminLogin(e.target.checked)}
                 className="accent-accent"
               />
-              <label htmlFor="edit-admin-login" className="text-sm text-text-secondary">Editar dados de login do Admin</label>
+              <label htmlFor="edit-admin-login" className="text-sm text-text-secondary">{t("tenants.labels.editAdminLogin")}</label>
             </div>
 
             {editAdminLogin && (
               <>
-                <FormInput label="Nome do Admin" value={editForm.adminName} onChange={e => setEditForm(f => ({ ...f, adminName: e.target.value }))} />
-                <FormInput label="E-mail do Admin" type="email" value={editForm.adminEmail} onChange={e => setEditForm(f => ({ ...f, adminEmail: e.target.value }))} />
+                <FormInput label={t("tenants.labels.adminName")} value={editForm.adminName} onChange={e => setEditForm(f => ({ ...f, adminName: e.target.value }))} />
+                <FormInput label={t("tenants.labels.adminEmail")} type="email" value={editForm.adminEmail} onChange={e => setEditForm(f => ({ ...f, adminEmail: e.target.value }))} />
                 <div className="col-span-2">
                   <FormInput
-                    label="Nova senha do Admin (opcional)"
+                    label={t("tenants.labels.adminPasswordOptional")}
                     type="password"
                     value={editForm.adminPassword}
                     onChange={e => setEditForm(f => ({ ...f, adminPassword: e.target.value }))}
-                    placeholder="Deixe em branco para manter"
+                    placeholder={t("tenants.placeholders.keepBlank")}
                   />
                 </div>
               </>

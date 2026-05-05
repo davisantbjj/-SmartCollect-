@@ -11,6 +11,19 @@ public static class TenantContextResolver
         throw new UnauthorizedAccessException("Missing tenant claim.");
     }
 
+    public static Guid ResolveTenantOrThrow(ClaimsPrincipal user, Guid? requestedTenantId)
+    {
+        if (user.IsInRole("Master"))
+        {
+            if (requestedTenantId is null || requestedTenantId == Guid.Empty)
+                throw new InvalidOperationException("Selecione uma empresa para continuar.");
+
+            return requestedTenantId.Value;
+        }
+
+        return GetTenantIdOrThrow(user);
+    }
+
     public static Guid? ResolveDashboardTenant(ClaimsPrincipal user, Guid? requestedTenantId)
     {
         if (user.IsInRole("Master"))

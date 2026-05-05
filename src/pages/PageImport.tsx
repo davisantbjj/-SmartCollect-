@@ -53,20 +53,20 @@ export const PageImport = ({
 
   const handleFile = async (file: File) => {
     if (!file.name.match(/\.(xlsx|csv|xlsm|xls)$/i)) {
-      showToast(`${ICONS.cross} Formato inválido. Use .xlsx ou .csv`, "error");
+      showToast(`${ICONS.cross} ${t("importPage.errors.invalidFormat")}`, "error");
       return;
     }
     try {
       setUploading(true);
-      showToast(`${ICONS.dashboard} "${file.name}" enviando...`, "info");
+      showToast(`${ICONS.dashboard} ${t("importPage.messages.uploading")} "${file.name}"`, "info");
       const res = await uploadImportFile(file);
       setLastResult(res);
       showToast(
-        `${ICONS.checkmark} ${res.successRows} importados · ${res.errorRows} erros`,
+        `${ICONS.checkmark} ${res.successRows} ${t("importPage.messages.imported")} · ${res.errorRows} ${t("importPage.messages.errors")}`,
         res.errorRows > 0 ? "warn" : "success"
       );
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Falha no upload.";
+      const msg = err instanceof ApiError ? err.message : t("importPage.errors.uploadFailed");
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setUploading(false);
@@ -80,7 +80,7 @@ export const PageImport = ({
       const res = await syncPendingTitles();
       showToast(`${ICONS.checkmark} ${res.message}`, "success");
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Falha na sincronização.";
+      const msg = err instanceof ApiError ? err.message : t("importPage.errors.syncFailed");
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setSyncing1(false);
@@ -94,7 +94,7 @@ export const PageImport = ({
       const res = await syncOccurrences();
       showToast(`${ICONS.checkmark} ${res.message}`, "success");
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Falha ao verificar ocorrências.";
+      const msg = err instanceof ApiError ? err.message : t("importPage.errors.checkFailed");
       showToast(`${ICONS.cross} ${msg}`, "error");
     } finally {
       setSyncing2(false);
@@ -136,7 +136,7 @@ export const PageImport = ({
               onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])} />
             <div className="text-[42px] mb-3.5">{uploading ? "⏳" : ICONS.dashboard}</div>
             <div className="font-extrabold text-base mb-1.5">
-              {uploading ? "Processando arquivo..." : t("import.dragOrClick")}
+              {uploading ? t("importPage.messages.processing") : t("import.dragOrClick")}
             </div>
             <div className="text-[13px] text-text-secondary mb-2">{t("import.fileTypes")}</div>
             <div className="text-[11.5px] text-text-muted">{t("import.requiredColumns")}</div>
@@ -147,15 +147,15 @@ export const PageImport = ({
             <div className="mt-4 p-4 bg-surface-2 rounded-xl border border-border-subtle grid grid-cols-3 gap-4 text-center">
               <div>
                 <div className="text-2xl font-extrabold text-text-primary">{lastResult.totalRows}</div>
-                <div className="text-xs text-text-muted">Total de linhas</div>
+                <div className="text-xs text-text-muted">{t("importPage.summary.totalRows")}</div>
               </div>
               <div>
                 <div className="text-2xl font-extrabold text-success">{lastResult.successRows}</div>
-                <div className="text-xs text-text-muted">Importados</div>
+                <div className="text-xs text-text-muted">{t("importPage.summary.imported")}</div>
               </div>
               <div>
                 <div className="text-2xl font-extrabold text-danger">{lastResult.errorRows}</div>
-                <div className="text-xs text-text-muted">Erros</div>
+                <div className="text-xs text-text-muted">{t("importPage.summary.errors")}</div>
               </div>
             </div>
           )}
@@ -225,7 +225,7 @@ export const PageImport = ({
                       <td className="px-4 py-[11px] text-text-secondary text-[13px]">{col.type}</td>
                       <td className="px-4 py-[11px]">
                         <span className={`text-[11px] font-bold px-[9px] py-[3px] rounded-full ${col.required ? "bg-success/12 text-success" : "bg-surface-3 text-text-muted"}`}>
-                          {col.required ? "Obrigatorio" : "Opcional"}
+                          {col.required ? t("importPage.required") : t("importPage.optional")}
                         </span>
                       </td>
                       <td className="px-4 py-[11px] text-xs text-text-muted font-mono max-w-[220px] truncate" title={col.example}>{col.example}</td>
@@ -241,8 +241,7 @@ export const PageImport = ({
       {tab === "api" && (
         <div className="space-y-4">
           <div className="bg-accent/[0.08] border border-accent/25 rounded-xl px-4 py-3 text-[12.5px] text-text-secondary">
-            <strong className="text-text-primary">Esta aba e operacional.</strong> Aqui voce acompanha status e executa sincronizacoes.
-            A configuracao da API externa (URL, token e endpoints) e feita na tela <strong className="text-text-primary">Integracao</strong>.
+            <strong className="text-text-primary">{t("importPage.api.noticeTitle")}</strong> {t("importPage.api.noticeBody")}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -254,7 +253,7 @@ export const PageImport = ({
                 right={
                   <span className={`${syncHealth?.connected ? "bg-success/12 text-success" : "bg-danger/12 text-danger"} text-[11px] font-bold px-[9px] py-[3px] rounded-full flex items-center gap-[5px]`}>
                     <span className="text-[7px]">{ICONS.dot}</span>
-                    {healthLoading ? "Verificando" : syncHealth?.connected ? "Online" : "Offline"}
+                    {healthLoading ? t("importPage.api.checking") : syncHealth?.connected ? t("importPage.api.online") : t("importPage.api.offline")}
                   </span>
                 }
               />
@@ -263,15 +262,15 @@ export const PageImport = ({
                   {syncHealth?.endpoints.pendingTitles ?? "GET /titulos-pendentes"}
                 </div>
                 <div className="text-[12.5px] leading-[2.1] text-text-secondary mb-4">
-                  <div>Base URL: <strong className="text-text-primary break-all">{syncHealth?.baseUrl ?? "Nao disponivel"}</strong></div>
-                  <div>Frequencia: <strong className="text-text-primary">2x por dia</strong></div>
-                  <div>Operacao: <strong className="text-text-primary">Upsert por codigo unico</strong></div>
-                  <div>Titulos sem contato: <strong className="text-text-primary">Pendente de Dados</strong></div>
-                  {syncHealth?.checkedAt && <div>Ultima verificacao: <strong className="text-text-primary">{new Date(syncHealth.checkedAt).toLocaleString("pt-BR")}</strong></div>}
+                  <div>{t("importPage.api.baseUrl")} <strong className="text-text-primary break-all">{syncHealth?.baseUrl ?? t("importPage.api.notAvailable")}</strong></div>
+                  <div>{t("importPage.api.frequency")} <strong className="text-text-primary">{t("importPage.api.frequencyTwiceDaily")}</strong></div>
+                  <div>{t("importPage.api.operation")} <strong className="text-text-primary">{t("importPage.api.operationUpsert")}</strong></div>
+                  <div>{t("importPage.api.noContactStatus")} <strong className="text-text-primary">{t("importPage.api.pendingData")}</strong></div>
+                  {syncHealth?.checkedAt && <div>{t("importPage.api.lastCheck")} <strong className="text-text-primary">{new Date(syncHealth.checkedAt).toLocaleString("pt-BR")}</strong></div>}
                 </div>
                 {canSync && (
                   <Button size="sm" variant="secondary" onClick={handleSync1} disabled={!syncHealth?.connected || syncing1}>
-                    {syncing1 ? "Sincronizando..." : t("import.syncNow")}
+                    {syncing1 ? t("importPage.api.syncing") : t("import.syncNow")}
                   </Button>
                 )}
               </div>
@@ -285,7 +284,7 @@ export const PageImport = ({
                 right={
                   <span className={`${syncHealth?.connected ? "bg-success/12 text-success" : "bg-danger/12 text-danger"} text-[11px] font-bold px-[9px] py-[3px] rounded-full flex items-center gap-[5px]`}>
                     <span className="text-[7px]">{ICONS.dot}</span>
-                    {healthLoading ? "Verificando" : syncHealth?.connected ? "Online" : "Offline"}
+                    {healthLoading ? t("importPage.api.checking") : syncHealth?.connected ? t("importPage.api.online") : t("importPage.api.offline")}
                   </span>
                 }
               />
@@ -294,14 +293,14 @@ export const PageImport = ({
                   {syncHealth?.endpoints.occurrences ?? "GET /ocorrencias?data={date}"}
                 </div>
                 <div className="text-[12.5px] leading-[2.1] text-text-secondary mb-4">
-                  <div>Frequencia: <strong className="text-text-primary">1x por dia</strong></div>
-                  <div>Parametros: <strong className="text-text-primary">D-1 e D-0</strong></div>
-                  <div>Acao: <strong className="text-text-primary">Corte imediato da regua</strong></div>
-                  <div>Autenticacao: <strong className="text-text-primary">{syncHealth?.authentication ?? "Bearer"}</strong></div>
+                  <div>{t("importPage.api.frequency")} <strong className="text-text-primary">{t("importPage.api.frequencyDaily")}</strong></div>
+                  <div>{t("importPage.api.parameters")} <strong className="text-text-primary">{t("importPage.api.parametersD1D0")}</strong></div>
+                  <div>{t("importPage.api.action")} <strong className="text-text-primary">{t("importPage.api.actionImmediateStop")}</strong></div>
+                  <div>{t("importPage.api.authentication")} <strong className="text-text-primary">{syncHealth?.authentication ?? t("importPage.api.authDefault")}</strong></div>
                 </div>
                 {canSync && (
                   <Button size="sm" variant="secondary" onClick={handleSync2} disabled={!syncHealth?.connected || syncing2}>
-                    {syncing2 ? "Verificando..." : t("import.checkNow")}
+                    {syncing2 ? t("importPage.api.checkingOccurrences") : t("import.checkNow")}
                   </Button>
                 )}
               </div>

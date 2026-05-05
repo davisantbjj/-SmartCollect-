@@ -1,4 +1,5 @@
 using SmartCollect.Tests;
+
 namespace SmartCollect.Tests.Application.Services;
 
 using Microsoft.Extensions.Configuration;
@@ -32,28 +33,28 @@ public class AuthServiceTests
     [Fact]
     public async Task Login_WithCorrectCredentials_ReturnsToken()
     {
-        var db2 = TestDbContextFactory.Create();
+        var db = TestDbContextFactory.Create();
         var tenantId = Guid.NewGuid();
-        db2.Tenants.Add(new Tenant { Id = tenantId, CompanyName = "Test", TaxId = "12345" });
-        db2.Users.Add(new User
+        db.Tenants.Add(new Tenant { Id = tenantId, CompanyName = "Test", TaxId = "12345" });
+        db.Users.Add(new User
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
             Name = "Test",
             Email = "test@test.com",
             PasswordHash = BCrypt.Net.BCrypt.HashPassword("password123"),
-            Role = UserRole.Worker,   // Updated: Worker (was Operator)
+            Role = UserRole.Worker,
             Active = true
         });
-        await db2.SaveChangesAsync();
+        await db.SaveChangesAsync();
 
-        var svc = new AuthService(db2, CreateConfig());
+        var svc = new AuthService(db, CreateConfig());
         var result = await svc.LoginAsync(new LoginRequest("test@test.com", "password123"));
 
         Assert.NotNull(result);
         Assert.NotEmpty(result!.Token);
         Assert.Equal("test@test.com", result.Email);
-        Assert.Equal("Worker", result.Role);  // Updated: Worker
+        Assert.Equal("Worker", result.Role);
     }
 
     [Fact]
@@ -154,9 +155,8 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task Login_SameEmail_DifferentTenants_ReturnsBothCorrectly()
+    public async Task Login_DuplicateEmailAcrossTenants_ThrowsRegularizationMessage()
     {
-        // B-01 fix: same email in two tenants must resolve correctly by password
         var db = TestDbContextFactory.Create();
         var tenantA = Guid.NewGuid();
         var tenantB = Guid.NewGuid();
@@ -168,15 +168,10 @@ public class AuthServiceTests
 
         var svc = new AuthService(db, CreateConfig());
 
-        var resultA = await svc.LoginAsync(new LoginRequest("shared@test.com", "passA"));
-        var resultB = await svc.LoginAsync(new LoginRequest("shared@test.com", "passB"));
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            svc.LoginAsync(new LoginRequest("shared@test.com", "passA")));
 
-        Assert.NotNull(resultA);
-        Assert.NotNull(resultB);
-        Assert.Equal(tenantA, resultA!.TenantId);
-        Assert.Equal(tenantB, resultB!.TenantId);
-        Assert.Equal("Admin", resultA.Role);
-        Assert.Equal("Worker", resultB.Role);
+        Assert.Equal("Este e-mail está vinculado a múltiplas empresas. Regularize o cadastro antes de entrar.", ex.Message);
     }
 
     [Fact]
@@ -186,7 +181,7 @@ public class AuthServiceTests
         db.Users.Add(new User
         {
             Id = Guid.NewGuid(),
-            TenantId = null,  // Master has no tenant
+            TenantId = null,
             Name = "Master",
             Email = "master@atos.com",
             PasswordHash = BCrypt.Net.BCrypt.HashPassword("masterpass"),
@@ -204,7 +199,7 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task Register_DuplicateEmail_ReturnsNull()
+    public async Task Register_DuplicateEmailInSameTenant_ReturnsNull()
     {
         var db = TestDbContextFactory.Create();
         var tenant = new Tenant { Id = Guid.NewGuid(), CompanyName = "Test", TaxId = "123" };
@@ -227,17 +222,123 @@ public class AuthServiceTests
     }
 
     [Fact]
+    public async Task Register_DuplicateEmailInAnotherTenant_ReturnsNull()
+    {
+        var db = TestDbContextFactory.Create();
+        var tenantA = new Tenant { Id = Guid.NewGuid(), CompanyName = "A", TaxId = "123" };
+        var tenantB = new Tenant { Id = Guid.NewGuid(), CompanyName = "B", TaxId = "456" };
+        db.Tenants.AddRange(tenantA, tenantB);
+        db.Users.Add(new User
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantA.Id,
+            Name = "Existing",
+            Email = "dupe@test.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("password"),
+            Active = true
+        });
+        await db.SaveChangesAsync();
+
+        var svc = new AuthService(db, CreateConfig());
+        var result = await svc.RegisterAsync(tenantB.Id, new RegisterRequest("New User", "dupe@test.com", "password"));
+
+        Assert.Null(result);
+    }
+
+    [Fact]
     public async Task Register_NewUser_DefaultsToWorkerRole()
     {
         var (svc, tenant) = await SetupAsync();
-        var db = TestDbContextFactory.Create();
-        db.Tenants.Add(new Tenant { Id = tenant.Id, CompanyName = tenant.CompanyName, TaxId = tenant.TaxId });
-        await db.SaveChangesAsync();
-
-        var freshSvc = new AuthService(db, CreateConfig());
-        var result = await freshSvc.RegisterAsync(tenant.Id, new RegisterRequest("New Worker", "new@test.com", "password123"));
+        var result = await svc.RegisterAsync(tenant.Id, new RegisterRequest("New Worker", "new@test.com", "password123"));
 
         Assert.NotNull(result);
         Assert.Equal("Worker", result!.Role);
+    }
+
+    [Fact]
+    public async Task Register_NewUser_WithAdminRole_ReturnsAdminRole()
+    {
+        var (svc, tenant) = await SetupAsync();
+        var result = await svc.RegisterAsync(
+            tenant.Id,
+            new RegisterRequest("New Admin", "admin-new@test.com", "password123", "Admin"));
+
+        Assert.NotNull(result);
+        Assert.Equal("Admin", result!.Role);
+    }
+
+    [Fact]
+    public async Task Register_WithInvalidRole_Throws()
+    {
+        var (svc, tenant) = await SetupAsync();
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            svc.RegisterAsync(
+                tenant.Id,
+                new RegisterRequest("Bad Role", "bad-role@test.com", "password123", "Master")));
+
+        Assert.Equal("Perfil inválido. Use Admin ou Worker.", ex.Message);
+    }
+
+    [Fact]
+    public async Task RegisterMaster_DuplicateEmailInTenant_ReturnsNull()
+    {
+        var db = TestDbContextFactory.Create();
+        var tenant = new Tenant { Id = Guid.NewGuid(), CompanyName = "Tenant", TaxId = "123" };
+        db.Tenants.Add(tenant);
+        db.Users.Add(new User
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenant.Id,
+            Name = "Tenant Admin",
+            Email = "shared@test.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("password"),
+            Role = UserRole.Admin,
+            Active = true
+        });
+        await db.SaveChangesAsync();
+
+        var svc = new AuthService(db, CreateConfig());
+        var result = await svc.RegisterMasterAsync(new RegisterRequest("Master", "shared@test.com", "password"));
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_DuplicateGlobalEmail_Throws()
+    {
+        var db = TestDbContextFactory.Create();
+        var tenantA = new Tenant { Id = Guid.NewGuid(), CompanyName = "A", TaxId = "111" };
+        var tenantB = new Tenant { Id = Guid.NewGuid(), CompanyName = "B", TaxId = "222" };
+        var userA = new User
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantA.Id,
+            Name = "User A",
+            Email = "a@test.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("password"),
+            Role = UserRole.Admin,
+            Active = true
+        };
+        var userB = new User
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantB.Id,
+            Name = "User B",
+            Email = "b@test.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("password"),
+            Role = UserRole.Worker,
+            Active = true
+        };
+        db.Tenants.AddRange(tenantA, tenantB);
+        db.Users.AddRange(userA, userB);
+        await db.SaveChangesAsync();
+
+        var svc = new AuthService(db, CreateConfig());
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            svc.UpdateProfileAsync(userB.Id, new UpdateProfileRequest("User B", "a@test.com", null, null, null, false)));
+
+        Assert.Equal("E-mail já cadastrado no sistema.", ex.Message);
     }
 }

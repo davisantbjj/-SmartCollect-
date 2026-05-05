@@ -90,6 +90,21 @@ export interface DefaulterItem {
 
 export interface TopDefaultersResponse { items: DefaulterItem[] }
 
+export interface RecoveryRatePointResponse {
+  month: string;
+  overdueBaseTitles: number;
+  recoveredTitles: number;
+  recoveryRate: number;
+}
+
+export interface CriticalMetricsResponse {
+  criticalTitles: number;
+  overdueBaseTitles: number;
+  recoveredTitles: number;
+  recoveryRate: number;
+  trend: RecoveryRatePointResponse[];
+}
+
 export interface SendsDayItem {
   day: string;
   emailCount: number;
@@ -662,6 +677,10 @@ export async function getDashboardAging(tenantId?: string) {
 
 export async function getDashboardTopDefaulters(tenantId?: string) {
   return request<TopDefaultersResponse>(`/api/dashboard/top-defaulters${tenantParam(tenantId)}`);
+}
+
+export async function getDashboardCriticalMetrics(tenantId?: string) {
+  return request<CriticalMetricsResponse>(`/api/dashboard/critical-metrics${tenantParam(tenantId)}`);
 }
 
 export async function getDashboardSendsPerDay(tenantId?: string) {

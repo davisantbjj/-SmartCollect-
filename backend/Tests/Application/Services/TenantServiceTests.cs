@@ -10,6 +10,47 @@ using SmartCollect.Domain.Enums;
 public class TenantServiceTests
 {
     [Fact]
+    public async Task CreateAsync_WithoutAdminInfo_CreatesTenantWithoutAdminUser()
+    {
+        var db = TestDbContextFactory.Create();
+        var service = new TenantService(db);
+
+        var created = await service.CreateAsync(new CreateTenantRequest(
+            "Tenant Sem Admin",
+            "12345678000100",
+            "tenant.com",
+            null,
+            null,
+            null));
+
+        Assert.Equal("Tenant Sem Admin", created.CompanyName);
+        Assert.Null(created.AdminName);
+        Assert.Null(created.AdminEmail);
+        Assert.Equal(0, created.UserCount);
+
+        var users = db.Users.Where(u => u.TenantId == created.Id).ToList();
+        Assert.Empty(users);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithPartialAdminInfo_Throws()
+    {
+        var db = TestDbContextFactory.Create();
+        var service = new TenantService(db);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.CreateAsync(new CreateTenantRequest(
+                "Tenant Invalido",
+                "12345678000101",
+                "tenant.com",
+                "Admin Sem Email",
+                null,
+                "senha123")));
+
+        Assert.Contains("administrador", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task CreateAsync_DuplicateAdminEmailGlobally_Throws()
     {
         var db = TestDbContextFactory.Create();

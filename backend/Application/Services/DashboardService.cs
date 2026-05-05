@@ -200,6 +200,52 @@ public class DashboardService : IDashboardService
         return new TopDefaultersResponse(items);
     }
 
+    public async Task<CriticalMetricsResponse> GetCriticalMetricsAsync(Guid? tenantId)
+    {
+        var now = DateTime.UtcNow;
+        var criticalCutoff = now.Date.AddDays(-10);
+
+        // Critical: unpaid titles with overdue greater than 10 days.
+        var criticalTitles = await TitlesFor(tenantId)
+            .CountAsync(t =>
+                (t.Status == TitleStatus.Open || t.Status == TitleStatus.Overdue || t.Status == TitleStatus.PendingData)
+                && t.DueDate.Date < criticalCutoff);
+
+        // Recovery concept: titles that became overdue (due date in past) and are now paid.
+        var overdueUniverse = await TitlesFor(tenantId)
+            .Where(t => t.DueDate.Date < now.Date && t.Status != TitleStatus.Cancelled)
+            .ToListAsync();
+
+        var overdueBaseTitles = overdueUniverse.Count;
+        var recoveredTitles = overdueUniverse.Count(t => t.Status == TitleStatus.Paid);
+        var recoveryRate = overdueBaseTitles > 0
+            ? Math.Round((double)recoveredTitles / overdueBaseTitles * 100, 1)
+            : 0;
+
+        var trendStart = now.Date.AddMonths(-5);
+        var trendItems = overdueUniverse
+            .Where(t => t.DueDate.Date >= trendStart)
+            .GroupBy(t => t.DueDate.ToString("yyyy-MM"))
+            .OrderBy(g => g.Key)
+            .Select(g =>
+            {
+                var baseCount = g.Count();
+                var recoveredCount = g.Count(t => t.Status == TitleStatus.Paid);
+                var rate = baseCount > 0
+                    ? Math.Round((double)recoveredCount / baseCount * 100, 1)
+                    : 0;
+                return new RecoveryRatePointResponse(g.Key, baseCount, recoveredCount, rate);
+            })
+            .ToList();
+
+        return new CriticalMetricsResponse(
+            criticalTitles,
+            overdueBaseTitles,
+            recoveredTitles,
+            recoveryRate,
+            trendItems);
+    }
+
     public async Task<SendsPerDayResponse> GetSendsPerDayAsync(Guid? tenantId)
     {
         var end = DateTime.UtcNow;
@@ -367,4 +413,3 @@ public class DashboardService : IDashboardService
         return new ActivityLogResponse(items);
     }
 }
-

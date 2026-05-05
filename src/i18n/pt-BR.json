@@ -139,11 +139,11 @@
     "totalOverdue": "Total em Atraso",
     "totalRecovered": "Total Pago",
     "recoveryRate": "Taxa de Pagamento",
+    "recovered": "Recuperado",
     "recoveryFunnel": "Funil de Recuperação",
     "monthlyEvolution": "Evolução mensal (R$ mil)",
     "receivable": "A Receber",
     "overdue": "Em Atraso",
-    "recovered": "Recuperado",
     "agingList": "Aging List",
     "agingSubtitle": "Distribuição por vencimento",
     "dueSoon": "A Vencer",
@@ -169,6 +169,7 @@
     "statusCancelled": "Cancelado"
   },
   "analytics": {
+    "recovered": "Títulos Recuperados",
     "recoveryRate": "Taxa de Pagamento",
     "thisMonthUp": "4,1pp este mês",
     "recoveredMonth": "Total Pago",
@@ -230,7 +231,9 @@
       "overdueShare": "da carteira a receber",
       "deliveredOf": "de",
       "delivered": "entregues",
-      "reads": "Leituras"
+      "reads": "Leituras",
+      "recoveredOfOverdue": "recuperados da base em atraso",
+      "criticalRule": "crítico: atraso > 10 dias"
     }
   },
   "contactsPage": {

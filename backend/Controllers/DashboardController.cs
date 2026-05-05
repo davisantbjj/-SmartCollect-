@@ -41,6 +41,10 @@ public class DashboardController : ControllerBase
     public async Task<IActionResult> TopDefaulters([FromQuery] Guid? tenantId = null)
         => Ok(await _service.GetTopDefaultersAsync(ResolveEffectiveTenantId(tenantId)));
 
+    [HttpGet("critical-metrics")]
+    public async Task<IActionResult> CriticalMetrics([FromQuery] Guid? tenantId = null)
+        => Ok(await _service.GetCriticalMetricsAsync(ResolveEffectiveTenantId(tenantId)));
+
     [HttpGet("sends-per-day")]
     public async Task<IActionResult> SendsPerDay([FromQuery] Guid? tenantId = null)
         => Ok(await _service.GetSendsPerDayAsync(ResolveEffectiveTenantId(tenantId)));
@@ -59,4 +63,3 @@ public class DashboardController : ControllerBase
         [FromQuery] DateTime? endDate = null)
         => Ok(await _service.GetActivityLogAsync(ResolveEffectiveTenantId(tenantId), startDate, endDate));
 }
-

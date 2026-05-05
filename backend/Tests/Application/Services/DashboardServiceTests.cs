@@ -202,4 +202,59 @@ public class DashboardServiceTests
         Assert.Equal(1, metrics.WhatsAppDelivered);
         Assert.Equal(0, metrics.WhatsAppViewed);
     }
+
+    [Fact]
+    public async Task CriticalMetrics_CriticalTitles_UsesMoreThanTenDaysOverdueRule()
+    {
+        var db = TestDbContextFactory.Create();
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+
+        db.Tenants.Add(new Tenant { Id = tenantId, CompanyName = "Test", TaxId = "123" });
+        db.Users.Add(new User { Id = userId, TenantId = tenantId, Name = "Op", Email = "op@t.com", PasswordHash = "x" });
+        db.Clients.Add(new Client { Id = clientId, TenantId = tenantId, UserId = userId, LegalName = "Client A", TaxId = "456" });
+
+        db.Titles.AddRange(
+            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "C1", Amount = 100, DueDate = DateTime.UtcNow.AddDays(-12), IssueDate = DateTime.UtcNow.AddDays(-20), Status = TitleStatus.Open },
+            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "C2", Amount = 100, DueDate = DateTime.UtcNow.AddDays(-11), IssueDate = DateTime.UtcNow.AddDays(-20), Status = TitleStatus.PendingData },
+            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "N1", Amount = 100, DueDate = DateTime.UtcNow.AddDays(-9), IssueDate = DateTime.UtcNow.AddDays(-20), Status = TitleStatus.Overdue },
+            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "N2", Amount = 100, DueDate = DateTime.UtcNow.AddDays(-20), IssueDate = DateTime.UtcNow.AddDays(-30), Status = TitleStatus.Paid }
+        );
+        await db.SaveChangesAsync();
+
+        var svc = new DashboardService(db);
+        var metrics = await svc.GetCriticalMetricsAsync(tenantId);
+
+        Assert.Equal(2, metrics.CriticalTitles);
+    }
+
+    [Fact]
+    public async Task CriticalMetrics_RecoveryRate_UsesOverduePaidOverOverdueBase()
+    {
+        var db = TestDbContextFactory.Create();
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+
+        db.Tenants.Add(new Tenant { Id = tenantId, CompanyName = "Test", TaxId = "123" });
+        db.Users.Add(new User { Id = userId, TenantId = tenantId, Name = "Op", Email = "op@t.com", PasswordHash = "x" });
+        db.Clients.Add(new Client { Id = clientId, TenantId = tenantId, UserId = userId, LegalName = "Client A", TaxId = "456" });
+
+        db.Titles.AddRange(
+            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "R1", Amount = 100, DueDate = DateTime.UtcNow.AddDays(-30), IssueDate = DateTime.UtcNow.AddDays(-60), Status = TitleStatus.Paid },
+            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "R2", Amount = 100, DueDate = DateTime.UtcNow.AddDays(-20), IssueDate = DateTime.UtcNow.AddDays(-40), Status = TitleStatus.Open },
+            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "R3", Amount = 100, DueDate = DateTime.UtcNow.AddDays(-10), IssueDate = DateTime.UtcNow.AddDays(-20), Status = TitleStatus.Paid },
+            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "R4", Amount = 100, DueDate = DateTime.UtcNow.AddDays(5), IssueDate = DateTime.UtcNow.AddDays(-2), Status = TitleStatus.Open }
+        );
+        await db.SaveChangesAsync();
+
+        var svc = new DashboardService(db);
+        var metrics = await svc.GetCriticalMetricsAsync(tenantId);
+
+        Assert.Equal(3, metrics.OverdueBaseTitles);
+        Assert.Equal(2, metrics.RecoveredTitles);
+        Assert.Equal(66.7, metrics.RecoveryRate);
+        Assert.NotEmpty(metrics.Trend);
+    }
 }

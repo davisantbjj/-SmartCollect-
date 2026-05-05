@@ -10,8 +10,8 @@ public interface IDashboardService
     Task<FunnelDataResponse> GetFunnelAsync(Guid? tenantId);
     Task<AgingListResponse> GetAgingAsync(Guid? tenantId);
     Task<TopDefaultersResponse> GetTopDefaultersAsync(Guid? tenantId);
+    Task<CriticalMetricsResponse> GetCriticalMetricsAsync(Guid? tenantId);
     Task<SendsPerDayResponse> GetSendsPerDayAsync(Guid? tenantId);
     Task<ChannelMetricsResponse> GetChannelMetricsAsync(Guid? tenantId, DateTime? startDate = null, DateTime? endDate = null);
     Task<ActivityLogResponse> GetActivityLogAsync(Guid? tenantId, DateTime? startDate = null, DateTime? endDate = null);
 }
-

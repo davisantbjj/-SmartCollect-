@@ -63,6 +63,45 @@ public class SyncServiceTests
             fakeMailer);
     }
 
+    private static async Task<(SyncService service, SmartCollect.Infrastructure.Data.AppDbContext db, Guid tenantId)> SetupSyncServiceWithPayloadAsync(
+        string payload)
+    {
+        var db = TestDbContextFactory.Create();
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        db.Tenants.Add(new Tenant
+        {
+            Id = tenantId,
+            CompanyName = "Test",
+            TaxId = "123",
+            ExternalApiBaseUrl = "http://localhost/",
+            ExternalApiAuthScheme = "None"
+        });
+        db.Users.Add(new User { Id = userId, TenantId = tenantId, Name = "Op", Email = "op@test.com", PasswordHash = "x" });
+        await db.SaveChangesAsync();
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ExternalApi:BaseUrl"] = "http://localhost/",
+                ["ExternalApi:DocsUrl"] = "http://localhost/docs"
+            })
+            .Build();
+
+        var dataProtectionProvider = DataProtectionProvider.Create("SmartCollect.Tests");
+
+        return (
+            new SyncService(
+                db,
+                new StaticHttpClientFactory(payload),
+                dataProtectionProvider,
+                configuration,
+                NullLogger<SyncService>.Instance),
+            db,
+            tenantId);
+    }
+
     [Fact]
     public async Task RN06_PaidOccurrence_OnAlreadyPaidTitle_IsIdempotent()
     {
@@ -284,8 +323,8 @@ public class SyncServiceTests
             CompanyName = "Tenant Sync",
             TaxId = "123",
             ExternalApiBaseUrl = "http://localhost/",
-            ExternalApiPendingTitlesPath = "titulos-pendentes",
-            ExternalApiOccurrencesPath = "ocorrencias?data={date}",
+            ExternalApiPendingTitlesPath = "reguacobranca?colecao=1&pageSize=0&pageNumber=0",
+            ExternalApiOccurrencesPath = "reguacobranca?colecao=2&dtOcorrencia={date}&pageSize=0&pageNumber=0",
             ExternalApiAuthScheme = "None",
             Active = true
         });
@@ -328,7 +367,7 @@ public class SyncServiceTests
 
         await db.SaveChangesAsync();
 
-        var payload = "[{\"nome_cliente\":\"Cliente\",\"cnpj\":\"999\",\"email\":\"contato@test.com\",\"telefone\":\"\",\"codigo_unico\":\"T-SYNC-001\",\"valor\":100.0,\"data_vencimento\":\"2099-12-31T00:00:00Z\",\"data_emissao\":\"2099-12-01T00:00:00Z\",\"link_boleto\":null,\"status\":\"open\"}]";
+        var payload = "{\"TotalDeRegistros\":1,\"ItensPorPagina\":0,\"PaginaAtual\":0,\"Registros\":[{\"nmCliente\":\"Cliente\",\"nrCNPJ\":\"999\",\"dsEmail\":\"contato@test.com\",\"nrTelefone\":\"\",\"cdTitulo\":1001,\"vlTitulo\":100.0,\"dtVencimento\":\"2099-12-31T00:00:00Z\",\"dtEmissao\":\"2099-12-01T00:00:00Z\",\"dsLinkBoleto\":null,\"dsStatus\":\"Aberto\"}],\"Totais\":null}";
 
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -351,11 +390,56 @@ public class SyncServiceTests
 
         Assert.Equal(1, processed);
 
-        var title = await db.Titles.SingleAsync(t => t.UniqueCode == "T-SYNC-001");
+        var title = await db.Titles.SingleAsync(t => t.UniqueCode == "1001");
         var dispatches = await db.Dispatches.Where(d => d.TitleId == title.Id).ToListAsync();
 
         Assert.Single(dispatches);
         Assert.Equal(DispatchStatus.Pending, dispatches[0].Status);
+    }
+
+    [Fact]
+    public async Task SyncPendingTitles_EnvelopeWithEmptyRecords_ReturnsZero()
+    {
+        var (svc, _, tenantId) = await SetupSyncServiceWithPayloadAsync("{\"Registros\":[]}");
+
+        var processed = await svc.SyncPendingTitlesAsync(tenantId);
+
+        Assert.Equal(0, processed);
+    }
+
+    [Fact]
+    public async Task SyncPendingTitles_EnvelopeWithNullRecords_ReturnsZero()
+    {
+        var (svc, _, tenantId) = await SetupSyncServiceWithPayloadAsync("{\"Registros\":null}");
+
+        var processed = await svc.SyncPendingTitlesAsync(tenantId);
+
+        Assert.Equal(0, processed);
+    }
+
+    [Fact]
+    public async Task SyncPendingTitles_EnvelopeWithMissingRecords_ReturnsZero()
+    {
+        var (svc, _, tenantId) = await SetupSyncServiceWithPayloadAsync("{\"TotalDeRegistros\":0}");
+
+        var processed = await svc.SyncPendingTitlesAsync(tenantId);
+
+        Assert.Equal(0, processed);
+    }
+
+    [Fact]
+    public async Task SyncPendingTitles_ExternalDatesAreNormalizedToUtc()
+    {
+        var payload = "{\"TotalDeRegistros\":1,\"ItensPorPagina\":0,\"PaginaAtual\":0,\"Registros\":[{\"nmCliente\":\"Cliente\",\"nrCNPJ\":\"999\",\"dsEmail\":\"contato@test.com\",\"nrTelefone\":\"\",\"cdTitulo\":1001,\"vlTitulo\":100.0,\"dtVencimento\":\"2026-03-10T00:00:00\",\"dtEmissao\":\"2026-02-01T00:00:00\",\"dsLinkBoleto\":null,\"dsStatus\":\"Aberto\"}],\"Totais\":null}";
+        var (svc, db, tenantId) = await SetupSyncServiceWithPayloadAsync(payload);
+
+        var processed = await svc.SyncPendingTitlesAsync(tenantId);
+
+        Assert.Equal(1, processed);
+
+        var title = await db.Titles.SingleAsync(t => t.UniqueCode == "1001");
+        Assert.Equal(DateTimeKind.Utc, title.DueDate.Kind);
+        Assert.Equal(DateTimeKind.Utc, title.IssueDate.Kind);
     }
 }
 

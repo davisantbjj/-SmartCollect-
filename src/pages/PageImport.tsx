@@ -8,9 +8,11 @@ import type { ShowToast } from "../types";
 export const PageImport = ({
   showToast,
   session,
+  selectedTenantId,
 }: {
   showToast: ShowToast;
   session: StoredSession;
+  selectedTenantId?: string;
 }) => {
   const [tab, setTab] = useState<"upload" | "api">("upload");
   const [dragging, setDragging] = useState(false);
@@ -21,7 +23,9 @@ export const PageImport = ({
   const [syncHealth, setSyncHealth] = useState<SyncHealthResponse | null>(null);
   const [healthLoading, setHealthLoading] = useState(true);
 
-  const canSync = session.role === "Admin";
+  const tenantId = session.role === "Master" ? selectedTenantId : undefined;
+  const requiresTenantSelection = session.role === "Master" && !tenantId;
+  const canSync = session.role === "Admin" || (session.role === "Master" && Boolean(tenantId));
   const layoutColumns = [
     { field: "nome_cliente", type: t("import.type.text"), required: true, example: "Construtora Alpha Ltda." },
     { field: "cnpj", type: t("import.type.text"), required: true, example: "12.345.678/0001-90" },
@@ -38,7 +42,11 @@ export const PageImport = ({
   const loadSyncHealth = async () => {
     try {
       setHealthLoading(true);
-      const data = await getSyncHealth();
+      if (requiresTenantSelection) {
+        setSyncHealth(null);
+        return;
+      }
+      const data = await getSyncHealth(tenantId);
       setSyncHealth(data);
     } catch {
       setSyncHealth(null);
@@ -49,7 +57,7 @@ export const PageImport = ({
 
   useEffect(() => {
     void loadSyncHealth();
-  }, []);
+  }, [tenantId, requiresTenantSelection]);
 
   const handleFile = async (file: File) => {
     if (!file.name.match(/\.(xlsx|csv|xlsm|xls)$/i)) {
@@ -77,7 +85,7 @@ export const PageImport = ({
     try {
       setSyncing1(true);
       showToast(`${ICONS.refresh} ${t("toast.syncStarted")}`, "info");
-      const res = await syncPendingTitles();
+      const res = await syncPendingTitles(tenantId);
       showToast(`${ICONS.checkmark} ${res.message}`, "success");
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("importPage.errors.syncFailed");
@@ -91,7 +99,7 @@ export const PageImport = ({
     try {
       setSyncing2(true);
       showToast(`${ICONS.refresh} ${t("toast.checkingOccurrences")}`, "info");
-      const res = await syncOccurrences();
+      const res = await syncOccurrences(tenantId);
       showToast(`${ICONS.checkmark} ${res.message}`, "success");
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("importPage.errors.checkFailed");
@@ -259,7 +267,7 @@ export const PageImport = ({
               />
               <div className="p-5">
                 <div className="bg-surface-2 rounded-lg px-3.5 py-3 font-mono text-xs text-accent mb-4 border border-border-subtle">
-                  {syncHealth?.endpoints.pendingTitles ?? "GET /titulos-pendentes"}
+                  {syncHealth?.endpoints.pendingTitles ?? "GET /reguacobranca?colecao=1&pageSize=0&pageNumber=0"}
                 </div>
                 <div className="text-[12.5px] leading-[2.1] text-text-secondary mb-4">
                   <div>{t("importPage.api.baseUrl")} <strong className="text-text-primary break-all">{syncHealth?.baseUrl ?? t("importPage.api.notAvailable")}</strong></div>
@@ -290,7 +298,7 @@ export const PageImport = ({
               />
               <div className="p-5">
                 <div className="bg-surface-2 rounded-lg px-3.5 py-3 font-mono text-xs text-accent mb-4 border border-border-subtle">
-                  {syncHealth?.endpoints.occurrences ?? "GET /ocorrencias?data={date}"}
+                  {syncHealth?.endpoints.occurrences ?? "GET /reguacobranca?colecao=2&dtOcorrencia={date}&pageSize=0&pageNumber=0"}
                 </div>
                 <div className="text-[12.5px] leading-[2.1] text-text-secondary mb-4">
                   <div>{t("importPage.api.frequency")} <strong className="text-text-primary">{t("importPage.api.frequencyDaily")}</strong></div>

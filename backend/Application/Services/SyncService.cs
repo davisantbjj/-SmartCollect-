@@ -1,6 +1,7 @@
 namespace SmartCollect.Application.Services;
 
 using System.Globalization;
+using System.Linq;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
@@ -55,24 +56,11 @@ public class SyncService : ISyncService
         using var _ = _dispatchExecutionGuard.BlockTenant(tenantId);
 
         var (http, settings) = await CreateTenantApiClientAsync(tenantId);
-
-        using var response = await http.GetAsync(settings.PendingTitlesPath);
-        if (!response.IsSuccessStatusCode)
-        {
-            var body = await response.Content.ReadAsStringAsync();
-            _logger.LogError(
-                "SyncPendingTitles failed with status {StatusCode} for tenant {TenantId}. Response: {Body}",
-                response.StatusCode,
-                tenantId,
-                body);
-
-            throw new HttpRequestException(
-                $"External API returned {(int)response.StatusCode} while syncing pending titles.",
-                null,
-                response.StatusCode);
-        }
-
-        var externalTitles = await ReadPayloadListAsync<ExternalTitleDto>(response);
+        var externalTitles = await ReadPagedPayloadAsync<ExternalTitleDto>(
+            http,
+            settings.PendingTitlesPath,
+            tenantId,
+            collection: 1);
 
         var defaultUserId = await _db.Users
             .Where(u => u.TenantId == tenantId)
@@ -97,9 +85,10 @@ public class SyncService : ISyncService
         var processed = 0;
         foreach (var item in externalTitles)
         {
+            var uniqueCode = item.TitleCode.ToString(CultureInfo.InvariantCulture);
             try
             {
-                if (string.IsNullOrWhiteSpace(item.UniqueCode) || string.IsNullOrWhiteSpace(item.TaxId))
+                if (string.IsNullOrWhiteSpace(uniqueCode) || string.IsNullOrWhiteSpace(item.TaxId))
                     throw new InvalidOperationException("External title is missing required fields.");
 
                 if (!clientsByTaxId.TryGetValue(item.TaxId, out var client))
@@ -152,12 +141,12 @@ public class SyncService : ISyncService
                     ? parsedStatus
                     : hasContactInfo ? TitleStatus.Open : TitleStatus.PendingData;
 
-                if (titlesByUniqueCode.TryGetValue(item.UniqueCode, out var existing))
+                if (titlesByUniqueCode.TryGetValue(uniqueCode, out var existing))
                 {
                     existing.ClientId = client.Id;
                     existing.Amount = item.Amount;
-                    existing.DueDate = item.DueDate;
-                    existing.IssueDate = item.IssueDate;
+                    existing.DueDate = NormalizeExternalDate(item.DueDate);
+                    existing.IssueDate = NormalizeExternalDate(item.IssueDate);
                     existing.BoletoUrl = item.BoletoUrl;
                     existing.Status = mappedStatus;
 
@@ -178,16 +167,16 @@ public class SyncService : ISyncService
                         Id = Guid.NewGuid(),
                         TenantId = tenantId,
                         ClientId = client.Id,
-                        UniqueCode = item.UniqueCode,
+                        UniqueCode = uniqueCode,
                         Amount = item.Amount,
-                        DueDate = item.DueDate,
-                        IssueDate = item.IssueDate,
+                        DueDate = NormalizeExternalDate(item.DueDate),
+                        IssueDate = NormalizeExternalDate(item.IssueDate),
                         BoletoUrl = item.BoletoUrl,
                         Status = mappedStatus
                     };
 
                     await _db.Titles.AddAsync(title);
-                    titlesByUniqueCode[item.UniqueCode] = title;
+                    titlesByUniqueCode[uniqueCode] = title;
 
                     if (mappedStatus is TitleStatus.Open or TitleStatus.Overdue)
                         titlesEligibleForAutomaticDispatch.Add(title.Id);
@@ -200,7 +189,7 @@ public class SyncService : ISyncService
                 _logger.LogWarning(
                     ex,
                     "Failed processing external title {UniqueCode} for tenant {TenantId}",
-                    item.UniqueCode,
+                    uniqueCode,
                     tenantId);
             }
         }
@@ -240,32 +229,20 @@ public class SyncService : ISyncService
         string occurrencesPathTemplate,
         DateTime referenceDate)
     {
-        var formattedDate = referenceDate.ToString("yyyy-MM-dd");
+        var formattedDate = referenceDate.ToString("yyyyMMdd");
         var occurrencesPath = BuildOccurrencesPath(occurrencesPathTemplate, formattedDate);
-
-        using var response = await http.GetAsync(occurrencesPath);
-        if (!response.IsSuccessStatusCode)
-        {
-            var body = await response.Content.ReadAsStringAsync();
-            _logger.LogError(
-                "SyncOccurrences failed with status {StatusCode} for tenant {TenantId} and date {ReferenceDate}. Response: {Body}",
-                response.StatusCode,
-                tenantId,
-                formattedDate,
-                body);
-
-            throw new HttpRequestException(
-                $"External API returned {(int)response.StatusCode} while syncing occurrences for {formattedDate}.",
-                null,
-                response.StatusCode);
-        }
-
-        var occurrences = await ReadPayloadListAsync<ExternalOccurrenceDto>(response);
+        var occurrences = await ReadPagedPayloadAsync<ExternalOccurrenceDto>(
+            http,
+            occurrencesPath,
+            tenantId,
+            collection: 2,
+            occurrenceDate: formattedDate);
         var processed = 0;
 
         foreach (var occurrence in occurrences)
         {
-            if (string.IsNullOrWhiteSpace(occurrence.UniqueCode))
+            var uniqueCode = occurrence.TitleCode.ToString(CultureInfo.InvariantCulture);
+            if (string.IsNullOrWhiteSpace(uniqueCode))
             {
                 _logger.LogWarning("Occurrence ignored due to missing unique code for tenant {TenantId}", tenantId);
                 continue;
@@ -276,13 +253,13 @@ public class SyncService : ISyncService
                 _logger.LogWarning(
                     "Occurrence ignored due to unknown status '{Status}' for unique code {UniqueCode} in tenant {TenantId}",
                     occurrence.UpdatedStatus,
-                    occurrence.UniqueCode,
+                    uniqueCode,
                     tenantId);
                 continue;
             }
 
             var occurrenceDate = ResolveOccurrenceDate(occurrence, referenceDate);
-            await ProcessOccurrenceAsync(tenantId, occurrence.UniqueCode, newStatus, occurrenceDate);
+            await ProcessOccurrenceAsync(tenantId, uniqueCode, newStatus, occurrenceDate);
             processed++;
         }
 
@@ -348,8 +325,8 @@ public class SyncService : ISyncService
 
         tenant.ExternalApiBaseUrl = baseUrl;
         tenant.ExternalApiDocsUrl = string.IsNullOrWhiteSpace(request.DocsUrl) ? null : request.DocsUrl.Trim();
-        tenant.ExternalApiPendingTitlesPath = NormalizePath(request.PendingTitlesPath, "titulos-pendentes");
-        tenant.ExternalApiOccurrencesPath = NormalizePath(request.OccurrencesPath, "ocorrencias?data={date}");
+        tenant.ExternalApiPendingTitlesPath = NormalizePath(request.PendingTitlesPath, "reguacobranca?colecao=1&pageSize=0&pageNumber=0");
+        tenant.ExternalApiOccurrencesPath = NormalizePath(request.OccurrencesPath, "reguacobranca?colecao=2&dtOcorrencia={date}&pageSize=0&pageNumber=0");
         tenant.ExternalApiAuthScheme = string.IsNullOrWhiteSpace(request.AuthenticationScheme)
             ? "Bearer"
             : request.AuthenticationScheme.Trim();
@@ -372,7 +349,7 @@ public class SyncService : ISyncService
     /// </summary>
     public async Task ProcessOccurrenceAsync(Guid tenantId, string uniqueCode, TitleStatus newStatus, DateTime? occurrenceDate = null)
     {
-        var effectiveOccurrenceDate = (occurrenceDate ?? DateTime.UtcNow).Date;
+        var effectiveOccurrenceDate = NormalizeExternalDateOnly(occurrenceDate ?? DateTime.UtcNow);
         var startDate = effectiveOccurrenceDate;
         var endDate = startDate.AddDays(1);
 
@@ -588,12 +565,12 @@ public class SyncService : ISyncService
     private static DateTime ResolveOccurrenceDate(ExternalOccurrenceDto occurrence, DateTime fallbackDate)
     {
         if (TryParseOccurrenceDate(occurrence.OccurrenceDate, out var parsedDate))
-            return parsedDate;
+            return NormalizeExternalDateOnly(parsedDate);
 
         if (TryParseOccurrenceDate(occurrence.ReferenceDate, out parsedDate))
-            return parsedDate;
+            return NormalizeExternalDateOnly(parsedDate);
 
-        return DateTime.SpecifyKind(fallbackDate.Date, DateTimeKind.Utc);
+        return NormalizeExternalDateOnly(fallbackDate);
     }
 
     private static bool TryParseOccurrenceDate(string? raw, out DateTime occurrenceDate)
@@ -642,15 +619,36 @@ public class SyncService : ISyncService
             or "pendingdata" or "dadospendentes";
     }
 
+    private static DateTime NormalizeExternalDate(DateTime value)
+    {
+        return value.Kind == DateTimeKind.Utc
+            ? value
+            : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+    }
+
+    private static DateTime NormalizeExternalDateOnly(DateTime value)
+    {
+        var date = value.Date;
+        return DateTime.SpecifyKind(date, DateTimeKind.Utc);
+    }
+
     private async Task<List<T>> ReadPayloadListAsync<T>(HttpResponseMessage response)
     {
+        var page = await ReadPayloadPageAsync<T>(response);
+        return page.Items;
+    }
+
+    private sealed record PayloadPage<T>(List<T> Items, int? TotalRecords, int? PageSize, int? PageNumber);
+
+    private async Task<PayloadPage<T>> ReadPayloadPageAsync<T>(HttpResponseMessage response)
+    {
         var json = await response.Content.ReadAsStringAsync();
-        if (string.IsNullOrWhiteSpace(json)) return [];
+        if (string.IsNullOrWhiteSpace(json)) return new PayloadPage<T>([], null, null, null);
 
         try
         {
             var direct = JsonSerializer.Deserialize<List<T>>(json, JsonOptions);
-            if (direct is not null) return direct;
+            if (direct is not null) return new PayloadPage<T>(direct, null, null, null);
         }
         catch (JsonException)
         {
@@ -660,13 +658,21 @@ public class SyncService : ISyncService
         using var document = JsonDocument.Parse(json);
         if (document.RootElement.ValueKind == JsonValueKind.Object)
         {
-            foreach (var propertyName in new[] { "items", "data", "results" })
+            var total = TryGetIntProperty(document.RootElement, "TotalDeRegistros")
+                ?? TryGetIntProperty(document.RootElement, "total");
+            var pageSize = TryGetIntProperty(document.RootElement, "ItensPorPagina")
+                ?? TryGetIntProperty(document.RootElement, "pageSize");
+            var pageNumber = TryGetIntProperty(document.RootElement, "PaginaAtual")
+                ?? TryGetIntProperty(document.RootElement, "pageNumber");
+
+            foreach (var propertyName in new[] { "items", "data", "results", "Registros", "registros" })
             {
                 if (document.RootElement.TryGetProperty(propertyName, out var nested)
                     && nested.ValueKind == JsonValueKind.Array)
                 {
                     var nestedList = JsonSerializer.Deserialize<List<T>>(nested.GetRawText(), JsonOptions);
-                    if (nestedList is not null) return nestedList;
+                    if (nestedList is not null)
+                        return new PayloadPage<T>(nestedList, total, pageSize, pageNumber);
                 }
             }
         }
@@ -675,7 +681,103 @@ public class SyncService : ISyncService
             "External API payload could not be parsed into {TypeName}. Returning empty list.",
             typeof(T).Name);
 
-        return [];
+        return new PayloadPage<T>([], null, null, null);
+    }
+
+    private static int? TryGetIntProperty(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var property))
+            return null;
+
+        return property.ValueKind switch
+        {
+            JsonValueKind.Number when property.TryGetInt32(out var value) => value,
+            JsonValueKind.String when int.TryParse(property.GetString(), out var value) => value,
+            _ => null
+        };
+    }
+
+    private async Task<List<T>> ReadPagedPayloadAsync<T>(
+        HttpClient http,
+        string path,
+        Guid tenantId,
+        int collection,
+        string? occurrenceDate = null)
+    {
+        var pageSize = TryGetQueryInt(path, "pageSize") ?? 0;
+        var pageNumber = TryGetQueryInt(path, "pageNumber") ?? 0;
+        var results = new List<T>();
+        var currentPage = pageNumber;
+        var shouldPaginate = pageSize > 0;
+
+        while (true)
+        {
+            var pagePath = shouldPaginate
+                ? SetQueryParam(path, "pageNumber", currentPage.ToString(CultureInfo.InvariantCulture))
+                : path;
+
+            using var response = await http.GetAsync(pagePath);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                if (collection == 1)
+                {
+                    _logger.LogError(
+                        "SyncPendingTitles failed with status {StatusCode} for tenant {TenantId}. Response: {Body}",
+                        response.StatusCode,
+                        tenantId,
+                        body);
+                }
+                else
+                {
+                    _logger.LogError(
+                        "SyncOccurrences failed with status {StatusCode} for tenant {TenantId} and date {ReferenceDate}. Response: {Body}",
+                        response.StatusCode,
+                        tenantId,
+                        occurrenceDate,
+                        body);
+                }
+
+                throw new HttpRequestException(
+                    $"External API returned {(int)response.StatusCode} while syncing {collection}.",
+                    null,
+                    response.StatusCode);
+            }
+
+            var payload = await ReadPayloadPageAsync<T>(response);
+            var totalReturned = payload.TotalRecords ?? payload.Items.Count;
+
+            _logger.LogInformation(
+                "External API sync returned {Count} items (total {Total}) for tenant {TenantId}, collection {Collection}, date {OccurrenceDate}.",
+                payload.Items.Count,
+                totalReturned,
+                tenantId,
+                collection,
+                occurrenceDate ?? "N/A");
+
+            results.AddRange(payload.Items);
+
+            if (!shouldPaginate)
+                break;
+
+            if (payload.Items.Count == 0)
+                break;
+
+            if (payload.TotalRecords.HasValue && pageSize > 0)
+            {
+                var nextIndex = (currentPage + 1) * pageSize;
+                if (nextIndex >= payload.TotalRecords.Value)
+                    break;
+            }
+            else if (payload.Items.Count < pageSize)
+            {
+                break;
+            }
+
+            currentPage++;
+        }
+
+        return results;
     }
 
     private async Task<(HttpClient HttpClient, ResolvedSyncSettings Settings)> CreateTenantApiClientAsync(
@@ -744,8 +846,8 @@ public class SyncService : ISyncService
         return new ResolvedSyncSettings(
             normalizedBaseUrl,
             docsUrl,
-            NormalizePath(tenant.ExternalApiPendingTitlesPath, "titulos-pendentes"),
-            NormalizePath(tenant.ExternalApiOccurrencesPath, "ocorrencias?data={date}"),
+            NormalizePath(tenant.ExternalApiPendingTitlesPath, "reguacobranca?colecao=1&pageSize=0&pageNumber=0"),
+            NormalizePath(tenant.ExternalApiOccurrencesPath, "reguacobranca?colecao=2&dtOcorrencia={date}&pageSize=0&pageNumber=0"),
             authScheme,
             token,
             !string.IsNullOrWhiteSpace(token));
@@ -779,7 +881,55 @@ public class SyncService : ISyncService
             return templatePath.Replace("{date}", Uri.EscapeDataString(referenceDate), StringComparison.OrdinalIgnoreCase);
 
         var separator = templatePath.Contains('?') ? "&" : "?";
-        return $"{templatePath}{separator}data={Uri.EscapeDataString(referenceDate)}";
+        return $"{templatePath}{separator}dtOcorrencia={Uri.EscapeDataString(referenceDate)}";
+    }
+
+    private static int? TryGetQueryInt(string path, string key)
+    {
+        var queryIndex = path.IndexOf('?', StringComparison.Ordinal);
+        if (queryIndex < 0)
+            return null;
+
+        var query = path[(queryIndex + 1)..];
+        foreach (var pair in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var parts = pair.Split('=', 2, StringSplitOptions.TrimEntries);
+            if (parts.Length == 2 && parts[0].Equals(key, StringComparison.OrdinalIgnoreCase))
+            {
+                if (int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var value))
+                    return value;
+            }
+        }
+
+        return null;
+    }
+
+    private static string SetQueryParam(string path, string key, string value)
+    {
+        var queryIndex = path.IndexOf('?', StringComparison.Ordinal);
+        if (queryIndex < 0)
+            return $"{path}?{key}={value}";
+
+        var basePath = path[..queryIndex];
+        var query = path[(queryIndex + 1)..];
+        var parts = query.Split('&', StringSplitOptions.RemoveEmptyEntries).ToList();
+        var replaced = false;
+
+        for (var i = 0; i < parts.Count; i++)
+        {
+            var kv = parts[i].Split('=', 2, StringSplitOptions.TrimEntries);
+            if (kv.Length > 0 && kv[0].Equals(key, StringComparison.OrdinalIgnoreCase))
+            {
+                parts[i] = kv.Length == 2 ? $"{kv[0]}={value}" : $"{key}={value}";
+                replaced = true;
+                break;
+            }
+        }
+
+        if (!replaced)
+            parts.Add($"{key}={value}");
+
+        return $"{basePath}?{string.Join("&", parts)}";
     }
 
     private sealed record ResolvedSyncSettings(

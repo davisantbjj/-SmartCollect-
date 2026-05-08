@@ -85,8 +85,8 @@ export const PageIntegration = ({
   const [apiHasToken, setApiHasToken] = useState(false);
   const [apiBaseUrl, setApiBaseUrl] = useState("");
   const [apiDocsUrl, setApiDocsUrl] = useState("");
-  const [apiPendingPath, setApiPendingPath] = useState("titulos-pendentes");
-  const [apiOccurrencesPath, setApiOccurrencesPath] = useState("ocorrencias?data={date}");
+  const [apiPendingPath, setApiPendingPath] = useState("reguacobranca?colecao=1&pageSize=0&pageNumber=0");
+  const [apiOccurrencesPath, setApiOccurrencesPath] = useState("reguacobranca?colecao=2&dtOcorrencia={date}&pageSize=0&pageNumber=0");
   const [apiAuthScheme, setApiAuthScheme] = useState("Bearer");
   const [apiToken, setApiToken] = useState("");
   const [clearApiToken, setClearApiToken] = useState(false);
@@ -213,8 +213,8 @@ export const PageIntegration = ({
       const data = await getExternalApiConfig(tenantId);
       setApiBaseUrl(data.baseUrl ?? "");
       setApiDocsUrl(data.docsUrl ?? "");
-      setApiPendingPath(data.pendingTitlesPath ?? "titulos-pendentes");
-      setApiOccurrencesPath(data.occurrencesPath ?? "ocorrencias?data={date}");
+      setApiPendingPath(data.pendingTitlesPath ?? "reguacobranca?colecao=1&pageSize=0&pageNumber=0");
+      setApiOccurrencesPath(data.occurrencesPath ?? "reguacobranca?colecao=2&dtOcorrencia={date}&pageSize=0&pageNumber=0");
       setApiAuthScheme(data.authenticationScheme ?? "Bearer");
       setApiHasToken(Boolean(data.hasToken));
       setClearApiToken(false);
@@ -713,14 +713,14 @@ export const PageIntegration = ({
                   value={apiPendingPath}
                   onChange={e => setApiPendingPath(e.target.value)}
                   disabled={!canEdit}
-                  placeholder="titulos-pendentes"
+                  placeholder="reguacobranca?colecao=1&pageSize=0&pageNumber=0"
                 />
                 <FormInput
                   label={t("integrationPage.api.occurrencesEndpointLabel")}
                   value={apiOccurrencesPath}
                   onChange={e => setApiOccurrencesPath(e.target.value)}
                   disabled={!canEdit}
-                  placeholder="ocorrencias?data={date}"
+                  placeholder="reguacobranca?colecao=2&dtOcorrencia={date}&pageSize=0&pageNumber=0"
                 />
                 <FormSelect
                   label={t("integrationPage.api.authLabel")}

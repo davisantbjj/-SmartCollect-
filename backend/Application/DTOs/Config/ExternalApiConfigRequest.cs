@@ -10,10 +10,10 @@ public class ExternalApiConfigRequest
     public string? DocsUrl { get; set; }
 
     [Required]
-    public string PendingTitlesPath { get; set; } = "titulos-pendentes";
+    public string PendingTitlesPath { get; set; } = "reguacobranca?colecao=1&pageSize=0&pageNumber=0";
 
     [Required]
-    public string OccurrencesPath { get; set; } = "ocorrencias?data={date}";
+    public string OccurrencesPath { get; set; } = "reguacobranca?colecao=2&dtOcorrencia={date}&pageSize=0&pageNumber=0";
 
     [Required]
     public string AuthenticationScheme { get; set; } = "Bearer";

@@ -85,6 +85,12 @@ public class SyncService : ISyncService
         var processed = 0;
         foreach (var item in externalTitles)
         {
+            if (item is null)
+            {
+                _logger.LogWarning("External API returned a null title item for tenant {TenantId}. Item ignored.", tenantId);
+                continue;
+            }
+
             var uniqueCode = item.TitleCode.ToString(CultureInfo.InvariantCulture);
             try
             {
@@ -241,6 +247,12 @@ public class SyncService : ISyncService
 
         foreach (var occurrence in occurrences)
         {
+            if (occurrence is null)
+            {
+                _logger.LogWarning("External API returned a null occurrence item for tenant {TenantId}. Item ignored.", tenantId);
+                continue;
+            }
+
             var uniqueCode = occurrence.TitleCode.ToString(CultureInfo.InvariantCulture);
             if (string.IsNullOrWhiteSpace(uniqueCode))
             {

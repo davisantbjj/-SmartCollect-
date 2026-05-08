@@ -851,7 +851,7 @@
       "tokenConfigured": "Configurado",
       "tokenNotConfigured": "Nao configurado",
       "summaryLastCheck": "Ultima verificacao:",
-      "expectedFields": "Campos esperados no JSON (mesmo layout da planilha): nome_cliente, cnpj, codigo_titulo, valor, data_vencimento, data_emissao, status, email, telefone_whatsapp, link_boleto.",
+      "expectedFields": "Campos esperados no JSON (API Atos): nmCliente, nrCNPJ, dsEmail, nrTelefone, cdTitulo, vlTitulo, dtVencimento, dtEmissao, dsLinkBoleto, dsStatus. Envelope de lista: Registros.",
       "docsUnavailable": "URL de documentação não disponível.",
       "testing": "Testando..."
     },

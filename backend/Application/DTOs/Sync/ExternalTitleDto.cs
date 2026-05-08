@@ -3,14 +3,14 @@ using System.Text.Json.Serialization;
 namespace SmartCollect.Application.DTOs.Sync;
 
 public record ExternalTitleDto(
-    [property: JsonPropertyName("nome_cliente")] string ClientName,
-    [property: JsonPropertyName("cnpj")] string TaxId,
-    [property: JsonPropertyName("email")] string Email,
-    [property: JsonPropertyName("telefone")] string Phone,
-    [property: JsonPropertyName("codigo_unico")] string UniqueCode,
-    [property: JsonPropertyName("valor")] decimal Amount,
-    [property: JsonPropertyName("data_vencimento")] DateTime DueDate,
-    [property: JsonPropertyName("data_emissao")] DateTime IssueDate,
-    [property: JsonPropertyName("link_boleto")] string? BoletoUrl,
-    [property: JsonPropertyName("status")] string Status
+    [property: JsonPropertyName("nmCliente")] string ClientName,
+    [property: JsonPropertyName("nrCNPJ")] string TaxId,
+    [property: JsonPropertyName("dsEmail")] string? Email,
+    [property: JsonPropertyName("nrTelefone")] string? Phone,
+    [property: JsonPropertyName("cdTitulo")] int TitleCode,
+    [property: JsonPropertyName("vlTitulo")] decimal Amount,
+    [property: JsonPropertyName("dtVencimento")] DateTime DueDate,
+    [property: JsonPropertyName("dtEmissao")] DateTime IssueDate,
+    [property: JsonPropertyName("dsLinkBoleto")] string? BoletoUrl,
+    [property: JsonPropertyName("dsStatus")] string Status
 );

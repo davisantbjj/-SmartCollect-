@@ -266,6 +266,15 @@
       "empty": "Nenhuma empresa encontrada.",
       "noPrimary": "Sem contato principal"
     },
+    "summary": {
+      "pendingCompanies": "com pendencias de dados",
+      "noPending": "Nenhuma pendencia de dados"
+    },
+    "filters": {
+      "statusLabel": "Status",
+      "statusAll": "Todos",
+      "statusPending": "Somente pendentes"
+    },
     "actions": {
       "viewContacts": "Ver contatos",
       "addContact": "Adicionar contato",
@@ -875,6 +884,7 @@
   "importPage": {
     "errors": {
       "invalidFormat": "Formato inválido. Use .xlsx ou .csv",
+      "selectTenant": "Selecione uma empresa para importar.",
       "uploadFailed": "Falha no upload.",
       "syncFailed": "Falha na sincronização.",
       "checkFailed": "Falha ao verificar ocorrências."

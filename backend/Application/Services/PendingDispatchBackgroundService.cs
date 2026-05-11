@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SmartCollect.Application.Interfaces;
+using SmartCollect.Domain.Enums;
 
 public class PendingDispatchBackgroundService : BackgroundService
 {
@@ -15,6 +16,7 @@ public class PendingDispatchBackgroundService : BackgroundService
     private readonly ILogger<PendingDispatchBackgroundService> _logger;
     private DateTime _lastPendingTitlesSyncUtc = DateTime.MinValue;
     private DateTime _lastOccurrencesSyncUtc = DateTime.MinValue;
+    private DateTime _lastStatusRefreshUtc = DateTime.MinValue;
 
     public PendingDispatchBackgroundService(
         IServiceScopeFactory scopeFactory,
@@ -31,6 +33,7 @@ public class PendingDispatchBackgroundService : BackgroundService
             try
             {
                 using var scope = _scopeFactory.CreateScope();
+                await RefreshTitleStatusesAsync(scope.ServiceProvider, stoppingToken);
                 await ExecuteAutomaticSyncsAsync(scope.ServiceProvider, stoppingToken);
 
                 var deliveryService = scope.ServiceProvider.GetRequiredService<IDispatchDeliveryService>();
@@ -136,5 +139,83 @@ public class PendingDispatchBackgroundService : BackgroundService
 
         if (shouldSyncOccurrences && anyOccurrenceSyncSucceeded)
             _lastOccurrencesSyncUtc = now;
+    }
+
+    private async Task RefreshTitleStatusesAsync(IServiceProvider services, CancellationToken cancellationToken)
+    {
+        var nowDate = DateTime.UtcNow.Date;
+        if (_lastStatusRefreshUtc.Date == nowDate)
+            return;
+
+        var db = services.GetRequiredService<IAppDbContext>();
+
+        var tenantIds = await db.Tenants
+            .Where(t => t.Active)
+            .Select(t => t.Id)
+            .ToListAsync(cancellationToken);
+
+        if (tenantIds.Count == 0)
+        {
+            _lastStatusRefreshUtc = DateTime.UtcNow;
+            return;
+        }
+
+        foreach (var tenantId in tenantIds)
+        {
+            var titles = await db.Titles
+                .Include(t => t.Client)
+                    .ThenInclude(c => c.Contacts)
+                .Where(t => t.TenantId == tenantId && t.Status != TitleStatus.Paid && t.Status != TitleStatus.Cancelled)
+                .ToListAsync(cancellationToken);
+
+            var changed = 0;
+            foreach (var title in titles)
+            {
+                var hasContactInfo = title.Client.Contacts.Any(c =>
+                    HasMeaningfulEmail(c.Email) || HasMeaningfulPhone(c.WhatsAppPhone));
+
+                var nextStatus = !hasContactInfo
+                    ? TitleStatus.PendingData
+                    : title.DueDate.Date < nowDate
+                        ? TitleStatus.Overdue
+                        : TitleStatus.Open;
+
+                if (title.Status == nextStatus)
+                    continue;
+
+                var oldStatus = title.Status;
+                title.Status = nextStatus;
+                changed += 1;
+
+                await db.TitleHistories.AddAsync(new Domain.Entities.TitleHistory
+                {
+                    Id = Guid.NewGuid(),
+                    TitleId = title.Id,
+                    TenantId = tenantId,
+                    Action = "Atualizacao automatica",
+                    Description = $"Status ajustado de {oldStatus} para {nextStatus} pela verificacao de vencimento"
+                }, cancellationToken);
+            }
+
+            if (changed > 0)
+            {
+                await db.SaveChangesAsync(cancellationToken);
+                _logger.LogInformation("Auto status refresh updated {Count} titles for tenant {TenantId}.", changed, tenantId);
+            }
+        }
+
+        _lastStatusRefreshUtc = DateTime.UtcNow;
+    }
+
+    private static bool HasMeaningfulEmail(string? email)
+        => !string.IsNullOrWhiteSpace(email);
+
+    private static bool HasMeaningfulPhone(string? phone)
+    {
+        if (string.IsNullOrWhiteSpace(phone))
+            return false;
+
+        var digits = new string(phone.Where(char.IsDigit).ToArray());
+        return digits.Length >= 10;
     }
 }

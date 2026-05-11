@@ -107,10 +107,13 @@ export const PageDashboard = ({
         setActivityLogs(act.status === "fulfilled"
           ? act.value.items.map((i, idx) => {
               const normalizedChannel = i.channel.toLowerCase();
+              const parsedTimestamp = new Date(i.timestamp);
+              const dateLabel = parsedTimestamp.toLocaleDateString("pt-BR");
+              const timeLabel = parsedTimestamp.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
 
               return {
                 id: idx + 1,
-                timestamp: new Date(i.timestamp).toLocaleTimeString("pt-BR", { hour12: false }),
+                timestamp: `${dateLabel} ${timeLabel}`,
                 channel: normalizedChannel.includes("both") || normalizedChannel.includes("ambos")
                   ? "both"
                   : normalizedChannel.includes("whatsapp")

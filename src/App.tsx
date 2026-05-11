@@ -71,6 +71,7 @@ export default function SmartCollect() {
       return "";
     }
   });
+  const [contactsSubtitle, setContactsSubtitle] = useState("");
   const [titlesPreset, setTitlesPreset] = useState<{ status: string; token: number } | null>(null);
   const {
     toast,
@@ -384,7 +385,7 @@ export default function SmartCollect() {
     analytics:   <PageAnalytics showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} />,
     titles:      <PageTitles showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} presetStatusFilter={titlesPreset?.status} presetFilterToken={titlesPreset?.token} />,
     import:      <PageImport showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} />,
-    contacts:    <PageContacts showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} />,
+    contacts:    <PageContacts showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} onSubtitleChange={setContactsSubtitle} />,
     sequence:    <PageSequence showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} />,
     templates:   <PageTemplates showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} />,
     integration: <PageIntegration showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} />,
@@ -419,6 +420,7 @@ export default function SmartCollect() {
           unreadToastCount={unreadToastCount}
           onMarkToastLogsRead={markAllToastRead}
           onClearToastLogs={clearToastLogs}
+          contactsSubtitle={contactsSubtitle}
         />
 
         <div className="p-7 pt-3 flex-1 text-text-primary">

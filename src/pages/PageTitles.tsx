@@ -353,7 +353,10 @@ export const PageTitles = ({
         )}
       </div>
 
-      <div className="text-xs text-text-muted mb-2">{totalCount} {t("titles.foundCount")}</div>
+      <div className="text-xs text-text-muted mb-2">
+        {totalCount} {t("titles.foundCount")}
+        {loading && titles.length > 0 ? ` • ${t("common.loading")}` : ""}
+      </div>
 
       <div className="rounded-xl border border-border-subtle overflow-hidden">
         <table className="w-full border-collapse text-[13px]">
@@ -367,7 +370,7 @@ export const PageTitles = ({
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {loading && titles.length === 0 ? (
               <tr><td colSpan={8} className="text-center py-12 text-sm text-text-muted">{t("common.loading")}</td></tr>
             ) : titles.length === 0 ? (
               <tr>
@@ -426,9 +429,9 @@ export const PageTitles = ({
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 mt-4">
-          <Button size="sm" variant="secondary" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>←</Button>
+          <Button size="sm" variant="secondary" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1 || loading}>←</Button>
           <span className="text-sm text-text-secondary">{page} / {totalPages}</span>
-          <Button size="sm" variant="secondary" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>→</Button>
+          <Button size="sm" variant="secondary" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || loading}>→</Button>
         </div>
       )}
 
@@ -499,7 +502,6 @@ export const PageTitles = ({
                   className="bg-surface border border-border-subtle-2 rounded-lg px-[13px] py-[9px] text-[13px] text-text-primary outline-none w-full focus:border-accent"
                 >
                   <option value="Open">{t("badge.open")}</option>
-                  <option value="Overdue">{t("badge.overdue")}</option>
                   <option value="Paid">{t("badge.paid")}</option>
                   <option value="Cancelled">{t("badge.cancelled")}</option>
                 </select>

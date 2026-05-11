@@ -161,36 +161,6 @@ public class TenantService : ITenantService
         tenant.TaxId = taxId;
         tenant.EmailDomain = emailDomain;
 
-        var admin = tenant.Users
-            .Where(u => u.Role == UserRole.Admin)
-            .OrderBy(u => u.CreatedAt)
-            .FirstOrDefault();
-
-        if (request.EditAdminLogin)
-        {
-            if (admin is null)
-                throw new InvalidOperationException("Administrador do tenant não encontrado.");
-
-            var adminName = request.AdminName?.Trim() ?? string.Empty;
-            var adminEmail = request.AdminEmail?.Trim().ToLowerInvariant() ?? string.Empty;
-
-            if (string.IsNullOrWhiteSpace(adminName) || string.IsNullOrWhiteSpace(adminEmail))
-                throw new InvalidOperationException("Nome e e-mail do administrador são obrigatórios.");
-
-            var duplicatedEmail = await _db.Users.AnyAsync(u =>
-                u.Id != admin.Id &&
-                u.Email == adminEmail);
-
-            if (duplicatedEmail)
-                throw new InvalidOperationException("E-mail do administrador já cadastrado no sistema.");
-
-            admin.Name = adminName;
-            admin.Email = adminEmail;
-
-            if (!string.IsNullOrWhiteSpace(request.AdminPassword))
-                admin.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.AdminPassword);
-        }
-
         await _db.SaveChangesAsync();
 
         var titleCount = await _db.Titles.CountAsync(ti => ti.TenantId == tenantId);
@@ -205,8 +175,16 @@ public class TenantService : ITenantService
             tenant.Users.Count,
             titleCount,
             tenant.CreatedAt,
-            admin?.Name,
-            admin?.Email);
+            _db.Users
+                .Where(u => u.TenantId == tenantId && u.Role == UserRole.Admin)
+                .OrderBy(u => u.CreatedAt)
+                .Select(u => u.Name)
+                .FirstOrDefault(),
+            _db.Users
+                .Where(u => u.TenantId == tenantId && u.Role == UserRole.Admin)
+                .OrderBy(u => u.CreatedAt)
+                .Select(u => u.Email)
+                .FirstOrDefault());
     }
 
     public async Task<TenantResponse?> UpdateAccessAsync(Guid tenantId, UpdateTenantAccessRequest request)

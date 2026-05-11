@@ -174,10 +174,6 @@ if (applyMigrationsOnStartup)
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SmartCollect.Infrastructure.Data.AppDbContext>();
 
-    var configuredAdminEmail = (Environment.GetEnvironmentVariable("ADMIN_EMAIL") ?? "admin@atoscapital.com.br")
-        .ToLowerInvariant();
-    var configuredAdminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "Admin@2026!";
-
     // Normalize legacy data: Master users must be cross-tenant (TenantId = null)
     var legacyMasters = db.Set<SmartCollect.Domain.Entities.User>()
         .Where(u => u.Role == SmartCollect.Domain.Enums.UserRole.Master && u.TenantId != null)
@@ -189,12 +185,19 @@ if (applyMigrationsOnStartup)
         db.SaveChanges();
     }
 
-    // Seed: Master user (Atos Capital) if no Master exists yet
+    // Seed: Master user from .env if no Master exists yet
     if (!db.Set<SmartCollect.Domain.Entities.User>().Any(u => u.Role == SmartCollect.Domain.Enums.UserRole.Master))
     {
-        var masterPassword = Environment.GetEnvironmentVariable("MASTER_PASSWORD") ?? "Master@2026!";
-        var masterEmail = Environment.GetEnvironmentVariable("MASTER_EMAIL") ?? "master@atoscapital.com.br";
-        var masterName = Environment.GetEnvironmentVariable("MASTER_NAME") ?? "Atos Capital Master";
+        var masterPassword = Environment.GetEnvironmentVariable("MASTER_PASSWORD");
+        var masterEmail = Environment.GetEnvironmentVariable("MASTER_EMAIL");
+        var masterName = Environment.GetEnvironmentVariable("MASTER_NAME");
+
+        if (string.IsNullOrWhiteSpace(masterEmail))
+            throw new InvalidOperationException("MASTER_EMAIL is not configured in .env/environment.");
+        if (string.IsNullOrWhiteSpace(masterPassword))
+            throw new InvalidOperationException("MASTER_PASSWORD is not configured in .env/environment.");
+        if (string.IsNullOrWhiteSpace(masterName))
+            throw new InvalidOperationException("MASTER_NAME is not configured in .env/environment.");
 
         db.Set<SmartCollect.Domain.Entities.User>().Add(new SmartCollect.Domain.Entities.User
         {
@@ -210,59 +213,6 @@ if (applyMigrationsOnStartup)
         db.SaveChanges();
     }
 
-    // Seed: Default tenant + Admin if DB is empty
-    if (!db.Set<SmartCollect.Domain.Entities.Tenant>().Any())
-    {
-        var tenantId = Guid.NewGuid();
-        db.Set<SmartCollect.Domain.Entities.Tenant>().Add(new SmartCollect.Domain.Entities.Tenant
-        {
-            Id = tenantId,
-            CompanyName = "Atos Capital",
-            TaxId = "00000000000000",
-            EmailDomain = "atoscapital.com.br"
-        });
-
-        db.Set<SmartCollect.Domain.Entities.User>().Add(new SmartCollect.Domain.Entities.User
-        {
-            Id = Guid.NewGuid(),
-            TenantId = tenantId,
-            Name = "Administrador",
-            Email = configuredAdminEmail,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(configuredAdminPassword),
-            Role = SmartCollect.Domain.Enums.UserRole.Admin,
-            Active = true
-        });
-
-        db.SaveChanges();
-    }
-
-    var firstTenantId = db.Set<SmartCollect.Domain.Entities.Tenant>()
-        .OrderBy(t => t.CreatedAt)
-        .Select(t => t.Id)
-        .FirstOrDefault();
-
-    if (firstTenantId != Guid.Empty)
-    {
-        var hasConfiguredAdmin = db.Set<SmartCollect.Domain.Entities.User>().Any(u =>
-            u.TenantId == firstTenantId &&
-            u.Email == configuredAdminEmail);
-
-        if (!hasConfiguredAdmin)
-        {
-            db.Set<SmartCollect.Domain.Entities.User>().Add(new SmartCollect.Domain.Entities.User
-            {
-                Id = Guid.NewGuid(),
-                TenantId = firstTenantId,
-                Name = "Administrador",
-                Email = configuredAdminEmail,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(configuredAdminPassword),
-                Role = SmartCollect.Domain.Enums.UserRole.Admin,
-                Active = true
-            });
-
-            db.SaveChanges();
-        }
-    }
 
         using var unlockConnection = new NpgsqlConnection(connectionBuilder.ConnectionString);
         unlockConnection.Open();

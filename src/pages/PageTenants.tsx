@@ -42,7 +42,6 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
   const [editLoading, setEditLoading] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const [editingTenantId, setEditingTenantId] = useState<string | null>(null);
-  const [editAdminLogin, setEditAdminLogin] = useState(false);
   const [createAdminLogin, setCreateAdminLogin] = useState(true);
   const [currentAdmin, setCurrentAdmin] = useState<{ name: string; email: string } | null>(null);
   const [form, setForm] = useState<TenantForm>(defaultForm);
@@ -127,7 +126,6 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
       setEditingTenantId(tenantId);
       setEditOpen(true);
       setEditLoading(true);
-      setEditAdminLogin(false);
 
       const tenant = await getTenantById(tenantId);
       const adminName = tenant.adminName ?? t("tenants.adminNotInformed");
@@ -161,21 +159,12 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
       return;
     }
 
-    if (editAdminLogin && (!editForm.adminName || !editForm.adminEmail)) {
-      showToast(`${ICONS.warning} ${t("tenants.validation.adminEditRequired")}`, "warn");
-      return;
-    }
-
     try {
       setEditSaving(true);
       await updateTenant(editingTenantId, {
         companyName: editForm.companyName.trim(),
         taxId: onlyDigits(editForm.taxId),
         emailDomain: editForm.emailDomain.trim(),
-        editAdminLogin,
-        adminName: editAdminLogin ? editForm.adminName.trim() : undefined,
-        adminEmail: editAdminLogin ? editForm.adminEmail.trim() : undefined,
-        adminPassword: editAdminLogin && editForm.adminPassword.trim() ? editForm.adminPassword : undefined,
       });
 
       showToast(`${ICONS.checkmark} ${t("tenants.messages.updated")}`, "success");
@@ -308,7 +297,6 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
           setEditOpen(false);
           setEditingTenantId(null);
           setCurrentAdmin(null);
-          setEditAdminLogin(false);
         }}
         title={t("tenants.modalEditTitle")}
         maxWidth={680}
@@ -317,7 +305,6 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
             setEditOpen(false);
             setEditingTenantId(null);
             setCurrentAdmin(null);
-            setEditAdminLogin(false);
           }}>{t("common.cancel")}</Button>
           <Button variant="primary" onClick={handleUpdate}>{editSaving ? t("common.saving") : t("tenants.saveChanges")}</Button>
         </>}
@@ -339,32 +326,6 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
               </div>
             )}
 
-            <div className="col-span-2 flex items-center gap-2 mt-1">
-              <input
-                id="edit-admin-login"
-                type="checkbox"
-                checked={editAdminLogin}
-                onChange={e => setEditAdminLogin(e.target.checked)}
-                className="accent-accent"
-              />
-              <label htmlFor="edit-admin-login" className="text-sm text-text-secondary">{t("tenants.labels.editAdminLogin")}</label>
-            </div>
-
-            {editAdminLogin && (
-              <>
-                <FormInput label={t("tenants.labels.adminName")} value={editForm.adminName} onChange={e => setEditForm(f => ({ ...f, adminName: e.target.value }))} />
-                <FormInput label={t("tenants.labels.adminEmail")} type="email" value={editForm.adminEmail} onChange={e => setEditForm(f => ({ ...f, adminEmail: e.target.value }))} />
-                <div className="col-span-2">
-                  <FormInput
-                    label={t("tenants.labels.adminPasswordOptional")}
-                    type="password"
-                    value={editForm.adminPassword}
-                    onChange={e => setEditForm(f => ({ ...f, adminPassword: e.target.value }))}
-                    placeholder={t("tenants.placeholders.keepBlank")}
-                  />
-                </div>
-              </>
-            )}
           </div>
         )}
       </Modal>

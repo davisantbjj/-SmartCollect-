@@ -8,7 +8,7 @@ import {
   createContact,
   deleteContact,
   getClients,
-  getContactsByClient,
+  getContacts,
   updateClientDispatchPreference,
   updateContact,
   type ClientResponse,
@@ -121,15 +121,20 @@ export const PageContacts = ({
   showToast,
   session,
   selectedTenantId,
+  onSubtitleChange,
 }: {
   showToast: ShowToast;
   session: StoredSession;
   selectedTenantId?: string;
+  onSubtitleChange?: (subtitle: string) => void;
 }) => {
   const [clients, setClients] = useState<ClientResponse[]>([]);
   const [contacts, setContacts] = useState<ContactResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending">("all");
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
   const [companyDetailsClientId, setCompanyDetailsClientId] = useState<string | null>(null);
   const [updatingDispatchClientId, setUpdatingDispatchClientId] = useState<string | null>(null);
   const [settingPrimaryContactId, setSettingPrimaryContactId] = useState<string | null>(null);
@@ -161,8 +166,8 @@ export const PageContacts = ({
       const companyList = await getClients(tenantId);
       setClients(companyList);
 
-      const batches = await Promise.all(companyList.map(c => getContactsByClient(c.id, tenantId).catch(() => [])));
-      setContacts(batches.flat());
+      const contactList = await getContacts(tenantId);
+      setContacts(contactList);
     } catch {
       showToast(`${ICONS.cross} ${t("contactsPage.errors.load")}`, "error");
     } finally {
@@ -174,7 +179,9 @@ export const PageContacts = ({
     void loadAll();
   }, [tenantId, requiresTenantSelection]);
 
-  const companyRows = useMemo<CompanyRow[]>(() => {
+  const isPendingStatus = (status: CompanyRow["status"]) => status !== "complete";
+
+  const baseCompanyRows = useMemo<CompanyRow[]>(() => {
     const s = search.trim().toLowerCase();
 
     const hasEmail = (contact?: ContactResponse | null) => !!contact?.email?.trim();
@@ -215,6 +222,41 @@ export const PageContacts = ({
       })
       .sort((a, b) => a.client.legalName.localeCompare(b.client.legalName, "pt-BR"));
   }, [clients, contacts, search]);
+
+  const pendingCompanyCount = useMemo(
+    () => baseCompanyRows.filter(row => isPendingStatus(row.status)).length,
+    [baseCompanyRows]
+  );
+
+  useEffect(() => {
+    if (!onSubtitleChange) return;
+    const nextSubtitle = requiresTenantSelection
+      ? t("contactsPage.validation.selectTenantView")
+      : loading
+        ? t("common.loading")
+        : pendingCompanyCount === 0
+          ? t("contactsPage.summary.noPending")
+          : `${pendingCompanyCount} ${t("contactsPage.summary.pendingCompanies")}`;
+
+    onSubtitleChange(nextSubtitle);
+
+    return () => onSubtitleChange("");
+  }, [onSubtitleChange, pendingCompanyCount, requiresTenantSelection, loading]);
+
+  const companyRows = useMemo(
+    () => (statusFilter === "pending" ? baseCompanyRows.filter(row => isPendingStatus(row.status)) : baseCompanyRows),
+    [baseCompanyRows, statusFilter]
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter, baseCompanyRows.length]);
+
+  const totalPages = Math.max(1, Math.ceil(companyRows.length / pageSize));
+  const pagedRows = useMemo(
+    () => companyRows.slice((page - 1) * pageSize, page * pageSize),
+    [companyRows, page]
+  );
 
   const selectedCompany = useMemo(
     () => clients.find(c => c.id === companyDetailsClientId) ?? null,
@@ -431,6 +473,17 @@ export const PageContacts = ({
           className="bg-surface-2 border border-border-subtle-2 rounded-lg px-[13px] py-[9px] text-[13px] text-text-primary outline-none flex-1 focus:border-accent"
           disabled={requiresTenantSelection}
         />
+        <div className="min-w-[190px]">
+          <FormSelect
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value as "all" | "pending")}
+            disabled={requiresTenantSelection}
+            aria-label={t("contactsPage.filters.statusLabel")}
+          >
+            <option value="all">{t("contactsPage.filters.statusAll")}</option>
+            <option value="pending">{t("contactsPage.filters.statusPending")}</option>
+          </FormSelect>
+        </div>
         <Button
           variant="primary"
           onClick={openNew}
@@ -447,7 +500,9 @@ export const PageContacts = ({
         </div>
       )}
 
-      <div className="text-xs text-text-muted mb-2">{companyRows.length} {t("contactsPage.table.found")}</div>
+      <div className="text-xs text-text-muted mb-2">
+        {companyRows.length} {t("contactsPage.table.found")}
+      </div>
 
       <div className="rounded-xl border border-border-subtle overflow-hidden">
         <table className="w-full border-collapse text-[13px]">
@@ -463,7 +518,7 @@ export const PageContacts = ({
               <tr><td colSpan={6} className="text-center py-12 text-sm text-text-muted">{t("common.loading")}</td></tr>
             ) : companyRows.length === 0 ? (
               <tr><td colSpan={6} className="text-center py-8 text-sm text-text-muted">{t("contactsPage.table.empty")}</td></tr>
-            ) : companyRows.map(({ client, contacts: companyContacts, primaryContact, status }) => (
+            ) : pagedRows.map(({ client, contacts: companyContacts, primaryContact, status }) => (
               <tr key={client.id} className="border-b border-border-subtle hover:bg-surface-2/50 transition-colors">
                 <td className="px-4 py-[13px]">
                   <div className="font-semibold">{client.legalName}</div>
@@ -497,6 +552,14 @@ export const PageContacts = ({
           </tbody>
         </table>
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-4">
+          <Button size="sm" variant="secondary" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>←</Button>
+          <span className="text-sm text-text-secondary">{page} / {totalPages}</span>
+          <Button size="sm" variant="secondary" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>→</Button>
+        </div>
+      )}
 
       <Modal
         open={!!companyDetailsClientId}

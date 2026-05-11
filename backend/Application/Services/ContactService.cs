@@ -11,10 +11,32 @@ public class ContactService : IContactService
     private readonly IAppDbContext _db;
     public ContactService(IAppDbContext db) => _db = db;
 
+    public async Task<List<ContactResponse>> ListByTenantAsync(Guid tenantId)
+    {
+        return await _db.Contacts
+            .AsNoTracking()
+            .Where(c => c.Client.TenantId == tenantId)
+            .Select(c => new ContactResponse(
+                c.Id,
+                c.ClientId,
+                c.Client.LegalName,
+                c.Client.TaxId,
+                c.Name,
+                c.Department.ToString(),
+                c.Email,
+                c.WhatsAppPhone,
+                c.IsPrimary,
+                c.Client.Titles.Count,
+                HasMeaningfulEmail(c.Email) && HasMeaningfulPhone(c.WhatsAppPhone) ? "complete"
+                    : HasMeaningfulEmail(c.Email) || HasMeaningfulPhone(c.WhatsAppPhone) ? "partial"
+                    : "pending"))
+            .ToListAsync();
+    }
+
     public async Task<List<ContactResponse>> ListByClientAsync(Guid tenantId, Guid clientId)
     {
         return await _db.Contacts
-            .Include(c => c.Client)
+            .AsNoTracking()
             .Where(c => c.ClientId == clientId && c.Client.TenantId == tenantId)
             .Select(c => new ContactResponse(
                 c.Id,

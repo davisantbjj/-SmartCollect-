@@ -16,6 +16,19 @@ public class ContactsController : ControllerBase
 
     private Guid ResolveTenantId(Guid? tenantId) => TenantContextResolver.ResolveTenantOrThrow(User, tenantId);
 
+    [HttpGet("~/api/contacts")]
+    public async Task<IActionResult> ListAll([FromQuery] Guid? tenantId = null)
+    {
+        try
+        {
+            return Ok(await _contactService.ListByTenantAsync(ResolveTenantId(tenantId)));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpGet]
     public async Task<IActionResult> List(Guid clientId, [FromQuery] Guid? tenantId = null)
     {

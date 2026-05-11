@@ -420,10 +420,6 @@ export interface UpdateTenantRequest {
   companyName: string;
   taxId: string;
   emailDomain: string;
-  editAdminLogin: boolean;
-  adminName?: string;
-  adminEmail?: string;
-  adminPassword?: string;
 }
 
 export type TenantUserRole = "Admin" | "Worker";
@@ -768,6 +764,10 @@ export async function getContactsByClient(clientId: string, tenantId?: string) {
   return request<ContactResponse[]>(`/api/clients/${clientId}/contacts${tenantParam(tenantId)}`);
 }
 
+export async function getContacts(tenantId?: string) {
+  return request<ContactResponse[]>(`/api/contacts${tenantParam(tenantId)}`);
+}
+
 export async function createContact(clientId: string, payload: UpsertContactRequest, tenantId?: string) {
   return request<ContactResponse>(`/api/clients/${clientId}/contacts${tenantParam(tenantId)}`, {
     method: "POST",
@@ -795,10 +795,10 @@ export async function deleteContact(clientId: string, contactId: string, tenantI
 
 // ── Import ────────────────────────────────────────────────────────────────
 
-export async function uploadImportFile(file: File) {
+export async function uploadImportFile(file: File, tenantId?: string) {
   const formData = new FormData();
   formData.append("file", file);
-  return request<ImportResultResponse>("/api/import/upload", {
+  return request<ImportResultResponse>(`/api/import/upload${tenantParam(tenantId)}`, {
     method: "POST",
     body: formData,
   });

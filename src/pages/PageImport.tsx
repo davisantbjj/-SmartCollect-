@@ -26,6 +26,7 @@ export const PageImport = ({
   const tenantId = session.role === "Master" ? selectedTenantId : undefined;
   const requiresTenantSelection = session.role === "Master" && !tenantId;
   const canSync = session.role === "Admin" || (session.role === "Master" && Boolean(tenantId));
+  const uploadDisabled = uploading || requiresTenantSelection;
   const layoutColumns = [
     { field: "nome_cliente", type: t("import.type.text"), required: true, example: "Construtora Alpha Ltda." },
     { field: "cnpj", type: t("import.type.text"), required: true, example: "12.345.678/0001-90" },
@@ -64,10 +65,14 @@ export const PageImport = ({
       showToast(`${ICONS.cross} ${t("importPage.errors.invalidFormat")}`, "error");
       return;
     }
+    if (requiresTenantSelection) {
+      showToast(`${ICONS.warning} ${t("importPage.errors.selectTenant")}`, "warn");
+      return;
+    }
     try {
       setUploading(true);
       showToast(`${ICONS.dashboard} ${t("importPage.messages.uploading")} "${file.name}"`, "info");
-      const res = await uploadImportFile(file);
+      const res = await uploadImportFile(file, tenantId);
       setLastResult(res);
       showToast(
         `${ICONS.checkmark} ${res.successRows} ${t("importPage.messages.imported")} · ${res.errorRows} ${t("importPage.messages.errors")}`,
@@ -130,14 +135,33 @@ export const PageImport = ({
 
       {tab === "upload" && (
         <div>
+          {requiresTenantSelection && (
+            <div className="mb-4 rounded-xl border border-border-subtle bg-surface-2/60 px-4 py-3 text-sm text-text-secondary">
+              {t("importPage.errors.selectTenant")}
+            </div>
+          )}
           {/* Drop zone */}
           <div
-            onDragOver={e => { e.preventDefault(); setDragging(true); }}
+            onDragOver={e => {
+              if (uploadDisabled) return;
+              e.preventDefault();
+              setDragging(true);
+            }}
             onDragLeave={() => setDragging(false)}
-            onDrop={e => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
-            onClick={() => !uploading && document.getElementById("sc-file-input")?.click()}
-            className={`border-2 border-dashed rounded-[14px] px-6 py-[52px] text-center cursor-pointer transition-all duration-200 ${
-              dragging ? "border-accent bg-accent/[0.03]" : uploading ? "border-border-subtle-2 opacity-60" : "border-border-subtle-2 bg-surface hover:border-accent/40"
+            onDrop={e => {
+              if (uploadDisabled) return;
+              e.preventDefault();
+              setDragging(false);
+              const f = e.dataTransfer.files[0];
+              if (f) handleFile(f);
+            }}
+            onClick={() => !uploadDisabled && document.getElementById("sc-file-input")?.click()}
+            className={`border-2 border-dashed rounded-[14px] px-6 py-[52px] text-center transition-all duration-200 ${
+              uploadDisabled
+                ? "border-border-subtle-2 opacity-60 cursor-not-allowed"
+                : dragging
+                  ? "border-accent bg-accent/[0.03] cursor-pointer"
+                  : "border-border-subtle-2 bg-surface hover:border-accent/40 cursor-pointer"
             }`}
           >
             <input id="sc-file-input" type="file" accept=".xlsx,.csv,.xlsm,.xls" className="hidden"

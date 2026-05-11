@@ -481,6 +481,7 @@ export const Topbar = ({
   unreadToastCount,
   onMarkToastLogsRead,
   onClearToastLogs,
+  contactsSubtitle,
 }: {
   page: string;
   onImport: () => void;
@@ -493,6 +494,7 @@ export const Topbar = ({
   unreadToastCount: number;
   onMarkToastLogsRead: () => void;
   onClearToastLogs: () => void;
+  contactsSubtitle?: string;
 }) => {
   const [title, subtitle] = PAGE_META[page] || ["SmartCollect", ""];
   const showTenantSelector = session.role === "Master";
@@ -751,7 +753,9 @@ export const Topbar = ({
     ? titlesSubtitle
     : page === "templates"
       ? templatesSubtitle
-      : subtitle;
+      : page === "contacts"
+        ? contactsSubtitle ?? ""
+        : subtitle;
 
   return (
     <div className="h-[60px] bg-surface border-b border-border-subtle flex items-center justify-between px-7 sticky top-0 z-50">

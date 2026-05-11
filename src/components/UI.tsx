@@ -61,14 +61,9 @@ export const ChannelPills = ({ channels }: { channels: string[] }) => (
 
 // ---- Button ----
 type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
-interface ButtonProps {
-  children: ReactNode;
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: "sm" | "md";
-  onClick?: () => void;
-  className?: string;
-  disabled?: boolean;
-  type?: "button" | "submit" | "reset";
 }
 
 const buttonVariants: Record<ButtonVariant, string> = {
@@ -78,12 +73,13 @@ const buttonVariants: Record<ButtonVariant, string> = {
   ghost:     "bg-transparent text-text-secondary hover:text-text-primary",
 };
 
-export const Button = ({ children, variant = "secondary", size = "md", onClick, className = "", disabled = false, type = "button" }: ButtonProps) => {
+export const Button = ({ children, variant = "secondary", size = "md", onClick, className = "", disabled = false, type = "button", title }: ButtonProps) => {
   const sizeClass = size === "sm" ? "px-3 py-1.5 text-xs" : "px-[18px] py-[9px] text-[13px]";
   return (
     <button
       type={type}
       disabled={disabled}
+      title={title}
       className={`inline-flex items-center gap-[7px] border-none rounded-[9px] font-sans font-semibold transition-all duration-[170ms] whitespace-nowrap ${sizeClass} ${buttonVariants[variant]} ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"} ${className}`}
       onClick={disabled ? undefined : onClick}
     >{children}</button>

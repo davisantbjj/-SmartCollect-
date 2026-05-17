@@ -110,9 +110,18 @@ public class TitlesController : ControllerBase
         try
         {
             var success = await _titleService.SendCollectionAsync(ResolveTenantIdForWrite(tenantId), id, request);
-            return success
-                ? Ok(new { message = request?.UseQuickTemplate == true ? "Cobrança rápida enviada." : "Disparos de cobrança agendados." })
-                : BadRequest(new { message = "Não foi possível cobrar este título. Verifique o status e os contatos." });
+            if (!success)
+                return BadRequest(new { message = "Não foi possível cobrar este título. Verifique o status e os contatos." });
+
+            var isThankYouQuick = request?.UseQuickTemplate == true
+                && string.Equals(request.TemplateType, "ThankYou", StringComparison.OrdinalIgnoreCase);
+
+            return Ok(new
+            {
+                message = request?.UseQuickTemplate == true
+                    ? isThankYouQuick ? "Agradecimento rápido enviado." : "Cobrança rápida enviada."
+                    : "Disparos de cobrança agendados."
+            });
         }
         catch (InvalidOperationException ex)
         {

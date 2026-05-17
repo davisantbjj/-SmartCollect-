@@ -228,16 +228,22 @@ public class TitleService : ITitleService
 
         if (title is null) return false;
 
+        var isThankYouQuickTemplate = request?.UseQuickTemplate == true
+            && string.Equals(request.TemplateType, "ThankYou", StringComparison.OrdinalIgnoreCase);
+
         // RN06: Never collect on paid/cancelled titles
-        if (title.Status == TitleStatus.Paid || title.Status == TitleStatus.Cancelled)
+        if (!isThankYouQuickTemplate && (title.Status == TitleStatus.Paid || title.Status == TitleStatus.Cancelled))
             return false;
+
+        if (isThankYouQuickTemplate && title.Status != TitleStatus.Paid)
+            throw new InvalidOperationException("Agradecimento rápido só pode ser enviado para títulos pagos.");
 
         var recipientContacts = ResolveCollectionRecipients(title.Client, request?.ContactIds);
         if (recipientContacts.Count == 0)
             return false;
 
         if (request?.UseQuickTemplate == true)
-            return await SendQuickTemplateCollectionAsync(tenantId, title, recipientContacts, request);
+            return await SendQuickTemplateCollectionAsync(tenantId, title, recipientContacts, request, isThankYouQuickTemplate);
 
         var activeRules = await _db.CollectionRules
             .Include(r => r.Triggers)
@@ -313,7 +319,8 @@ public class TitleService : ITitleService
         Guid tenantId,
         Domain.Entities.Title title,
         IReadOnlyList<Domain.Entities.Contact> recipientContacts,
-        SendCollectionRequest request)
+        SendCollectionRequest request,
+        bool isThankYouQuickTemplate)
     {
         if (_dispatchDeliveryService is null)
             throw new InvalidOperationException("Serviço de envio não está disponível.");
@@ -344,7 +351,9 @@ public class TitleService : ITitleService
         }
 
         var subjectTemplate = string.IsNullOrWhiteSpace(request.Subject)
-            ? $"Cobrança do título {title.UniqueCode}"
+            ? isThankYouQuickTemplate
+                ? $"Agradecimento pelo pagamento do título {title.UniqueCode}"
+                : $"Cobrança do título {title.UniqueCode}"
             : request.Subject.Trim();
 
         var tenantCompanyName = await _db.Tenants
@@ -406,18 +415,25 @@ public class TitleService : ITitleService
         }
 
         if (sentChannels.Count == 0)
-            throw new InvalidOperationException($"Falha ao enviar cobrança rápida. {string.Join(" | ", failedChannels)}");
+        {
+            var failureMessage = isThankYouQuickTemplate
+                ? "Falha ao enviar agradecimento rápido."
+                : "Falha ao enviar cobrança rápida.";
+            throw new InvalidOperationException($"{failureMessage} {string.Join(" | ", failedChannels)}");
+        }
 
         var details = string.Join(". ", sentChannels);
         if (failedChannels.Count > 0)
             details = $"{details}. Falhas parciais: {string.Join(" | ", failedChannels)}";
+
+        var actionLabel = isThankYouQuickTemplate ? "Agradecimento manual enviado" : "Cobranca manual rapida";
 
         await _db.TitleHistories.AddAsync(new Domain.Entities.TitleHistory
         {
             Id = Guid.NewGuid(),
             TitleId = title.Id,
             TenantId = tenantId,
-            Action = "Cobranca manual rapida",
+            Action = actionLabel,
             Description = details
         });
 

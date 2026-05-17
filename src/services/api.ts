@@ -180,6 +180,7 @@ export interface SendCollectionRequest {
   subject?: string;
   body?: string;
   contactIds?: string[];
+  templateType?: "Collection" | "ThankYou";
 }
 
 export interface UpdateTitleStatusRequest {

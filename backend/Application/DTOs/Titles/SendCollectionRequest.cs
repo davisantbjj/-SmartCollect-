@@ -5,5 +5,6 @@ public record SendCollectionRequest(
     string? Channel,
     string? Subject,
     string? Body,
-    List<Guid>? ContactIds = null
+    List<Guid>? ContactIds = null,
+    string? TemplateType = null
 );

@@ -283,6 +283,7 @@ export const PageTitles = ({
               channel: quickChannel,
               subject: quickSubject,
               body: quickBody,
+              templateType: quickTemplateType,
             }
           : {}),
         ...(selectedContactIds.length > 0 ? { contactIds: selectedContactIds } : {}),
@@ -293,7 +294,10 @@ export const PageTitles = ({
         useQuickTemplate || selectedContactIds.length > 0 ? payload : undefined,
         tenantId
       );
-      showToast(`${ICONS.checkmark} ${t("toast.manualCollectionSent")}`, "success");
+      const toastKey = useQuickTemplate && quickTemplateType === "ThankYou"
+        ? "toast.manualThankYouSent"
+        : "toast.manualCollectionSent";
+      showToast(`${ICONS.checkmark} ${t(toastKey)}`, "success");
       setCollectOpen(false);
       void load();
     } catch (err) {

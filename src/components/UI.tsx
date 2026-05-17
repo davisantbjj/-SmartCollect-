@@ -261,7 +261,18 @@ export const ActivityLog = ({ logs = [] }: { logs?: ActivityLogEntry[] }) => {
           logs.map((log) => {
             const channel = getChannelIcon(log.channel);
             const isError = log.status === "error";
+            const isPending = log.status === "pending";
+            const isCancelled = log.status === "cancelled";
             const isInfo = log.status === "info";
+            const badgeLabel = isError
+              ? t("activityLog.statusError")
+              : isPending
+                ? "AGENDADO"
+                : isCancelled
+                  ? "CANCELADO"
+                  : isInfo
+                    ? "HISTÓRICO"
+                    : t("activityLog.statusSent");
             return (
               <div
                 key={log.id}
@@ -290,9 +301,9 @@ export const ActivityLog = ({ logs = [] }: { logs?: ActivityLogEntry[] }) => {
                     <span className="text-[11px] text-text-muted whitespace-nowrap">{log.timestamp}</span>
                   </div>
                   <div className="text-xs text-text-secondary leading-[1.4] mb-1.5 line-clamp-2">{log.summary}</div>
-                  <div className={`inline-flex items-center gap-[5px] px-2 py-[3px] rounded-[5px] text-[10px] font-bold ${isError ? "bg-danger/12 text-danger" : isInfo ? "bg-surface-3 text-text-secondary" : "bg-success/12 text-success"}`}>
-                    <span className={`w-1 h-1 rounded-full inline-block ${isError ? "bg-danger" : isInfo ? "bg-text-secondary" : "bg-success"}`} />
-                    {log.status === "error" ? t("activityLog.statusError") : log.status === "info" ? "HISTÓRICO" : t("activityLog.statusSent")}
+                  <div className={`inline-flex items-center gap-[5px] px-2 py-[3px] rounded-[5px] text-[10px] font-bold ${isError ? "bg-danger/12 text-danger" : (isPending || isCancelled || isInfo) ? "bg-surface-3 text-text-secondary" : "bg-success/12 text-success"}`}>
+                    <span className={`w-1 h-1 rounded-full inline-block ${isError ? "bg-danger" : (isPending || isCancelled || isInfo) ? "bg-text-secondary" : "bg-success"}`} />
+                    {badgeLabel}
                   </div>
                 </div>
               </div>

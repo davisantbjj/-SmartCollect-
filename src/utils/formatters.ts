@@ -22,6 +22,19 @@ export const formatIsoDateBR = (value?: string | null) => {
   return parsed.toLocaleDateString("pt-BR", { timeZone: "UTC" });
 };
 
+export const formatDateTimeBR = (value?: string | null) => {
+  if (!value) return "";
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime()))
+    return value;
+
+  const pad = (part: number) => String(part).padStart(2, "0");
+  const date = `${pad(parsed.getDate())}/${pad(parsed.getMonth() + 1)}/${parsed.getFullYear()}`;
+  const time = `${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
+  return `${date} ${time}`;
+};
+
 export const onlyDigits = (value: string) => value.replace(/\D/g, "");
 
 export const formatCnpj = (value: string) => {

@@ -6,7 +6,7 @@ import {
 import { ICONS } from "../utils/icons";
 import { colors } from "../utils/colors";
 import { t } from "../i18n";
-import { formatBRL, formatBRLFull } from "../utils/formatters";
+import { formatBRL, formatBRLFull, formatDateTimeBR } from "../utils/formatters";
 import { KpiCard, CardHeader, ChartTooltip, Button, ActivityLog } from "../components/UI";
 import {
   getDashboardSummary, getDashboardFunnel, getDashboardAging,
@@ -107,13 +107,21 @@ export const PageDashboard = ({
         setActivityLogs(act.status === "fulfilled"
           ? act.value.items.map((i, idx) => {
               const normalizedChannel = i.channel.toLowerCase();
-              const parsedTimestamp = new Date(i.timestamp);
-              const dateLabel = parsedTimestamp.toLocaleDateString("pt-BR");
-              const timeLabel = parsedTimestamp.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
+
+              const normalizedStatus = i.status.toLowerCase();
+              const status = normalizedStatus.includes("error")
+                ? "error"
+                : normalizedStatus.includes("pending")
+                  ? "pending"
+                  : normalizedStatus.includes("cancel")
+                    ? "cancelled"
+                    : normalizedStatus.includes("info")
+                      ? "info"
+                      : "sent";
 
               return {
                 id: idx + 1,
-                timestamp: `${dateLabel} ${timeLabel}`,
+                timestamp: formatDateTimeBR(i.timestamp),
                 channel: normalizedChannel.includes("both") || normalizedChannel.includes("ambos")
                   ? "both"
                   : normalizedChannel.includes("whatsapp")
@@ -121,11 +129,7 @@ export const PageDashboard = ({
                     : normalizedChannel.includes("email")
                       ? "email"
                       : "system",
-                status: i.status.toLowerCase().includes("error")
-                  ? "error"
-                  : i.status.toLowerCase().includes("info")
-                    ? "info"
-                    : "sent",
+                status,
                 recipient: i.recipient,
                 summary: i.summary,
               };

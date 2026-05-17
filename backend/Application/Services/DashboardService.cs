@@ -369,19 +369,37 @@ public class DashboardService : IDashboardService
                 .Include(d => d.Title)
                 .Include(d => d.Contact);
 
-        dispatchQuery = dispatchQuery.Where(d => (d.SentAt ?? d.ScheduledFor) >= start && (d.SentAt ?? d.ScheduledFor) <= end);
+        dispatchQuery = dispatchQuery
+            .Where(d => (d.SentAt ?? d.ScheduledFor) >= start && (d.SentAt ?? d.ScheduledFor) <= end);
 
-        var dispatchItems = await dispatchQuery
+        var dispatchRows = await dispatchQuery
             .OrderByDescending(d => d.SentAt ?? d.ScheduledFor)
             .Take(30)
-            .Select(d => new ActivityLogItem(
-                d.Id,
-                d.SentAt ?? d.ScheduledFor,
-                d.Channel.ToString(),
-                d.Status.ToString(),
-                d.Contact.Name,
-                $"Cobrança ref. {d.Title.UniqueCode}"))
             .ToListAsync();
+
+        var dispatchItems = dispatchRows
+            .Select(d =>
+            {
+                var titleCode = string.IsNullOrWhiteSpace(d.Title?.UniqueCode) ? "sem código" : d.Title.UniqueCode;
+                var recipient = string.IsNullOrWhiteSpace(d.Contact?.Name) ? "Contato não informado" : d.Contact.Name;
+                var timestamp = d.Status is DispatchStatus.Cancelled or DispatchStatus.Error
+                    ? d.UpdatedAt
+                    : d.SentAt ?? d.ScheduledFor;
+                var summary = d.Status == DispatchStatus.Pending
+                    ? $"Agendado: Cobrança ref. {titleCode}"
+                    : d.Status == DispatchStatus.Cancelled
+                        ? $"Agendamento cancelado automaticamente: Cobrança ref. {titleCode}"
+                        : $"Cobrança ref. {titleCode}";
+
+                return new ActivityLogItem(
+                    d.Id,
+                    timestamp,
+                    d.Channel.ToString(),
+                    d.Status.ToString(),
+                    recipient,
+                    summary);
+            })
+            .ToList();
 
         var historyQuery = tenantId.HasValue
             ? _db.TitleHistories
@@ -392,17 +410,20 @@ public class DashboardService : IDashboardService
 
         historyQuery = historyQuery.Where(h => h.CreatedAt >= start && h.CreatedAt <= end);
 
-        var historyItems = await historyQuery
+        var historyRows = await historyQuery
             .OrderByDescending(h => h.CreatedAt)
             .Take(30)
+            .ToListAsync();
+
+        var historyItems = historyRows
             .Select(h => new ActivityLogItem(
                 h.Id,
                 h.CreatedAt,
                 "System",
                 "Info",
-                h.Title.UniqueCode,
+                string.IsNullOrWhiteSpace(h.Title?.UniqueCode) ? "Sistema" : h.Title.UniqueCode,
                 $"{h.Action}: {h.Description}"))
-            .ToListAsync();
+            .ToList();
 
         var items = dispatchItems
             .Concat(historyItems)

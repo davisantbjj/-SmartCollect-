@@ -547,6 +547,7 @@ public class TitleServiceTests
             string recipientEmail,
             string subject,
             string body,
+            string? boletoUrl = null,
             CancellationToken cancellationToken = default)
         {
             QuickEmailCalls++;

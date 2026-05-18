@@ -20,6 +20,14 @@ public class DispatchDeliveryService : IDispatchDeliveryService
     private static readonly Regex TemplateRegex = new("\\{\\{\\s*([a-zA-Z0-9_]+)\\s*\\}\\}", RegexOptions.Compiled);
     private static readonly Regex HtmlTagRegex = new("<\\s*([a-z][a-z0-9]*|!doctype)\\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex StripHtmlRegex = new("<[^>]+>", RegexOptions.Compiled);
+    private const string EmailSurface = "#111827";
+    private const string EmailSurface2 = "#1F2937";
+    private const string EmailSurface3 = "#374151";
+    private const string EmailBorder = "rgba(255, 255, 255, 0.15)";
+    private const string EmailAccent = "#DC2626";
+    private const string EmailText = "#F9FAFB";
+    private const string EmailTextSecondary = "#D1D5DB";
+    private const string EmailTextMuted = "#9CA3AF";
 
     private readonly IAppDbContext _db;
     private readonly IDataProtector _smtpProtector;
@@ -224,7 +232,7 @@ public class DispatchDeliveryService : IDispatchDeliveryService
                         dispatch.Contact.Email,
                         subject,
                         body,
-                        dispatch.Title.BoletoUrl,
+                        dispatch.Trigger.Template.Type == TemplateType.ThankYou ? null : dispatch.Title.BoletoUrl,
                         cancellationToken);
 
                     if (emailResult.Sent)
@@ -338,7 +346,7 @@ public class DispatchDeliveryService : IDispatchDeliveryService
             : $"""
               <tr>
                 <td style="padding: 8px 32px 28px 32px;">
-                  <a href="{WebUtility.HtmlEncode(boletoHref)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#dc2626;color:#ffffff;text-decoration:none;font-family:Arial,sans-serif;font-size:15px;font-weight:700;padding:13px 22px;border-radius:8px;">
+                  <a href="{WebUtility.HtmlEncode(boletoHref)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:{EmailAccent};color:#ffffff;text-decoration:none;font-family:'Plus Jakarta Sans',Arial,sans-serif;font-size:15px;font-weight:800;padding:13px 22px;border-radius:8px;">
                     Boleto
                   </a>
                 </td>
@@ -353,26 +361,26 @@ public class DispatchDeliveryService : IDispatchDeliveryService
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <title>{safeSubject}</title>
           </head>
-          <body style="margin:0;padding:0;background:#f3f4f6;">
-            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f4f6;margin:0;padding:28px 12px;">
+          <body style="margin:0;padding:0;background:{EmailSurface};">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:{EmailSurface};margin:0;padding:28px 12px;">
               <tr>
                 <td align="center">
-                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:{EmailSurface2};border:1px solid {EmailBorder};border-radius:14px;overflow:hidden;">
                     <tr>
-                      <td style="background:#111827;padding:24px 32px;">
-                        <div style="font-family:Arial,sans-serif;color:#ffffff;font-size:20px;font-weight:800;line-height:1.25;">{safeCompanyName}</div>
-                        <div style="font-family:Arial,sans-serif;color:#cbd5e1;font-size:13px;line-height:1.4;margin-top:6px;">{safeSubject}</div>
+                      <td style="background:{EmailSurface3};padding:24px 32px;border-bottom:2px solid {EmailAccent};">
+                        <div style="font-family:'Plus Jakarta Sans',Arial,sans-serif;color:{EmailText};font-size:20px;font-weight:800;line-height:1.25;">{safeCompanyName}</div>
+                        <div style="font-family:'Plus Jakarta Sans',Arial,sans-serif;color:{EmailTextSecondary};font-size:13px;line-height:1.4;margin-top:6px;">{safeSubject}</div>
                       </td>
                     </tr>
                     <tr>
-                      <td style="padding:30px 32px 18px 32px;font-family:Arial,sans-serif;color:#111827;font-size:15px;line-height:1.6;">
+                      <td style="padding:30px 32px 18px 32px;font-family:'Plus Jakarta Sans',Arial,sans-serif;color:{EmailTextSecondary};font-size:15px;line-height:1.6;">
                         {contentHtml}
                       </td>
                     </tr>
                     {boletoButton}
                     <tr>
-                      <td style="border-top:1px solid #e5e7eb;padding:18px 32px;background:#f9fafb;">
-                        <div style="font-family:Arial,sans-serif;color:#6b7280;font-size:12px;line-height:1.5;">
+                      <td style="border-top:1px solid {EmailBorder};padding:18px 32px;background:{EmailSurface3};">
+                        <div style="font-family:'Plus Jakarta Sans',Arial,sans-serif;color:{EmailTextMuted};font-size:12px;line-height:1.5;">
                           Este e-mail é automático. Não responda.
                         </div>
                       </td>

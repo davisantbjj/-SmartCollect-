@@ -383,7 +383,7 @@ public class TitleService : ITitleService
                     contact.Email,
                     subject,
                     body,
-                    title.BoletoUrl);
+                    isThankYouQuickTemplate ? null : title.BoletoUrl);
 
                 if (emailResult.Sent)
                     sentChannels.Add($"E-mail enviado para {contact.Email}");

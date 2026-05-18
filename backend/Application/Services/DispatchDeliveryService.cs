@@ -325,13 +325,15 @@ public class DispatchDeliveryService : IDispatchDeliveryService
 
         if (HtmlTagRegex.IsMatch(content))
         {
-            builder.HtmlBody = BuildStyledHtml(content, subject, companyName, boletoHref);
-            builder.TextBody = BuildTextBody(ToPlainText(content), boletoHref);
+            var htmlContent = RemoveBoletoUrlFromHtml(content, boletoHref);
+            builder.HtmlBody = BuildStyledHtml(htmlContent, subject, companyName, boletoHref);
+            builder.TextBody = BuildTextBody(RemoveBoletoUrlFromText(ToPlainText(content), boletoHref), boletoHref);
         }
         else
         {
-            builder.TextBody = BuildTextBody(content, boletoHref);
-            builder.HtmlBody = BuildStyledHtml(ToSimpleHtml(content), subject, companyName, boletoHref);
+            var textContent = RemoveBoletoUrlFromText(content, boletoHref);
+            builder.TextBody = BuildTextBody(textContent, boletoHref);
+            builder.HtmlBody = BuildStyledHtml(ToSimpleHtml(textContent), subject, companyName, boletoHref);
         }
 
         return builder.ToMessageBody();
@@ -345,8 +347,8 @@ public class DispatchDeliveryService : IDispatchDeliveryService
             ? string.Empty
             : $"""
               <tr>
-                <td style="padding: 8px 32px 28px 32px;">
-                  <a href="{WebUtility.HtmlEncode(boletoHref)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:{EmailAccent};color:#ffffff;text-decoration:none;font-family:'Plus Jakarta Sans',Arial,sans-serif;font-size:15px;font-weight:800;padding:13px 22px;border-radius:8px;">
+                <td align="center" style="padding: 8px 32px 28px 32px;text-align:center;">
+                  <a href="{WebUtility.HtmlEncode(boletoHref)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:{EmailAccent};color:#ffffff;text-decoration:none;font-family:'Plus Jakarta Sans',Arial,sans-serif;font-size:15px;font-weight:800;padding:13px 22px;border-radius:8px;margin:0 auto;">
                     Boleto
                   </a>
                 </td>
@@ -418,6 +420,45 @@ public class DispatchDeliveryService : IDispatchDeliveryService
         var withBreaks = Regex.Replace(html ?? string.Empty, "<\\s*br\\s*/?\\s*>", "\n", RegexOptions.IgnoreCase);
         var withoutTags = StripHtmlRegex.Replace(withBreaks, " ");
         return WebUtility.HtmlDecode(withoutTags).Trim();
+    }
+
+    private static string RemoveBoletoUrlFromText(string content, string? boletoHref)
+    {
+        if (string.IsNullOrWhiteSpace(content) || string.IsNullOrWhiteSpace(boletoHref))
+            return content ?? string.Empty;
+
+        var normalized = content
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace("\r", "\n", StringComparison.Ordinal);
+
+        var lines = normalized
+            .Split('\n')
+            .Where(line => !line.Contains(boletoHref, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        return string.Join("\n", lines).Trim();
+    }
+
+    private static string RemoveBoletoUrlFromHtml(string content, string? boletoHref)
+    {
+        if (string.IsNullOrWhiteSpace(content) || string.IsNullOrWhiteSpace(boletoHref))
+            return content ?? string.Empty;
+
+        var escapedUrl = Regex.Escape(boletoHref);
+        var encodedUrl = Regex.Escape(WebUtility.HtmlEncode(boletoHref));
+        var result = content;
+
+        result = Regex.Replace(
+            result,
+            $@"<a\b[^>]*href\s*=\s*[""'](?:{escapedUrl}|{encodedUrl})[""'][^>]*>.*?</a>",
+            string.Empty,
+            RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+        result = Regex.Replace(result, escapedUrl, string.Empty, RegexOptions.IgnoreCase);
+        result = Regex.Replace(result, encodedUrl, string.Empty, RegexOptions.IgnoreCase);
+        result = Regex.Replace(result, @"(Link\s+para\s+pagamento|Pagamento|Boleto)\s*:\s*(<br\s*/?>)?", string.Empty, RegexOptions.IgnoreCase);
+
+        return result.Trim();
     }
 
     private static bool TryNormalizeHttpUrl(string? value, out string? url)

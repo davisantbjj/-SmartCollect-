@@ -56,7 +56,7 @@ export const PageWorkers = ({
       setWorkers(await getWorkers(tenantId));
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("workers.errors.load");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setLoading(false);
     }
@@ -76,19 +76,19 @@ export const PageWorkers = ({
 
   const handleCreate = async () => {
     if (!newName.trim() || !newEmail.trim() || !newPassword) {
-      showToast(`${ICONS.warning} ${t("workers.validation.requiredFields")}`, "warn");
+      showToast(`${t("workers.validation.requiredFields")}`, "warn");
       return;
     }
 
     if (requiresTenantSelection) {
-      showToast(`${ICONS.warning} ${t("workers.validation.selectTenantCreate")}`, "warn");
+      showToast(`${t("workers.validation.selectTenantCreate")}`, "warn");
       return;
     }
 
     try {
       setSaving(true);
       await registerTenantUser(newName.trim(), newEmail.trim(), newPassword, newRole, tenantId);
-      showToast(`${ICONS.checkmark} ${t("workers.messages.created")}`, "success");
+      showToast(`${t("workers.messages.created")}`, "success");
       setCreateOpen(false);
       setNewName("");
       setNewEmail("");
@@ -97,7 +97,7 @@ export const PageWorkers = ({
       await load();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("workers.errors.create");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setSaving(false);
     }
@@ -107,17 +107,17 @@ export const PageWorkers = ({
     if (!selected) return;
 
     if (!editName.trim()) {
-      showToast(`${ICONS.warning} ${t("workers.validation.nameRequired")}`, "warn");
+      showToast(`${t("workers.validation.nameRequired")}`, "warn");
       return;
     }
 
     if (!editEmail.trim()) {
-      showToast(`${ICONS.warning} ${t("workers.validation.emailRequired")}`, "warn");
+      showToast(`${t("workers.validation.emailRequired")}`, "warn");
       return;
     }
 
     if (requiresTenantSelection) {
-      showToast(`${ICONS.warning} ${t("workers.validation.selectTenantUpdate")}`, "warn");
+      showToast(`${t("workers.validation.selectTenantUpdate")}`, "warn");
       return;
     }
 
@@ -129,12 +129,12 @@ export const PageWorkers = ({
         active: selected.active,
         password: editPassword.trim() || undefined,
       }, tenantId);
-      showToast(`${ICONS.checkmark} ${t("workers.messages.updated")}`, "success");
+      showToast(`${t("workers.messages.updated")}`, "success");
       setEditOpen(false);
       await load();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("workers.errors.update");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setSaving(false);
     }
@@ -142,7 +142,7 @@ export const PageWorkers = ({
 
   const handleDelete = async (worker: WorkerResponse) => {
     if (requiresTenantSelection) {
-      showToast(`${ICONS.warning} ${t("workers.validation.selectTenantDelete")}`, "warn");
+      showToast(`${t("workers.validation.selectTenantDelete")}`, "warn");
       return;
     }
 
@@ -152,11 +152,11 @@ export const PageWorkers = ({
     try {
       setDeletingWorkerId(worker.id);
       await deleteWorker(worker.id, tenantId);
-      showToast(`${ICONS.checkmark} ${t("workers.messages.deleted")}`, "success");
+      showToast(`${t("workers.messages.deleted")}`, "success");
       await load();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("workers.errors.delete");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setDeletingWorkerId(null);
     }
@@ -164,7 +164,7 @@ export const PageWorkers = ({
 
   const handleToggleAccess = async (worker: WorkerResponse) => {
     if (requiresTenantSelection) {
-      showToast(`${ICONS.warning} ${t("workers.validation.selectTenantUpdate")}`, "warn");
+      showToast(`${t("workers.validation.selectTenantUpdate")}`, "warn");
       return;
     }
 
@@ -182,13 +182,13 @@ export const PageWorkers = ({
         active: nextActive,
       }, tenantId);
       showToast(
-        `${ICONS.checkmark} ${nextActive ? t("workers.messages.accessReactivated") : t("workers.messages.accessDeactivated")}`,
+        `${nextActive ? t("workers.messages.accessReactivated") : t("workers.messages.accessDeactivated")}`,
         "success"
       );
       await load();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("workers.errors.accessUpdate");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setUpdatingWorkerId(null);
     }
@@ -310,7 +310,7 @@ export const PageWorkers = ({
               disabled={deletingWorkerId === selected.id}
               onClick={() => void handleDelete(selected)}
             >
-              {deletingWorkerId === selected.id ? t("workers.actionDeleting") : `${ICONS.cross} ${t("workers.actionDelete")}`}
+              {deletingWorkerId === selected.id ? t("workers.actionDeleting") : `${t("workers.actionDelete")}`}
             </Button>
           )}
           <Button variant="secondary" onClick={() => setEditOpen(false)}>{t("common.cancel")}</Button>

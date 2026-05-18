@@ -63,7 +63,7 @@ export const PageTemplates = ({
       const data = await getTemplates(tenantId);
       setTemplates(data);
     } catch {
-      showToast(`${ICONS.cross} ${t("templates.errors.load")}`, "error");
+      showToast(`${t("templates.errors.load")}`, "error");
     } finally {
       setLoading(false);
     }
@@ -91,12 +91,12 @@ export const PageTemplates = ({
 
   const handleSave = async () => {
     if (requiresTenantSelection) {
-      showToast(`${ICONS.warning} ${t("templates.validation.selectTenant")}`, "warn");
+      showToast(`${t("templates.validation.selectTenant")}`, "warn");
       return;
     }
 
     if (!form.name || !form.body) {
-      showToast(`${ICONS.warning} ${t("templates.validation.requiredFields")}`, "warn");
+      showToast(`${t("templates.validation.requiredFields")}`, "warn");
       return;
     }
     try {
@@ -113,12 +113,12 @@ export const PageTemplates = ({
           subject: form.subject || undefined, body: form.body,
         }, tenantId);
       }
-      showToast(`${ICONS.checkmark} ${t("toast.templateCreated")}`, "success");
+      showToast(`${t("toast.templateCreated")}`, "success");
       setModalOpen(false);
       void load();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("templates.errors.save");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setSaving(false);
     }
@@ -205,7 +205,7 @@ export const PageTemplates = ({
           {TEMPLATE_VARIABLES.map(v => (
             <span
               key={v}
-              onClick={() => showToast(`${ICONS.clipboard} ${v} ${t("toast.variableCopied")}`, "info")}
+              onClick={() => showToast(`${v} ${t("toast.variableCopied")}`, "info")}
               className="bg-accent/10 text-accent px-3 py-[5px] rounded-full font-mono text-xs cursor-pointer border border-accent/20 hover:bg-accent/[0.16] transition-colors"
             >
               {v}

@@ -91,7 +91,7 @@ export const PageTitles = ({
       setTotalCount(res.totalCount);
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("titles.errors.load");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setLoading(false);
     }
@@ -121,13 +121,13 @@ export const PageTitles = ({
 
   const handleCreate = async () => {
     if (!fClientId || !fCode || !fAmount || !fDue) {
-      showToast(`${ICONS.warning} ${t("titles.validation.requiredFields")}`, "warn");
+      showToast(`${t("titles.validation.requiredFields")}`, "warn");
       return;
     }
     try {
       setSaving(true);
       if (requiresTenantSelection) {
-        showToast(`${ICONS.warning} ${t("titles.validation.selectTenantToCreate")}`, "warn");
+        showToast(`${t("titles.validation.selectTenantToCreate")}`, "warn");
         return;
       }
 
@@ -139,13 +139,13 @@ export const PageTitles = ({
         issueDate: fIssue || fDue,
         boletoUrl: fBoleto || undefined,
       }, tenantId);
-      showToast(`${ICONS.checkmark} ${t("toast.titleCreated")}`, "success");
+      showToast(`${t("toast.titleCreated")}`, "success");
       setModalOpen(false);
       setFClientId(""); setFCode(""); setFAmount(""); setFDue(""); setFIssue(""); setFBoleto("");
       void load();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("titles.errors.save");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setSaving(false);
     }
@@ -161,12 +161,12 @@ export const PageTitles = ({
     if (!selected) return;
 
     if (!statusDraft) {
-      showToast(`${ICONS.warning} ${t("titles.validation.selectStatus")}`, "warn");
+      showToast(`${t("titles.validation.selectStatus")}`, "warn");
       return;
     }
 
     if (statusDraft === selected.status) {
-      showToast(`${ICONS.info} ${t("titles.validation.statusAlreadySet")}`, "info");
+      showToast(`${t("titles.validation.statusAlreadySet")}`, "info");
       return;
     }
 
@@ -175,11 +175,11 @@ export const PageTitles = ({
       const updated = await updateTitleStatus(selected.id, { status: statusDraft }, tenantId);
       setSelected(updated);
       setStatusDraft(updated.status);
-      showToast(`${ICONS.checkmark} ${t("titles.messages.statusUpdated")}`, "success");
+      showToast(`${t("titles.messages.statusUpdated")}`, "success");
       void load();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("titles.errors.statusUpdate");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setStatusSaving(false);
     }
@@ -264,13 +264,13 @@ export const PageTitles = ({
     if (!collectTarget) return;
 
     if (useQuickTemplate && !quickBody.trim()) {
-      showToast(`${ICONS.warning} ${t("titles.validation.quickTemplateMessage")}`, "warn");
+      showToast(`${t("titles.validation.quickTemplateMessage")}`, "warn");
       return;
     }
 
     const selectedContactIds = resolveManualContactIds();
     if (collectRecipientMode !== "companyDefault" && selectedContactIds.length === 0) {
-      showToast(`${ICONS.warning} ${t("titles.validation.selectContact")}`, "warn");
+      showToast(`${t("titles.validation.selectContact")}`, "warn");
       return;
     }
 
@@ -297,12 +297,12 @@ export const PageTitles = ({
       const toastKey = useQuickTemplate && quickTemplateType === "ThankYou"
         ? "toast.manualThankYouSent"
         : "toast.manualCollectionSent";
-      showToast(`${ICONS.checkmark} ${t(toastKey)}`, "success");
+      showToast(`${t(toastKey)}`, "success");
       setCollectOpen(false);
       void load();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("titles.errors.sendCollection");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setCollecting(false);
     }
@@ -317,7 +317,7 @@ export const PageTitles = ({
       setHistoryItems(items);
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("titles.errors.historyLoad");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
       setHistoryItems([]);
     } finally {
       setHistoryLoading(false);
@@ -336,7 +336,7 @@ export const PageTitles = ({
         <input
           value={search}
           onChange={e => { setSearch(e.target.value); setPage(1); }}
-          placeholder={`${ICONS.search}  ${t("titles.searchPlaceholder")}`}
+          placeholder={`${t("titles.searchPlaceholder")}`}
           className="bg-surface-2 border border-border-subtle-2 rounded-lg px-[13px] py-[9px] text-[13px] text-text-primary outline-none flex-1 min-w-[220px] focus:border-accent"
         />
         <select

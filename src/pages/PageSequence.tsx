@@ -93,7 +93,7 @@ export const PageSequence = ({
       setTemplates(tpl.filter(t => t.active));
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("sequence.errors.load");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setLoading(false);
     }
@@ -173,22 +173,22 @@ export const PageSequence = ({
 
   const handleSave = async () => {
     if (requiresTenantSelection) {
-      showToast(`${ICONS.warning} ${t("sequence.validation.selectTenant")}`, "warn");
+      showToast(`${t("sequence.validation.selectTenant")}`, "warn");
       return;
     }
 
     if (!ruleName.trim()) {
-      showToast(`${ICONS.warning} ${t("sequence.validation.nameRequired")}`, "warn");
+      showToast(`${t("sequence.validation.nameRequired")}`, "warn");
       return;
     }
 
     if (triggers.length === 0) {
-      showToast(`${ICONS.warning} ${t("sequence.validation.addTrigger")}`, "warn");
+      showToast(`${t("sequence.validation.addTrigger")}`, "warn");
       return;
     }
 
     if (triggers.some(tr => !tr.templateId)) {
-      showToast(`${ICONS.warning} ${t("sequence.validation.triggerNeedsTemplate")}`, "warn");
+      showToast(`${t("sequence.validation.triggerNeedsTemplate")}`, "warn");
       return;
     }
 
@@ -210,16 +210,16 @@ export const PageSequence = ({
       setSaving(true);
       if (editingRuleId) {
         await updateCollectionRule(editingRuleId, payload, tenantId);
-        showToast(`${ICONS.checkmark} ${t("sequence.messages.updated")}`, "success");
+        showToast(`${t("sequence.messages.updated")}`, "success");
       } else {
         await createCollectionRule(payload, tenantId);
-        showToast(`${ICONS.checkmark} ${t("sequence.messages.created")}`, "success");
+        showToast(`${t("sequence.messages.created")}`, "success");
       }
       setEditorOpen(false);
       await load();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("sequence.errors.save");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setSaving(false);
     }
@@ -230,12 +230,12 @@ export const PageSequence = ({
       return;
 
     if (requiresTenantSelection) {
-      showToast(`${ICONS.warning} ${t("sequence.validation.selectTenantDelete")}`, "warn");
+      showToast(`${t("sequence.validation.selectTenantDelete")}`, "warn");
       return;
     }
 
     if (rule.isDefault) {
-      showToast(`${ICONS.info} ${t("sequence.validation.cannotDeleteDefault")}`, "info");
+      showToast(`${t("sequence.validation.cannotDeleteDefault")}`, "info");
       return;
     }
 
@@ -246,11 +246,11 @@ export const PageSequence = ({
     try {
       setDeletingRuleId(rule.id);
       await deleteCollectionRule(rule.id, tenantId);
-      showToast(`${ICONS.checkmark} ${t("sequence.messages.deleted")}`, "success");
+      showToast(`${t("sequence.messages.deleted")}`, "success");
       await load();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("sequence.errors.delete");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setDeletingRuleId(null);
     }

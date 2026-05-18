@@ -53,7 +53,7 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
       setTenants(await getTenants());
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("tenants.errors.load");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setLoading(false);
     }
@@ -65,12 +65,12 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
 
   const handleCreate = async () => {
     if (!form.companyName || !form.taxId || !form.emailDomain) {
-      showToast(`${ICONS.warning} ${t("tenants.validation.companyRequired")}`, "warn");
+      showToast(`${t("tenants.validation.companyRequired")}`, "warn");
       return;
     }
 
     if (createAdminLogin && (!form.adminName || !form.adminEmail || !form.adminPassword)) {
-      showToast(`${ICONS.warning} ${t("tenants.validation.adminRequired")}`, "warn");
+      showToast(`${t("tenants.validation.adminRequired")}`, "warn");
       return;
     }
 
@@ -84,14 +84,14 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
         adminEmail: createAdminLogin ? form.adminEmail.trim() : undefined,
         adminPassword: createAdminLogin ? form.adminPassword : undefined,
       });
-      showToast(`${ICONS.checkmark} ${t("tenants.messages.created")}`, "success");
+      showToast(`${t("tenants.messages.created")}`, "success");
       setOpen(false);
       setForm(defaultForm);
       setCreateAdminLogin(true);
       await load();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("tenants.errors.create");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setSaving(false);
     }
@@ -109,13 +109,13 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
       setUpdatingTenantId(tenant.id);
       await updateTenantAccess(tenant.id, { active: nextActive });
       showToast(
-        `${ICONS.checkmark} ${nextActive ? t("tenants.messages.accessReactivated") : t("tenants.messages.accessRemoved")}`,
+        `${nextActive ? t("tenants.messages.accessReactivated") : t("tenants.messages.accessRemoved")}`,
         "success"
       );
       await load();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("tenants.errors.accessUpdate");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setUpdatingTenantId(null);
     }
@@ -142,7 +142,7 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
       setCurrentAdmin({ name: adminName, email: adminEmail });
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("tenants.errors.loadDetails");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
       setEditOpen(false);
       setEditingTenantId(null);
       setCurrentAdmin(null);
@@ -155,7 +155,7 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
     if (!editingTenantId) return;
 
     if (!editForm.companyName || !editForm.taxId || !editForm.emailDomain) {
-      showToast(`${ICONS.warning} ${t("tenants.validation.companyRequired")}`, "warn");
+      showToast(`${t("tenants.validation.companyRequired")}`, "warn");
       return;
     }
 
@@ -167,14 +167,14 @@ export const PageTenants = ({ showToast }: { showToast: ShowToast }) => {
         emailDomain: editForm.emailDomain.trim(),
       });
 
-      showToast(`${ICONS.checkmark} ${t("tenants.messages.updated")}`, "success");
+      showToast(`${t("tenants.messages.updated")}`, "success");
       setEditOpen(false);
       setEditingTenantId(null);
       setCurrentAdmin(null);
       await load();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("tenants.errors.update");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setEditSaving(false);
     }

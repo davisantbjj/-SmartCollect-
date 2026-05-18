@@ -1,6 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { t } from "./i18n";
-import { ICONS } from "./utils/icons";
 import { useToast } from "./hooks/useToast";
 import { Sidebar, Topbar } from "./components/Layout";
 import { LoadingState, Toast } from "./components/UI";
@@ -125,7 +124,7 @@ export default function SmartCollect() {
   useEffect(() => {
     const onUnauthorized = () => {
       setSessionState(null);
-      showToast(`${ICONS.warning} Sessão expirada. Faça login novamente.`, "warn");
+      showToast(`Sessão expirada. Faça login novamente.`, "warn");
     };
     window.addEventListener("smartcollect:unauthorized", onUnauthorized);
     return () => window.removeEventListener("smartcollect:unauthorized", onUnauthorized);
@@ -135,24 +134,24 @@ export default function SmartCollect() {
 
   const goImport = useCallback(() => {
     setPage("import");
-    showToast(`${ICONS.folder} ${t("toast.importAreaOpened")}`, "info");
+    showToast(`${t("toast.importAreaOpened")}`, "info");
   }, [showToast]);
 
   const goOverdueTitles = useCallback(() => {
     if (session?.role === "Master" && !selectedTenantId) {
-      showToast(`${ICONS.warning} Selecione uma empresa para visualizar os títulos inadimplentes.`, "warn");
+      showToast(`Selecione uma empresa para visualizar os títulos inadimplentes.`, "warn");
       return;
     }
 
     setTitlesPreset({ status: "Overdue", token: Date.now() });
     setPage("titles");
-    showToast(`${ICONS.trophy} Exibindo todos os inadimplentes.`, "info");
+    showToast(`Exibindo todos os inadimplentes.`, "info");
   }, [session?.role, selectedTenantId, showToast]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password) {
-      showToast(`${ICONS.warning} Informe e-mail e senha.`, "warn");
+      showToast(`Informe e-mail e senha.`, "warn");
       return;
     }
     try {
@@ -161,10 +160,10 @@ export default function SmartCollect() {
       const s = await login(emailValue, password);
       rememberRecentEmail(emailValue);
       setSessionState(s);
-      showToast(`${ICONS.checkmark} Bem-vindo, ${s.userName}!`, "success");
+      showToast(`Bem-vindo, ${s.userName}!`, "success");
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Falha ao autenticar.";
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setAuthLoading(false);
     }
@@ -180,7 +179,7 @@ export default function SmartCollect() {
     setPage("dashboard");
     setEmail("");
     setPassword("");
-    showToast(`${ICONS.info} Sessão encerrada.`, "info");
+    showToast(`Sessão encerrada.`, "info");
   };
 
   useEffect(() => {
@@ -202,7 +201,7 @@ export default function SmartCollect() {
         if (!cancelled) setTenants(items);
       } catch (err) {
         const msg = err instanceof ApiError ? err.message : "Falha ao carregar empresas.";
-        if (!cancelled) showToast(`${ICONS.cross} ${msg}`, "error");
+        if (!cancelled) showToast(`${msg}`, "error");
       }
     };
 

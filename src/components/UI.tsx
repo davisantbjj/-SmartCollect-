@@ -131,13 +131,11 @@ export const CardHeader = ({ title, subtitle, right }: { title: ReactNode; subti
 
 // ---- Toast ----
 export const Toast = ({ message, type, visible }: { message: string; type: ToastType; visible: boolean }) => {
-  const icons: Record<ToastType, string> = { success: ICONS.checkmark, info: ICONS.info, warn: ICONS.warning, error: ICONS.cross };
-  const normalizedMessage = message.trimStart();
-  const hasLeadingIcon = Object.values(ICONS).some(icon => normalizedMessage.startsWith(icon));
+  const icons: Record<ToastType, ReactNode> = { success: ICONS.checkmark, info: ICONS.info, warn: ICONS.warning, error: ICONS.cross };
 
   return (
     <div className={`fixed bottom-6 right-6 z-[9999] bg-surface-2 border border-border-subtle-2 rounded-[10px] px-[18px] py-3 flex items-center gap-2.5 text-[13px] font-medium shadow-[0_12px_36px_rgba(0,0,0,0.5)] max-w-[340px] transition-transform duration-300 ease-[cubic-bezier(.4,0,.2,1)] ${visible ? "translate-x-0" : "translate-x-[140%]"}`}>
-      {!hasLeadingIcon && <span className="text-[15px]">{icons[type] || ICONS.checkmark}</span>}
+      <span className="text-[15px]">{icons[type] || ICONS.checkmark}</span>
       {message}
     </div>
   );
@@ -194,7 +192,7 @@ export const Modal = ({ open, onClose, title, children, footer, maxWidth = 560 }
 interface KpiCardProps {
   label: string;
   value: string;
-  icon: string;
+  icon: ReactNode;
   delta: string;
   deltaDir: "up" | "down";
   accentColor: string;
@@ -234,7 +232,7 @@ export const ChartTooltip = ({ active, payload, label }: any) => {
 // ---- ActivityLog ----
 export const ActivityLog = ({ logs = [] }: { logs?: ActivityLogEntry[] }) => {
   const getChannelIcon = (channel: string) => {
-    const icons: Record<string, { symbol: string; label: string; color: string }> = {
+    const icons: Record<string, { symbol: ReactNode; label: string; color: string }> = {
       both:      { symbol: ICONS.link, label: "E-mail + WhatsApp", color: colors.accent },
       wa:        { symbol: ICONS.chat, label: "WhatsApp",  color: colors.wa },
       instagram: { symbol: ICONS.camera, label: "Instagram", color: "#E4405F" },

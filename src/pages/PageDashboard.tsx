@@ -140,7 +140,7 @@ export const PageDashboard = ({
         {
           if (!fullFailureWarnedRef.current)
           {
-            showToast(`${ICONS.cross} ${t("dashboardPage.errors.load")}`, "error");
+            showToast(`${t("dashboardPage.errors.load")}`, "error");
             fullFailureWarnedRef.current = true;
           }
         }
@@ -149,7 +149,7 @@ export const PageDashboard = ({
           fullFailureWarnedRef.current = false;
           if (failed > 0 && !partialFailureWarnedRef.current)
           {
-            showToast(`${ICONS.warning} ${t("dashboardPage.errors.partial")}`, "warn");
+            showToast(`${t("dashboardPage.errors.partial")}`, "warn");
             partialFailureWarnedRef.current = true;
           }
 
@@ -157,7 +157,7 @@ export const PageDashboard = ({
             partialFailureWarnedRef.current = false;
         }
       } catch {
-        if (!cancelled) showToast(`${ICONS.cross} ${t("dashboardPage.errors.load")}`, "error");
+        if (!cancelled) showToast(`${t("dashboardPage.errors.load")}`, "error");
       } finally {
         if (!cancelled) setLoading(false);
       }

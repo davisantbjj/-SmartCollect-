@@ -62,25 +62,25 @@ export const PageImport = ({
 
   const handleFile = async (file: File) => {
     if (!file.name.match(/\.(xlsx|csv|xlsm|xls)$/i)) {
-      showToast(`${ICONS.cross} ${t("importPage.errors.invalidFormat")}`, "error");
+      showToast(`${t("importPage.errors.invalidFormat")}`, "error");
       return;
     }
     if (requiresTenantSelection) {
-      showToast(`${ICONS.warning} ${t("importPage.errors.selectTenant")}`, "warn");
+      showToast(`${t("importPage.errors.selectTenant")}`, "warn");
       return;
     }
     try {
       setUploading(true);
-      showToast(`${ICONS.dashboard} ${t("importPage.messages.uploading")} "${file.name}"`, "info");
+      showToast(`${t("importPage.messages.uploading")} "${file.name}"`, "info");
       const res = await uploadImportFile(file, tenantId);
       setLastResult(res);
       showToast(
-        `${ICONS.checkmark} ${res.successRows} ${t("importPage.messages.imported")} · ${res.errorRows} ${t("importPage.messages.errors")}`,
+        `${res.successRows} ${t("importPage.messages.imported")} · ${res.errorRows} ${t("importPage.messages.errors")}`,
         res.errorRows > 0 ? "warn" : "success"
       );
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("importPage.errors.uploadFailed");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setUploading(false);
     }
@@ -89,12 +89,12 @@ export const PageImport = ({
   const handleSync1 = async () => {
     try {
       setSyncing1(true);
-      showToast(`${ICONS.refresh} ${t("toast.syncStarted")}`, "info");
+      showToast(`${t("toast.syncStarted")}`, "info");
       const res = await syncPendingTitles(tenantId);
-      showToast(`${ICONS.checkmark} ${res.message}`, "success");
+      showToast(`${res.message}`, "success");
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("importPage.errors.syncFailed");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setSyncing1(false);
     }
@@ -103,12 +103,12 @@ export const PageImport = ({
   const handleSync2 = async () => {
     try {
       setSyncing2(true);
-      showToast(`${ICONS.refresh} ${t("toast.checkingOccurrences")}`, "info");
+      showToast(`${t("toast.checkingOccurrences")}`, "info");
       const res = await syncOccurrences(tenantId);
-      showToast(`${ICONS.checkmark} ${res.message}`, "success");
+      showToast(`${res.message}`, "success");
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("importPage.errors.checkFailed");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setSyncing2(false);
     }
@@ -166,7 +166,7 @@ export const PageImport = ({
           >
             <input id="sc-file-input" type="file" accept=".xlsx,.csv,.xlsm,.xls" className="hidden"
               onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])} />
-            <div className="text-[42px] mb-3.5">{uploading ? "⏳" : ICONS.dashboard}</div>
+            <div className="text-[42px] mb-3.5">{uploading ? ICONS.hourglass : ICONS.dashboard}</div>
             <div className="font-extrabold text-base mb-1.5">
               {uploading ? t("importPage.messages.processing") : t("import.dragOrClick")}
             </div>

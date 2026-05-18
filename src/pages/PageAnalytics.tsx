@@ -82,7 +82,7 @@ export const PageAnalytics = ({
         });
       } catch (err) {
         const msg = err instanceof ApiError ? err.message : t("analyticsPage.errors.load");
-        if (!cancelled) showToast(`${ICONS.cross} ${msg}`, "error");
+        if (!cancelled) showToast(`${msg}`, "error");
       } finally {
         if (!cancelled) setLoading(false);
       }

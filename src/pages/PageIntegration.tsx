@@ -135,7 +135,7 @@ export const PageIntegration = ({
         if (err instanceof ApiError && err.status === 404) {
           setIsConfigured(false);
         } else {
-          showToast(`${ICONS.cross} ${t("integrationPage.errors.loadSmtp")}`, "error");
+          showToast(`${t("integrationPage.errors.loadSmtp")}`, "error");
         }
       } finally {
         setLoading(false);
@@ -165,7 +165,7 @@ export const PageIntegration = ({
       if (err instanceof ApiError && err.status === 404) {
         setWaConfigured(false);
       } else {
-        showToast(`${ICONS.cross} ${t("integrationPage.errors.loadWhatsApp")}`, "error");
+        showToast(`${t("integrationPage.errors.loadWhatsApp")}`, "error");
       }
     } finally {
       setWaLoading(false);
@@ -189,7 +189,7 @@ export const PageIntegration = ({
       setSyncHealth(data);
     } catch (err) {
       if (!(err instanceof ApiError && err.status === 403)) {
-        showToast(`${ICONS.cross} ${t("integrationPage.errors.validateExternal")}`, "error");
+        showToast(`${t("integrationPage.errors.validateExternal")}`, "error");
       }
       setSyncHealth(null);
     } finally {
@@ -221,7 +221,7 @@ export const PageIntegration = ({
       setApiToken("");
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("integrationPage.errors.loadApiConfig");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setApiLoading(false);
     }
@@ -254,7 +254,7 @@ export const PageIntegration = ({
         setDispatchWindowEndTime("18:00");
       } else {
         const msg = err instanceof ApiError ? err.message : t("integrationPage.errors.loadDispatchWindow");
-        showToast(`${ICONS.cross} ${msg}`, "error");
+        showToast(`${msg}`, "error");
       }
     } finally {
       setWindowLoading(false);
@@ -267,7 +267,7 @@ export const PageIntegration = ({
 
   const handleSave = async () => {
     if (!host || !port || !user) {
-      showToast(`${ICONS.warning} ${t("integrationPage.validation.smtpRequired")}`, "warn");
+      showToast(`${t("integrationPage.validation.smtpRequired")}`, "warn");
       return;
     }
     try {
@@ -279,10 +279,10 @@ export const PageIntegration = ({
       }, tenantId);
       setIsConfigured(true);
       setPassword(""); // Clear password after save for security
-      showToast(`${ICONS.checkmark} ${t("toast.smtpSaved")}`, "success");
+      showToast(`${t("toast.smtpSaved")}`, "success");
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("integrationPage.errors.saveSmtp");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setSaving(false);
     }
@@ -336,17 +336,17 @@ export const PageIntegration = ({
       : waApiBaseUrl.trim();
 
     if (!normalizedNumberId) {
-      showToast(`${ICONS.warning} ${getWaNumberLabel()} ${t("integrationPage.validation.required")}`, "warn");
+      showToast(`${getWaNumberLabel()} ${t("integrationPage.validation.required")}`, "warn");
       return;
     }
 
     if (waProvider === "Twilio" && !normalizedApiBaseUrl) {
-      showToast(`${ICONS.warning} ${t("integrationPage.validation.waTwilioAccountRequired")}`, "warn");
+      showToast(`${t("integrationPage.validation.waTwilioAccountRequired")}`, "warn");
       return;
     }
 
     if (waProvider === "Evolution API" && !normalizedApiBaseUrl) {
-      showToast(`${ICONS.warning} ${t("integrationPage.validation.waEvolutionBaseRequired")}`, "warn");
+      showToast(`${t("integrationPage.validation.waEvolutionBaseRequired")}`, "warn");
       return;
     }
 
@@ -362,11 +362,11 @@ export const PageIntegration = ({
       setWaConfigured(waClearToken ? false : (waToken.trim() ? true : waConfigured));
       setWaToken("");
       setWaClearToken(false);
-      showToast(`${ICONS.checkmark} ${t("integrationPage.messages.waSaved")}`, "success");
+      showToast(`${t("integrationPage.messages.waSaved")}`, "success");
       await loadWhatsAppConfig();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("integrationPage.errors.saveWhatsApp");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setWaSaving(false);
     }
@@ -376,10 +376,10 @@ export const PageIntegration = ({
     try {
       setWaTesting(true);
       const res = await testWhatsAppConfig(tenantId);
-      showToast(`${ICONS.checkmark} ${res.message}`, "success");
+      showToast(`${res.message}`, "success");
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("integrationPage.errors.testWhatsApp");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setWaTesting(false);
     }
@@ -387,16 +387,16 @@ export const PageIntegration = ({
 
   const handleTest = async () => {
     if (!isConfigured) {
-      showToast(`${ICONS.warning} ${t("integrationPage.validation.smtpTestBeforeSave")}`, "warn");
+      showToast(`${t("integrationPage.validation.smtpTestBeforeSave")}`, "warn");
       return;
     }
     try {
       setTesting(true);
       const res = await testSmtpConfig(tenantId);
-      showToast(`${ICONS.mailbox} ${res.message}`, "success");
+      showToast(`${res.message}`, "success");
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("integrationPage.errors.testSmtp");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setTesting(false);
     }
@@ -404,7 +404,7 @@ export const PageIntegration = ({
 
   const handleSaveExternalApi = async () => {
     if (!apiBaseUrl.trim() || !apiPendingPath.trim() || !apiOccurrencesPath.trim()) {
-      showToast(`${ICONS.warning} ${t("integrationPage.validation.apiRequired")}`, "warn");
+      showToast(`${t("integrationPage.validation.apiRequired")}`, "warn");
       return;
     }
 
@@ -423,11 +423,11 @@ export const PageIntegration = ({
       setApiHasToken(clearApiToken ? false : (apiToken.trim() ? true : apiHasToken));
       setApiToken("");
       setClearApiToken(false);
-      showToast(`${ICONS.checkmark} ${t("integrationPage.messages.apiSaved")}`, "success");
+      showToast(`${t("integrationPage.messages.apiSaved")}`, "success");
       await loadSyncHealth();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("integrationPage.errors.saveApiConfig");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setApiSaving(false);
     }
@@ -437,11 +437,11 @@ export const PageIntegration = ({
     try {
       setApiTesting(true);
       const res = await testExternalApiConfig(tenantId);
-      showToast(`${ICONS.checkmark} ${res.message}`, "success");
+      showToast(`${res.message}`, "success");
       await loadSyncHealth();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("integrationPage.errors.testExternalApi");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
       await loadSyncHealth();
     } finally {
       setApiTesting(false);
@@ -450,7 +450,7 @@ export const PageIntegration = ({
 
   const handleSaveDispatchWindow = async () => {
     if (!dispatchWindowStartTime.trim() || !dispatchWindowEndTime.trim()) {
-      showToast(`${ICONS.warning} ${t("integrationPage.validation.windowRequired")}`, "warn");
+      showToast(`${t("integrationPage.validation.windowRequired")}`, "warn");
       return;
     }
 
@@ -463,11 +463,11 @@ export const PageIntegration = ({
         endTime: dispatchWindowEndTime.trim(),
         pauseAutomaticDispatchDuringProcessing: true,
       }, tenantId);
-      showToast(`${ICONS.checkmark} ${response.message}`, "success");
+      showToast(`${response.message}`, "success");
       await loadDispatchWindowConfig();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("integrationPage.errors.saveDispatchWindow");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setWindowSaving(false);
     }
@@ -799,7 +799,7 @@ export const PageIntegration = ({
               variant="secondary"
               onClick={() => {
                 if (!apiDocsUrl && !syncHealth?.docsUrl) {
-                  showToast(`${ICONS.warning} ${t("integrationPage.api.docsUnavailable")}`, "warn");
+                  showToast(`${t("integrationPage.api.docsUnavailable")}`, "warn");
                   return;
                 }
                 window.open(apiDocsUrl || syncHealth?.docsUrl, "_blank", "noopener,noreferrer");

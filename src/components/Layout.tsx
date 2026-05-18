@@ -240,7 +240,7 @@ export const Sidebar = ({
   const handlePhotoUpload = (file: File | null) => {
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) {
-      showToast(`${ICONS.warning} A foto deve ter no máximo 2MB.`, "warn");
+      showToast(`A foto deve ter no máximo 2MB.`, "warn");
       return;
     }
 
@@ -255,12 +255,12 @@ export const Sidebar = ({
 
   const handleSaveProfile = async () => {
     if (!profileName.trim() || !profileEmail.trim()) {
-      showToast(`${ICONS.warning} Nome e e-mail são obrigatórios.`, "warn");
+      showToast(`Nome e e-mail são obrigatórios.`, "warn");
       return;
     }
 
     if (newPassword && newPassword.trim().length < 6) {
-      showToast(`${ICONS.warning} A nova senha deve ter pelo menos 6 caracteres.`, "warn");
+      showToast(`A nova senha deve ter pelo menos 6 caracteres.`, "warn");
       return;
     }
 
@@ -280,10 +280,10 @@ export const Sidebar = ({
       setCurrentPassword("");
       setNewPassword("");
       setRemovePhoto(false);
-      showToast(`${ICONS.checkmark} Perfil atualizado com sucesso.`, "success");
+      showToast(`Perfil atualizado com sucesso.`, "success");
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Erro ao atualizar perfil.";
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setProfileSaving(false);
     }
@@ -356,7 +356,7 @@ export const Sidebar = ({
                 className="w-7 h-7 rounded-md bg-surface-2 border border-border-subtle flex items-center justify-center text-[13px] text-text-muted hover:text-text-primary hover:border-border-subtle-2 transition-colors cursor-pointer shrink-0"
                 title={isDark ? "Modo Claro" : "Modo Escuro"}
               >
-                {isDark ? "☀" : "☾"}
+                {isDark ? ICONS.sun : ICONS.moon}
               </button>
             </div>
             <div className="text-[11px] text-text-muted whitespace-nowrap overflow-hidden text-ellipsis mt-0.5">

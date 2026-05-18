@@ -169,7 +169,7 @@ export const PageContacts = ({
       const contactList = await getContacts(tenantId);
       setContacts(contactList);
     } catch {
-      showToast(`${ICONS.cross} ${t("contactsPage.errors.load")}`, "error");
+      showToast(`${t("contactsPage.errors.load")}`, "error");
     } finally {
       setLoading(false);
     }
@@ -315,12 +315,12 @@ export const PageContacts = ({
 
   const handleSetDispatchPreference = async (clientId: string, mode: DispatchMode, selectedContactIds: string[]) => {
     if (requiresTenantSelection) {
-      showToast(`${ICONS.warning} ${t("contactsPage.validation.selectTenantDispatch")}`, "warn");
+      showToast(`${t("contactsPage.validation.selectTenantDispatch")}`, "warn");
       return;
     }
 
     if (mode === "Selected" && selectedContactIds.length === 0) {
-      showToast(`${ICONS.warning} ${t("contactsPage.validation.customRequiresContact")}`, "warn");
+      showToast(`${t("contactsPage.validation.customRequiresContact")}`, "warn");
       return;
     }
 
@@ -335,12 +335,12 @@ export const PageContacts = ({
       const updated = await updateClientDispatchPreference(clientId, payload, tenantId);
       setClients(prev => prev.map(c => c.id === updated.id ? updated : c));
       showToast(
-        `${ICONS.checkmark} ${t("contactsPage.messages.dispatchUpdated")} ${updated.dispatchMode === "All" ? t("contactsPage.dispatchModes.all") : updated.dispatchMode === "Selected" ? t("contactsPage.dispatchModes.selected") : t("contactsPage.dispatchModes.primary")}.`,
+        `${t("contactsPage.messages.dispatchUpdated")} ${updated.dispatchMode === "All" ? t("contactsPage.dispatchModes.all") : updated.dispatchMode === "Selected" ? t("contactsPage.dispatchModes.selected") : t("contactsPage.dispatchModes.primary")}.`,
         "success"
       );
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("contactsPage.errors.updateDispatch");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setUpdatingDispatchClientId(null);
     }
@@ -348,7 +348,7 @@ export const PageContacts = ({
 
   const handleSetPrimaryContact = async (contact: ContactResponse) => {
     if (requiresTenantSelection) {
-      showToast(`${ICONS.warning} ${t("contactsPage.validation.selectTenantContacts")}`, "warn");
+      showToast(`${t("contactsPage.validation.selectTenantContacts")}`, "warn");
       return;
     }
 
@@ -364,11 +364,11 @@ export const PageContacts = ({
       };
 
       await updateContact(contact.clientId, contact.id, payload, tenantId);
-      showToast(`${ICONS.checkmark} ${t("contactsPage.messages.primaryUpdated")}`, "success");
+      showToast(`${t("contactsPage.messages.primaryUpdated")}`, "success");
       await loadAll();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("contactsPage.errors.setPrimary");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setSettingPrimaryContactId(null);
     }
@@ -376,7 +376,7 @@ export const PageContacts = ({
 
   const handleDeleteContact = async (contact: ContactResponse) => {
     if (requiresTenantSelection) {
-      showToast(`${ICONS.warning} ${t("contactsPage.validation.selectTenantContacts")}`, "warn");
+      showToast(`${t("contactsPage.validation.selectTenantContacts")}`, "warn");
       return;
     }
 
@@ -387,11 +387,11 @@ export const PageContacts = ({
     try {
       setDeletingContactId(contact.id);
       await deleteContact(contact.clientId, contact.id, tenantId);
-      showToast(`${ICONS.checkmark} ${t("contactsPage.messages.deleted")}`, "success");
+      showToast(`${t("contactsPage.messages.deleted")}`, "success");
       await loadAll();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("contactsPage.errors.delete");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setDeletingContactId(null);
     }
@@ -399,7 +399,7 @@ export const PageContacts = ({
 
   const handleSave = async () => {
     if (requiresTenantSelection) {
-      showToast(`${ICONS.warning} ${t("contactsPage.validation.selectTenantManage")}`, "warn");
+      showToast(`${t("contactsPage.validation.selectTenantManage")}`, "warn");
       return;
     }
 
@@ -407,7 +407,7 @@ export const PageContacts = ({
     const normalizedPhone = normalizePhone(form.whatsAppPhone);
 
     if (!form.name || (!hasEmail && !normalizedPhone)) {
-      showToast(`${ICONS.warning} ${t("contactsPage.validation.requireContactChannel")}`, "warn");
+      showToast(`${t("contactsPage.validation.requireContactChannel")}`, "warn");
       return;
     }
 
@@ -425,7 +425,7 @@ export const PageContacts = ({
 
       if (!clientId) {
         if (!newClientName || !newClientCnpj) {
-          showToast(`${ICONS.warning} ${t("contactsPage.validation.selectOrCreateClient")}`, "warn");
+          showToast(`${t("contactsPage.validation.selectOrCreateClient")}`, "warn");
           setSaving(false);
           return;
         }
@@ -443,12 +443,12 @@ export const PageContacts = ({
         await createContact(clientId, payload, tenantId);
       }
 
-      showToast(`${ICONS.checkmark} ${t("toast.contactSaved")}`, "success");
+      showToast(`${t("toast.contactSaved")}`, "success");
       setModalOpen(false);
       await loadAll();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("contactsPage.errors.save");
-      showToast(`${ICONS.cross} ${msg}`, "error");
+      showToast(`${msg}`, "error");
     } finally {
       setSaving(false);
     }
@@ -469,7 +469,7 @@ export const PageContacts = ({
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder={`${ICONS.search} ${t("contacts.searchPlaceholder")}`}
+          placeholder={`${t("contacts.searchPlaceholder")}`}
           className="bg-surface-2 border border-border-subtle-2 rounded-lg px-[13px] py-[9px] text-[13px] text-text-primary outline-none flex-1 focus:border-accent"
           disabled={requiresTenantSelection}
         />

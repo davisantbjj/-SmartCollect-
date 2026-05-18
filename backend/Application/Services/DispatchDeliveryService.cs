@@ -49,6 +49,7 @@ public class DispatchDeliveryService : IDispatchDeliveryService
         string recipientEmail,
         string subject,
         string body,
+        string? boletoUrl = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(recipientEmail))
@@ -82,7 +83,7 @@ public class DispatchDeliveryService : IDispatchDeliveryService
             message.Subject = string.IsNullOrWhiteSpace(subject)
                 ? "Cobranca"
                 : subject;
-            message.Body = BuildEmailBody(body);
+            message.Body = BuildEmailBody(body, message.Subject, senderName, boletoUrl);
 
             using var smtp = new SmtpClient();
             var security = ResolveSmtpSecurity(tenant.SmtpPort.Value);
@@ -223,6 +224,7 @@ public class DispatchDeliveryService : IDispatchDeliveryService
                         dispatch.Contact.Email,
                         subject,
                         body,
+                        dispatch.Title.BoletoUrl,
                         cancellationToken);
 
                     if (emailResult.Sent)
@@ -307,23 +309,90 @@ public class DispatchDeliveryService : IDispatchDeliveryService
         });
     }
 
-    private static MimeEntity BuildEmailBody(string? body)
+    private static MimeEntity BuildEmailBody(string? body, string subject, string companyName, string? boletoUrl)
     {
         var content = body ?? string.Empty;
         var builder = new BodyBuilder();
+        TryNormalizeHttpUrl(boletoUrl, out var boletoHref);
 
         if (HtmlTagRegex.IsMatch(content))
         {
-            builder.HtmlBody = content;
-            builder.TextBody = ToPlainText(content);
+            builder.HtmlBody = BuildStyledHtml(content, subject, companyName, boletoHref);
+            builder.TextBody = BuildTextBody(ToPlainText(content), boletoHref);
         }
         else
         {
-            builder.TextBody = content;
-            builder.HtmlBody = ToSimpleHtml(content);
+            builder.TextBody = BuildTextBody(content, boletoHref);
+            builder.HtmlBody = BuildStyledHtml(ToSimpleHtml(content), subject, companyName, boletoHref);
         }
 
         return builder.ToMessageBody();
+    }
+
+    private static string BuildStyledHtml(string contentHtml, string subject, string companyName, string? boletoHref)
+    {
+        var safeSubject = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(subject) ? "Cobrança" : subject.Trim());
+        var safeCompanyName = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(companyName) ? "SmartCollect" : companyName.Trim());
+        var boletoButton = string.IsNullOrWhiteSpace(boletoHref)
+            ? string.Empty
+            : $"""
+              <tr>
+                <td style="padding: 8px 32px 28px 32px;">
+                  <a href="{WebUtility.HtmlEncode(boletoHref)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#dc2626;color:#ffffff;text-decoration:none;font-family:Arial,sans-serif;font-size:15px;font-weight:700;padding:13px 22px;border-radius:8px;">
+                    Boleto
+                  </a>
+                </td>
+              </tr>
+              """;
+
+        return $"""
+          <!doctype html>
+          <html lang="pt-BR">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>{safeSubject}</title>
+          </head>
+          <body style="margin:0;padding:0;background:#f3f4f6;">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f4f6;margin:0;padding:28px 12px;">
+              <tr>
+                <td align="center">
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
+                    <tr>
+                      <td style="background:#111827;padding:24px 32px;">
+                        <div style="font-family:Arial,sans-serif;color:#ffffff;font-size:20px;font-weight:800;line-height:1.25;">{safeCompanyName}</div>
+                        <div style="font-family:Arial,sans-serif;color:#cbd5e1;font-size:13px;line-height:1.4;margin-top:6px;">{safeSubject}</div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding:30px 32px 18px 32px;font-family:Arial,sans-serif;color:#111827;font-size:15px;line-height:1.6;">
+                        {contentHtml}
+                      </td>
+                    </tr>
+                    {boletoButton}
+                    <tr>
+                      <td style="border-top:1px solid #e5e7eb;padding:18px 32px;background:#f9fafb;">
+                        <div style="font-family:Arial,sans-serif;color:#6b7280;font-size:12px;line-height:1.5;">
+                          Este e-mail é automático. Não responda.
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </body>
+          </html>
+          """;
+    }
+
+    private static string BuildTextBody(string content, string? boletoHref)
+    {
+        var text = content ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(boletoHref))
+            text = $"{text}\n\nBoleto: {boletoHref}";
+
+        return $"{text}\n\nEste e-mail é automático. Não responda.";
     }
 
     private static string ToSimpleHtml(string text)
@@ -333,7 +402,7 @@ public class DispatchDeliveryService : IDispatchDeliveryService
             .Replace("\r", "\n", StringComparison.Ordinal)
             .Replace("\n", "<br />", StringComparison.Ordinal);
 
-        return $"<div style=\"font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5; color: #111827;\">{encoded}</div>";
+        return $"<div>{encoded}</div>";
     }
 
     private static string ToPlainText(string html)
@@ -341,6 +410,23 @@ public class DispatchDeliveryService : IDispatchDeliveryService
         var withBreaks = Regex.Replace(html ?? string.Empty, "<\\s*br\\s*/?\\s*>", "\n", RegexOptions.IgnoreCase);
         var withoutTags = StripHtmlRegex.Replace(withBreaks, " ");
         return WebUtility.HtmlDecode(withoutTags).Trim();
+    }
+
+    private static bool TryNormalizeHttpUrl(string? value, out string? url)
+    {
+        url = null;
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        var trimmed = value.Trim();
+        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var parsed))
+            return false;
+
+        if (parsed.Scheme is not ("http" or "https"))
+            return false;
+
+        url = parsed.AbsoluteUri;
+        return true;
     }
 
     private static bool IsWithinDispatchWindowUtc(Domain.Entities.Tenant tenant, DateTime nowUtc, out DateTime nextAllowedUtc)
@@ -398,6 +484,7 @@ public class DispatchDeliveryService : IDispatchDeliveryService
         string? recipientEmail,
         string subject,
         string body,
+        string? boletoUrl,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(recipientEmail))
@@ -425,7 +512,7 @@ public class DispatchDeliveryService : IDispatchDeliveryService
             message.From.Add(new MailboxAddress(tenant.CompanyName, senderFrom));
             message.To.Add(new MailboxAddress(recipientName ?? string.Empty, recipientEmail));
             message.Subject = subject;
-            message.Body = BuildEmailBody(body);
+            message.Body = BuildEmailBody(body, message.Subject, tenant.CompanyName, boletoUrl);
 
             using var smtp = new SmtpClient();
             var security = ResolveSmtpSecurity(tenant.SmtpPort.Value);

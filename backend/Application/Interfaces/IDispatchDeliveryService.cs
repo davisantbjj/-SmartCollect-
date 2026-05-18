@@ -11,6 +11,7 @@ public interface IDispatchDeliveryService
         string recipientEmail,
         string subject,
         string body,
+        string? boletoUrl = null,
         CancellationToken cancellationToken = default);
     Task<QuickSendResult> SendQuickWhatsAppAsync(
         Guid tenantId,

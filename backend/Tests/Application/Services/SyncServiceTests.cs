@@ -461,6 +461,7 @@ internal sealed class FakeDispatchDeliveryService : IDispatchDeliveryService
         string recipientEmail,
         string subject,
         string body,
+        string? boletoUrl = null,
         CancellationToken cancellationToken = default)
     {
         QuickEmailAttempts++;

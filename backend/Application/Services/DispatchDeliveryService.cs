@@ -3,6 +3,7 @@ namespace SmartCollect.Application.Services;
 using System.Text.RegularExpressions;
 using System.Globalization;
 using System.Text.Json;
+using System.Net;
 using System.Net.Http.Headers;
 using MailKit.Net.Smtp;
 using MailKit.Security;
@@ -17,6 +18,8 @@ using SmartCollect.Domain.Enums;
 public class DispatchDeliveryService : IDispatchDeliveryService
 {
     private static readonly Regex TemplateRegex = new("\\{\\{\\s*([a-zA-Z0-9_]+)\\s*\\}\\}", RegexOptions.Compiled);
+    private static readonly Regex HtmlTagRegex = new("<\\s*([a-z][a-z0-9]*|!doctype)\\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex StripHtmlRegex = new("<[^>]+>", RegexOptions.Compiled);
 
     private readonly IAppDbContext _db;
     private readonly IDataProtector _smtpProtector;
@@ -79,7 +82,7 @@ public class DispatchDeliveryService : IDispatchDeliveryService
             message.Subject = string.IsNullOrWhiteSpace(subject)
                 ? "Cobranca"
                 : subject;
-            message.Body = new TextPart("plain") { Text = body ?? string.Empty };
+            message.Body = BuildEmailBody(body);
 
             using var smtp = new SmtpClient();
             var security = ResolveSmtpSecurity(tenant.SmtpPort.Value);
@@ -304,6 +307,42 @@ public class DispatchDeliveryService : IDispatchDeliveryService
         });
     }
 
+    private static MimeEntity BuildEmailBody(string? body)
+    {
+        var content = body ?? string.Empty;
+        var builder = new BodyBuilder();
+
+        if (HtmlTagRegex.IsMatch(content))
+        {
+            builder.HtmlBody = content;
+            builder.TextBody = ToPlainText(content);
+        }
+        else
+        {
+            builder.TextBody = content;
+            builder.HtmlBody = ToSimpleHtml(content);
+        }
+
+        return builder.ToMessageBody();
+    }
+
+    private static string ToSimpleHtml(string text)
+    {
+        var encoded = WebUtility.HtmlEncode(text ?? string.Empty)
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace("\r", "\n", StringComparison.Ordinal)
+            .Replace("\n", "<br />", StringComparison.Ordinal);
+
+        return $"<div style=\"font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5; color: #111827;\">{encoded}</div>";
+    }
+
+    private static string ToPlainText(string html)
+    {
+        var withBreaks = Regex.Replace(html ?? string.Empty, "<\\s*br\\s*/?\\s*>", "\n", RegexOptions.IgnoreCase);
+        var withoutTags = StripHtmlRegex.Replace(withBreaks, " ");
+        return WebUtility.HtmlDecode(withoutTags).Trim();
+    }
+
     private static bool IsWithinDispatchWindowUtc(Domain.Entities.Tenant tenant, DateTime nowUtc, out DateTime nextAllowedUtc)
     {
         nextAllowedUtc = nowUtc;
@@ -386,7 +425,7 @@ public class DispatchDeliveryService : IDispatchDeliveryService
             message.From.Add(new MailboxAddress(tenant.CompanyName, senderFrom));
             message.To.Add(new MailboxAddress(recipientName ?? string.Empty, recipientEmail));
             message.Subject = subject;
-            message.Body = new TextPart("plain") { Text = body };
+            message.Body = BuildEmailBody(body);
 
             using var smtp = new SmtpClient();
             var security = ResolveSmtpSecurity(tenant.SmtpPort.Value);

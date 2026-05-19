@@ -839,6 +839,12 @@ export async function updateTemplate(id: string, payload: UpdateTemplateRequest,
   });
 }
 
+export async function deleteTemplate(id: string, tenantId?: string) {
+  return request<void>(`/api/templates/${id}${tenantParam(tenantId)}`, {
+    method: "DELETE",
+  });
+}
+
 // ── Collection Rules ──────────────────────────────────────────────────────
 
 export async function getCollectionRules(tenantId?: string) {

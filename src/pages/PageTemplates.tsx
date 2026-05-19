@@ -5,7 +5,7 @@ import { t } from "../i18n";
 import { TEMPLATE_VARIABLES } from "../config/templateVariables";
 
 import {
-  ApiError, getTemplates, createTemplate, updateTemplate,
+  ApiError, getTemplates, createTemplate, updateTemplate, deleteTemplate,
   type MessageTemplateResponse, type StoredSession,
 } from "../services/api";
 import type { ShowToast } from "../types";
@@ -36,6 +36,7 @@ export const PageTemplates = ({
   const [editing, setEditing] = useState<MessageTemplateResponse | null>(null);
   const [form, setForm] = useState<TemplateForm>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const tenantId = session.role === "Master" ? selectedTenantId : undefined;
   const requiresTenantSelection = session.role === "Master" && !tenantId;
@@ -124,6 +125,29 @@ export const PageTemplates = ({
     }
   };
 
+  const handleDelete = async (tpl: MessageTemplateResponse) => {
+    if (requiresTenantSelection) {
+      showToast(`${t("templates.validation.selectTenant")}`, "warn");
+      return;
+    }
+
+    const confirmed = window.confirm(`${t("templates.confirmDelete")} "${tpl.name}"?`);
+    if (!confirmed)
+      return;
+
+    try {
+      setDeletingId(tpl.id);
+      await deleteTemplate(tpl.id, tenantId);
+      showToast(`${t("templates.messages.deleted")}`, "success");
+      await load();
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : t("templates.errors.delete");
+      showToast(`${msg}`, "error");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const insertVar = (v: string) => {
     setForm(f => ({ ...f, body: f.body + v }));
   };
@@ -181,6 +205,17 @@ export const PageTemplates = ({
               <div className="mt-3 flex gap-1.5">
                 <Button size="sm" variant="secondary" onClick={() => openEdit(tpl)}>
                   {ICONS.pencil} {t("common.edit")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void handleDelete(tpl);
+                  }}
+                  disabled={deletingId === tpl.id}
+                >
+                  {deletingId === tpl.id ? t("templates.actionDeleting") : t("common.delete")}
                 </Button>
               </div>
             )}
@@ -250,7 +285,7 @@ export const PageTemplates = ({
           <div className="col-span-2">
             <label className="block text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted mb-[5px]">{t("templates.varsClickToInsert")}</label>
             <div className="flex flex-wrap gap-1.5 mt-1.5">
-              {TEMPLATE_VARIABLES.slice(0, 6).map(v => (
+              {TEMPLATE_VARIABLES.map(v => (
                 <span key={v} onClick={() => insertVar(v)} className="bg-accent/10 text-accent px-2 py-[3px] rounded-full font-mono text-[11px] cursor-pointer hover:bg-accent/20">{v}</span>
               ))}
             </div>

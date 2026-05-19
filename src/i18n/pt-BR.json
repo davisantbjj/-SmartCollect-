@@ -607,6 +607,11 @@
     "channelEmail": "E-mail",
     "channelWhatsapp": "WhatsApp",
     "loading": "Carregando templates...",
+    "confirmDelete": "Tem certeza que deseja excluir o template",
+    "actionDeleting": "Excluindo...",
+    "messages": {
+      "deleted": "Template excluído com sucesso!"
+    },
     "validation": {
       "selectTenant": "Selecione uma empresa no topo para visualizar e editar templates.",
       "requiredFields": "Nome e mensagem são obrigatórios.",
@@ -614,7 +619,8 @@
     },
     "errors": {
       "load": "Erro ao carregar templates.",
-      "save": "Erro ao salvar template."
+      "save": "Erro ao salvar template.",
+      "delete": "Erro ao excluir template."
     }
   },
   "tenants": {

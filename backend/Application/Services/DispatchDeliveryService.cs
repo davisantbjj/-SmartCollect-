@@ -91,7 +91,7 @@ public class DispatchDeliveryService : IDispatchDeliveryService
             message.Subject = string.IsNullOrWhiteSpace(subject)
                 ? "Cobranca"
                 : subject;
-            message.Body = BuildEmailBody(body, message.Subject, senderName, boletoUrl);
+            message.Body = BuildEmailBody(body, message.Subject, tenant, boletoUrl);
 
             using var smtp = new SmtpClient();
             var security = ResolveSmtpSecurity(tenant.SmtpPort.Value);
@@ -308,6 +308,7 @@ public class DispatchDeliveryService : IDispatchDeliveryService
             ["DataEmissao"] = dispatch.Title.IssueDate.ToString("dd/MM/yyyy"),
             ["LinkBoleto"] = dispatch.Title.BoletoUrl ?? string.Empty,
             ["Empresa"] = companyName,
+            ["NomeEmpresa"] = companyName,
         };
 
         return TemplateRegex.Replace(template ?? string.Empty, match =>
@@ -317,27 +318,172 @@ public class DispatchDeliveryService : IDispatchDeliveryService
         });
     }
 
-    private static MimeEntity BuildEmailBody(string? body, string subject, string companyName, string? boletoUrl)
+        private static MimeEntity BuildEmailBody(string? body, string subject, Domain.Entities.Tenant tenant, string? boletoUrl)
     {
         var content = body ?? string.Empty;
         var builder = new BodyBuilder();
         TryNormalizeHttpUrl(boletoUrl, out var boletoHref);
+                var htmlContent = HtmlTagRegex.IsMatch(content)
+                        ? RemoveBoletoUrlFromHtml(content, boletoHref)
+                        : ToSimpleHtml(RemoveBoletoUrlFromText(content, boletoHref));
 
-        if (HtmlTagRegex.IsMatch(content))
-        {
-            var htmlContent = RemoveBoletoUrlFromHtml(content, boletoHref);
-            builder.HtmlBody = BuildStyledHtml(htmlContent, subject, companyName, boletoHref);
-            builder.TextBody = BuildTextBody(RemoveBoletoUrlFromText(ToPlainText(content), boletoHref), boletoHref);
-        }
-        else
-        {
-            var textContent = RemoveBoletoUrlFromText(content, boletoHref);
-            builder.TextBody = BuildTextBody(textContent, boletoHref);
-            builder.HtmlBody = BuildStyledHtml(ToSimpleHtml(textContent), subject, companyName, boletoHref);
-        }
+                var textContent = HtmlTagRegex.IsMatch(content)
+                        ? RemoveBoletoUrlFromText(ToPlainText(content), boletoHref)
+                        : RemoveBoletoUrlFromText(content, boletoHref);
+
+                builder.TextBody = BuildTextBody(textContent, boletoHref);
+                builder.HtmlBody = tenant.EmailLayoutEnabled
+                        ? BuildTenantLayoutHtml(htmlContent, subject, tenant, boletoHref)
+                        : BuildStyledHtml(htmlContent, subject, tenant.CompanyName, boletoHref);
 
         return builder.ToMessageBody();
     }
+
+        private static string BuildTenantLayoutHtml(
+                string contentHtml,
+                string subject,
+                Domain.Entities.Tenant tenant,
+                string? boletoHref)
+        {
+                var safeSubject = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(subject) ? "Cobrança" : subject.Trim());
+                var safeCompanyName = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(tenant.CompanyName) ? "SmartCollect" : tenant.CompanyName.Trim());
+                var logo = BuildOptionalImageRow(tenant.EmailLayoutLogoUrl, "Logo");
+                var hero = BuildOptionalImageRow(tenant.EmailLayoutHeroUrl, "Imagem");
+                var footer = string.IsNullOrWhiteSpace(tenant.EmailLayoutFooterMessage)
+                        ? string.Empty
+                        : $"<div style=\"margin-top:18px;font-family:'Plus Jakarta Sans',Arial,sans-serif;color:{EmailTextMuted};font-size:12px;line-height:1.5;\">{WebUtility.HtmlEncode(tenant.EmailLayoutFooterMessage.Trim())}</div>";
+
+                var socialRow = BuildSocialRow(tenant, EmailAccent);
+
+                var boletoButton = string.IsNullOrWhiteSpace(boletoHref)
+                        ? string.Empty
+                        : $"""
+                            <tr>
+                                <td align=\"center\" style=\"padding: 8px 32px 28px 32px;text-align:center;\">
+                                    <a href=\"{WebUtility.HtmlEncode(boletoHref)}\" target=\"_blank\" rel=\"noopener noreferrer\" style=\"display:inline-block;background:{EmailAccent};color:#ffffff;text-decoration:none;font-family:'Plus Jakarta Sans',Arial,sans-serif;font-size:15px;font-weight:800;padding:13px 22px;border-radius:8px;margin:0 auto;\">
+                                        Boleto
+                                    </a>
+                                </td>
+                            </tr>
+                            """;
+
+                return $"""
+                    <!doctype html>
+                    <html lang=\"pt-BR\">
+                    <head>
+                        <meta charset=\"utf-8\">
+                        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
+                        <title>{safeSubject}</title>
+                    </head>
+                    <body style=\"margin:0;padding:0;background:{EmailSurface};\">
+                        <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"background:{EmailSurface};margin:0;padding:28px 12px;\">
+                            <tr>
+                                <td align=\"center\">
+                                    <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"max-width:640px;background:{EmailSurface2};border:1px solid {EmailBorder};border-radius:14px;overflow:hidden;\">
+                                        <tr>
+                                            <td style=\"background:{EmailSurface3};padding:24px 32px;border-bottom:2px solid {EmailAccent};\">
+                                                <div style=\"font-family:'Plus Jakarta Sans',Arial,sans-serif;color:{EmailText};font-size:20px;font-weight:800;line-height:1.25;\">{safeCompanyName}</div>
+                                                <div style=\"font-family:'Plus Jakarta Sans',Arial,sans-serif;color:{EmailTextSecondary};font-size:13px;line-height:1.4;margin-top:6px;\">{safeSubject}</div>
+                                            </td>
+                                        </tr>
+                                        {logo}
+                                        {hero}
+                                        <tr>
+                                            <td style=\"padding:30px 32px 18px 32px;font-family:'Plus Jakarta Sans',Arial,sans-serif;color:{EmailTextSecondary};font-size:15px;line-height:1.6;\">
+                                                {contentHtml}
+                                                {footer}
+                                            </td>
+                                        </tr>
+                                        {boletoButton}
+                                        {socialRow}
+                                        <tr>
+                                            <td style=\"border-top:1px solid {EmailBorder};padding:18px 32px;background:{EmailSurface3};\">
+                                                <div style=\"font-family:'Plus Jakarta Sans',Arial,sans-serif;color:{EmailTextMuted};font-size:12px;line-height:1.5;\">
+                                                    Este e-mail é automático. Não responda.
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    </body>
+                    </html>
+                    """;
+        }
+
+        private static string BuildOptionalImageRow(string? imageUrl, string alt)
+        {
+            if (!TryNormalizeImageSource(imageUrl, out var url))
+                        return string.Empty;
+
+                return $"""
+                    <tr>
+                        <td align=\"center\" style=\"padding:18px 24px 0 24px;\">
+                            <img src=\"{WebUtility.HtmlEncode(url)}\" alt=\"{WebUtility.HtmlEncode(alt)}\" style=\"display:block;border:none;max-width:100%;height:auto;border-radius:10px;\" />
+                        </td>
+                    </tr>
+                    """;
+        }
+
+        private static string BuildSocialRow(Domain.Entities.Tenant tenant, string accent)
+        {
+                var icons = new List<string>
+                {
+                        BuildSocialIcon("Instagram", tenant.EmailLayoutInstagramUrl, accent, "M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0-5.5c1.6 0 3.2.03 4.8.1 1.2.05 2.1.24 2.9.56.85.34 1.56.8 2.26 1.5.7.7 1.16 1.41 1.5 2.26.32.8.51 1.7.56 2.9.07 1.6.1 3.2.1 4.8s-.03 3.2-.1 4.8c-.05 1.2-.24 2.1-.56 2.9-.34.85-.8 1.56-1.5 2.26-.7.7-1.41 1.16-2.26 1.5-.8.32-1.7.51-2.9.56-1.6.07-3.2.1-4.8.1s-3.2-.03-4.8-.1c-1.2-.05-2.1-.24-2.9-.56-.85-.34-1.56-.8-2.26-1.5-.7-.7-1.16-1.41-1.5-2.26-.32-.8-.51-1.7-.56-2.9C1.03 15.2 1 13.6 1 12s.03-3.2.1-4.8c.05-1.2.24-2.1.56-2.9.34-.85.8-1.56 1.5-2.26.7-.7 1.41-1.16 2.26-1.5.8-.32 1.7-.51 2.9-.56C8.8 1.53 10.4 1.5 12 1.5zm0 7a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7zm6.1-2.9a1.3 1.3 0 1 1-2.6 0 1.3 1.3 0 0 1 2.6 0z"),
+                        BuildSocialIcon("LinkedIn", tenant.EmailLayoutLinkedInUrl, accent, "M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9h4v12H3V9zm7 0h3.8v1.64h.05c.53-1 1.85-2.06 3.8-2.06 4.07 0 4.82 2.68 4.82 6.16V21h-4v-5.2c0-1.24-.02-2.84-1.73-2.84-1.73 0-2 1.35-2 2.75V21h-4V9z"),
+                        BuildSocialIcon("WhatsApp", tenant.EmailLayoutWhatsAppUrl, accent, "M12 2a10 10 0 0 0-8.7 14.9L2 22l5.3-1.3A10 10 0 1 0 12 2zm5.8 14.2c-.24.68-1.4 1.3-1.93 1.38-.5.08-1.13.12-1.82-.11-.42-.14-.95-.31-1.64-.61-2.88-1.25-4.76-4.19-4.9-4.38-.13-.18-1.17-1.56-1.17-2.98 0-1.42.74-2.12 1-2.42.25-.3.56-.37.74-.37h.54c.18 0 .42-.07.65.5.24.57.8 1.96.87 2.1.07.14.12.3.02.48-.1.18-.15.3-.3.46-.15.16-.32.36-.45.48-.15.15-.3.32-.13.62.18.3.8 1.32 1.7 2.14 1.17 1.06 2.14 1.4 2.44 1.56.3.15.48.13.66-.08.18-.21.76-.88.96-1.18.2-.3.4-.24.66-.14.26.1 1.66.78 1.95.92.3.14.5.22.57.34.07.12.07.7-.17 1.38z"),
+                        BuildSocialIcon("Telegram", tenant.EmailLayoutTelegramUrl, accent, "M21.9 4.6 3.7 11.5c-1.25.48-1.23 1.17-.22 1.48l4.7 1.46 1.8 5.5c.22.6.12.85.76.85.5 0 .72-.23 1-.5l2.42-2.35 5.02 3.7c.92.5 1.58.25 1.8-.85l3.26-15.3c.3-1.35-.52-1.96-1.3-1.69zm-3.46 3.45-7.9 7.16-.3 3.08-1.83-5.83 10.03-4.41z")
+                };
+
+                var iconsHtml = string.Join(string.Empty, icons.Where(icon => !string.IsNullOrWhiteSpace(icon)));
+                if (string.IsNullOrWhiteSpace(iconsHtml))
+                        return string.Empty;
+
+                return $"""
+                    <tr>
+                        <td align=\"center\" style=\"padding: 0 32px 26px 32px;\">
+                            <table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" style=\"margin:0 auto;\">
+                                <tr>
+                                    {iconsHtml}
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    """;
+        }
+
+        private static string BuildSocialIcon(string label, string? url, string accent, string path)
+        {
+                if (!TryNormalizeHttpUrl(url, out var safeUrl))
+                        return string.Empty;
+
+                return $"""
+                    <td align=\"center\" style=\"padding:0 6px;\">
+                        <a href=\"{WebUtility.HtmlEncode(safeUrl)}\" target=\"_blank\" rel=\"noopener noreferrer\" style=\"display:inline-block;text-decoration:none;\">
+                            <svg width=\"26\" height=\"26\" viewBox=\"0 0 24 24\" fill=\"{EmailText}\" xmlns=\"http://www.w3.org/2000/svg\" aria-label=\"{WebUtility.HtmlEncode(label)}\">
+                                <path d=\"{path}\"/>
+                            </svg>
+                        </a>
+                    </td>
+                    """;
+        }
+
+        private static bool TryNormalizeImageSource(string? value, out string? url)
+        {
+                url = null;
+                if (string.IsNullOrWhiteSpace(value))
+                        return false;
+
+                var trimmed = value.Trim();
+                if (trimmed.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase))
+                {
+                        url = trimmed;
+                        return true;
+                }
+
+                return TryNormalizeHttpUrl(trimmed, out url);
+        }
 
     private static string BuildStyledHtml(string contentHtml, string subject, string companyName, string? boletoHref)
     {
@@ -561,7 +707,7 @@ public class DispatchDeliveryService : IDispatchDeliveryService
             message.From.Add(new MailboxAddress(tenant.CompanyName, senderFrom));
             message.To.Add(new MailboxAddress(recipientName ?? string.Empty, recipientEmail));
             message.Subject = subject;
-            message.Body = BuildEmailBody(body, message.Subject, tenant.CompanyName, boletoUrl);
+            message.Body = BuildEmailBody(body, message.Subject, tenant, boletoUrl);
 
             using var smtp = new SmtpClient();
             var security = ResolveSmtpSecurity(tenant.SmtpPort.Value);

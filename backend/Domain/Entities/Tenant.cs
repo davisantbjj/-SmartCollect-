@@ -19,6 +19,14 @@ public class Tenant : Entity
     public string? ExternalApiAuthScheme { get; set; }
     public string? ExternalApiTokenEncrypted { get; set; }
     public string? WhatsAppApiToken { get; set; }
+    public bool EmailLayoutEnabled { get; set; }
+    public string? EmailLayoutLogoUrl { get; set; }
+    public string? EmailLayoutHeroUrl { get; set; }
+    public string? EmailLayoutFooterMessage { get; set; }
+    public string? EmailLayoutInstagramUrl { get; set; }
+    public string? EmailLayoutLinkedInUrl { get; set; }
+    public string? EmailLayoutWhatsAppUrl { get; set; }
+    public string? EmailLayoutTelegramUrl { get; set; }
     public bool DispatchWindowEnabled { get; set; }
     public int DispatchWindowStartMinutes { get; set; } = 540;
     public int DispatchWindowEndMinutes { get; set; } = 1080;

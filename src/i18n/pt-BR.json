@@ -609,6 +609,31 @@
     "loading": "Carregando templates...",
     "confirmDelete": "Tem certeza que deseja excluir o template",
     "actionDeleting": "Excluindo...",
+    "layout": {
+      "open": "Layout do e-mail",
+      "title": "Layout do e-mail",
+      "enabled": "Ativar layout personalizado",
+      "enabledHint": "Use o layout com logomarca, imagem principal e redes sociais.",
+      "logoUpload": "Logo",
+      "heroUpload": "Imagem principal",
+      "upload": "Enviar imagem",
+      "remove": "Remover",
+      "footerMessage": "Mensagem de rodapé",
+      "footerPlaceholder": "Ex: Dúvidas? Fale com nosso time.",
+      "instagram": "Instagram (URL)",
+      "linkedin": "LinkedIn (URL)",
+      "whatsapp": "WhatsApp (URL)",
+      "telegram": "Telegram (URL)",
+      "preview": "Prévia do layout",
+      "save": "Salvar layout",
+      "messages": {
+        "saved": "Layout do e-mail salvo com sucesso!"
+      },
+      "errors": {
+        "load": "Erro ao carregar layout do e-mail.",
+        "save": "Erro ao salvar layout do e-mail."
+      }
+    },
     "messages": {
       "deleted": "Template excluído com sucesso!"
     },

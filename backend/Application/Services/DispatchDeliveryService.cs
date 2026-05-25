@@ -361,9 +361,8 @@ public class DispatchDeliveryService : IDispatchDeliveryService
             string? footerImageSource = null)
         {
                 var safeSubject = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(subject) ? "Cobrança" : subject.Trim());
-                var safeCompanyName = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(tenant.CompanyName) ? "SmartCollect" : tenant.CompanyName.Trim());
-                var logo = BuildOptionalImageRow(logoSource ?? tenant.EmailLayoutLogoUrl, "Logo", 140, "16px 32px 4px 32px");
-                var footerImage = BuildOptionalImageRow(footerImageSource ?? tenant.EmailLayoutHeroUrl, "Imagem de rodape", 320, "10px 32px 4px 32px");
+                var logo = BuildOptionalImageRow(logoSource ?? tenant.EmailLayoutLogoUrl, "Logo", 210, "12px 32px 6px 32px");
+                var footerImage = BuildOptionalImageRow(footerImageSource ?? tenant.EmailLayoutHeroUrl, "Imagem de rodape", 560, "6px 16px 6px 16px");
                 var footer = string.IsNullOrWhiteSpace(tenant.EmailLayoutFooterMessage)
                         ? string.Empty
                     : $"<div style=\"margin-top:18px;font-family:'Plus Jakarta Sans',Arial,sans-serif;color:{EmailTextMuted};font-size:12px;line-height:1.5;\">{WebUtility.HtmlEncode(tenant.EmailLayoutFooterMessage.Trim())}</div>";
@@ -396,12 +395,13 @@ public class DispatchDeliveryService : IDispatchDeliveryService
                                     <td align="center">
                                         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:{EmailSurface2};border:1px solid {EmailBorder};border-radius:14px;overflow:hidden;">
                                             <tr>
-                                                <td align="center" style="background:{EmailSurface3};padding:22px 32px;border-bottom:2px solid {EmailAccent};">
-                                                    <div style="font-family:'Plus Jakarta Sans',Arial,sans-serif;color:{EmailText};font-size:20px;font-weight:800;line-height:1.25;">{safeCompanyName}</div>
+                                                <td align="center" style="background:{EmailSurface3};padding:18px 32px 10px 32px;border-bottom:2px solid {EmailAccent};">
+                                                    <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 auto;">
+                                                        {logo}
+                                                    </table>
                                                     <div style="font-family:'Plus Jakarta Sans',Arial,sans-serif;color:{EmailTextSecondary};font-size:13px;line-height:1.45;margin-top:6px;">{safeSubject}</div>
                                                 </td>
                                             </tr>
-                                            {logo}
                                             <tr>
                                                 <td align="center" style="padding:18px 32px 12px 32px;">
                                                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:{EmailSurface3};border:1px solid {EmailBorder};border-radius:10px;margin:0 auto;">

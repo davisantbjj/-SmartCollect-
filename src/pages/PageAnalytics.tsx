@@ -33,10 +33,12 @@ export const PageAnalytics = ({
   showToast,
   session,
   selectedTenantId,
+  isDark,
 }: {
   showToast: ShowToast;
   session: StoredSession;
   selectedTenantId?: string;
+  isDark: boolean;
 }) => {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState({ totalReceivable: 0, totalOverdue: 0, totalPaid: 0, recoveryRate: 0 });
@@ -45,10 +47,10 @@ export const PageAnalytics = ({
   const [channel, setChannel] = useState({ emailSent: 0, emailDelivered: 0, emailViewed: 0, whatsAppSent: 0, whatsAppDelivered: 0, whatsAppViewed: 0 });
   const [critical, setCritical] = useState({ criticalTitles: 0, overdueBaseTitles: 0, recoveredTitles: 0, recoveryRate: 0, trend: [] as { month: string; recoveryRate: number; recoveredTitles: number; overdueBaseTitles: number }[] });
   const receivableColor = "#FDE047";
-  const paymentColor = "#00E676";
+  const paymentColor = colors.success;
   const overdueColor = colors.accent;
   const deliveryColor = "#4FC3F7";
-  const recoveredColor = paymentColor;
+  const recoveredColor = colors.success;
 
   const isMaster = session.role === "Master";
 
@@ -119,6 +121,18 @@ export const PageAnalytics = ({
   const paymentRate = totalOperational > 0
     ? Number(((statusBreakdown.paid / totalOperational) * 100).toFixed(1))
     : Number(summary.recoveryRate.toFixed(1));
+  const chartThemeKey = isDark ? "dark" : "light";
+  const gridStroke = isDark ? "rgba(255, 255, 255, 0.2)" : colors.border2;
+  const recoveryTrend = useMemo(() => (
+    critical.trend.map(item => {
+      const recoveredRate = safePercent(item.recoveredTitles, item.overdueBaseTitles);
+      return {
+        month: item.month,
+        recoveredRate,
+        remainingRate: Math.max(0, 100 - recoveredRate),
+      };
+    })
+  ), [critical.trend]);
 
   return (
     <div className="animate-fade-up">
@@ -193,14 +207,14 @@ export const PageAnalytics = ({
         <CardHeader title={t("analytics.sendsPerDay")} />
         <div className="p-5">
           <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={sends}>
-              <CartesianGrid strokeDasharray="3 3" stroke={colors.border} />
+            <BarChart data={sends} key={chartThemeKey}>
+              <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
               <XAxis dataKey="day" tick={{ fill: colors.text3, fontSize: 10 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: colors.text3, fontSize: 11 }} axisLine={false} tickLine={false} />
-              <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(220, 38, 38, 0.08)" }} />
+              <Tooltip content={<ChartTooltip />} cursor={{ fill: `${colors.accent}1A` }} />
               <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-              <Bar dataKey="email" name={t("channel.email")} stackId="a" fill={`${colors.accent}cc`} radius={[0, 0, 0, 0]} />
-              <Bar dataKey="wa" name={t("channel.whatsapp")} stackId="a" fill="#25d36699" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="email" name={t("channel.email")} stackId="a" fill={colors.accent} radius={[0, 0, 0, 0]} />
+              <Bar dataKey="wa" name={t("channel.whatsapp")} stackId="a" fill={colors.wa} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -209,18 +223,16 @@ export const PageAnalytics = ({
       <div className="bg-surface border border-border-subtle rounded-[14px] overflow-hidden mt-4">
         <CardHeader title={t("analytics.recoveryByAging")} subtitle={`${critical.recoveredTitles.toLocaleString("pt-BR")} / ${critical.overdueBaseTitles.toLocaleString("pt-BR")} • ${critical.recoveryRate.toFixed(1)}%`} />
         <div className="p-5">
-          <ResponsiveContainer width="100%" height={180}>
-            <ComposedChart data={critical.trend}>
-              <CartesianGrid strokeDasharray="3 3" stroke={colors.border} />
-              <XAxis dataKey="month" tick={{ fill: colors.text3, fontSize: 10 }} axisLine={false} tickLine={false} />
-              <YAxis yAxisId="left" tick={{ fill: colors.text3, fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fill: colors.text3, fontSize: 11 }} axisLine={false} tickLine={false} />
-              <Tooltip content={<ChartTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-              <Bar yAxisId="left" dataKey="overdueBaseTitles" name="Base em atraso" fill={`${colors.warn}66`} radius={[3, 3, 0, 0]} />
-              <Bar yAxisId="left" dataKey="recoveredTitles" name={t("analytics.recovered")} fill={`${recoveredColor}cc`} radius={[3, 3, 0, 0]} />
-              <Line yAxisId="right" type="monotone" dataKey="recoveryRate" name={t("analytics.recoveryRate")} stroke={recoveredColor} strokeWidth={2.2} dot={{ r: 3 }} />
-            </ComposedChart>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={recoveryTrend} barGap={6} key={`${chartThemeKey}-recovery`}>
+              <CartesianGrid strokeDasharray="4 4" stroke={gridStroke} />
+              <XAxis dataKey="month" tick={{ fill: colors.text2, fontSize: 11 }} axisLine={false} tickLine={false} tickMargin={8} />
+              <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tick={{ fill: colors.text2, fontSize: 11 }} axisLine={false} tickLine={false} tickMargin={6} />
+              <Tooltip content={<ChartTooltip />} cursor={{ fill: `${colors.accent}14` }} />
+              <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} iconType="circle" iconSize={8} />
+              <Bar dataKey="recoveredRate" name={t("analytics.recovered")} stackId="a" fill={recoveredColor} barSize={28} radius={[6, 6, 0, 0]} />
+              <Bar dataKey="remainingRate" name="Em atraso" stackId="a" fill={colors.warn} barSize={28} radius={[6, 6, 0, 0]} />
+            </BarChart>
           </ResponsiveContainer>
         </div>
       </div>

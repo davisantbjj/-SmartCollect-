@@ -549,6 +549,7 @@ public class TitleService : ITitleService
             ["DataEmissao"] = title.IssueDate.ToString("dd/MM/yyyy"),
             ["LinkBoleto"] = title.BoletoUrl ?? string.Empty,
             ["Empresa"] = companyName,
+            ["NomeEmpresa"] = companyName,
         };
 
         return TemplateRegex.Replace(template ?? string.Empty, match =>

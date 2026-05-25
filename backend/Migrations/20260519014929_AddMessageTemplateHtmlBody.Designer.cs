@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SmartCollect.Infrastructure.Data;
@@ -11,9 +12,11 @@ using SmartCollect.Infrastructure.Data;
 namespace SmartCollect.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260519014929_AddMessageTemplateHtmlBody")]
+    partial class AddMessageTemplateHtmlBody
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -257,6 +260,9 @@ namespace SmartCollect.Api.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("HtmlBody")
+                        .HasColumnType("text");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -351,30 +357,6 @@ namespace SmartCollect.Api.Migrations
 
                     b.Property<string>("EmailDomain")
                         .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<bool>("EmailLayoutEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("EmailLayoutFooterMessage")
-                        .HasColumnType("text");
-
-                    b.Property<string>("EmailLayoutHeroUrl")
-                        .HasColumnType("text");
-
-                    b.Property<string>("EmailLayoutInstagramUrl")
-                        .HasColumnType("text");
-
-                    b.Property<string>("EmailLayoutLinkedInUrl")
-                        .HasColumnType("text");
-
-                    b.Property<string>("EmailLayoutLogoUrl")
-                        .HasColumnType("text");
-
-                    b.Property<string>("EmailLayoutTelegramUrl")
-                        .HasColumnType("text");
-
-                    b.Property<string>("EmailLayoutWhatsAppUrl")
                         .HasColumnType("text");
 
                     b.Property<string>("ExternalApiAuthScheme")

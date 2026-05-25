@@ -54,6 +54,7 @@ public static class DependencyInjection
         services.AddScoped<IContactService, ContactService>();
         services.AddScoped<ICollectionRuleService, CollectionRuleService>();
         services.AddScoped<IMessageTemplateService, MessageTemplateService>();
+        services.AddScoped<IEmailLayoutConfigService, EmailLayoutConfigService>();
         services.AddScoped<IFileImportService, FileImportService>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<ISmtpConfigService, SmtpConfigService>();

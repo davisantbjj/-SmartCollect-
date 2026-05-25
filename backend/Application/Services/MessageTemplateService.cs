@@ -47,11 +47,11 @@ public class MessageTemplateService : IMessageTemplateService
             {
                 Id = Guid.NewGuid(),
                 TenantId = tenantId,
-                Name = "Lembrete D-3 (Email)",
+                Name = "Lembrete D-3 (E-mail)",
                 Channel = CollectionChannel.Email,
                 Type = TemplateType.Reminder,
-                Subject = "Lembrete: titulo {{CodigoTitulo}} vence em {{DataVencimento}}",
-                Body = "Ola {{NomeCliente}}, lembramos que o titulo {{CodigoTitulo}} no valor de {{Valor}} vence em {{DataVencimento}}. Caso ja tenha pago, desconsidere esta mensagem.",
+                Subject = "Lembrete: título {{CodigoTitulo}} vence em {{DataVencimento}}",
+                Body = "Olá {{NomeCliente}}, lembramos que o título {{CodigoTitulo}} no valor de {{Valor}} vence em {{DataVencimento}}. Caso já tenha pago, desconsidere esta mensagem.",
                 Active = true,
             },
             new()
@@ -62,29 +62,29 @@ public class MessageTemplateService : IMessageTemplateService
                 Channel = CollectionChannel.WhatsApp,
                 Type = TemplateType.Reminder,
                 Subject = null,
-                Body = "Ola {{NomeCliente}}, seu titulo {{CodigoTitulo}} ({{Valor}}) vence amanha ({{DataVencimento}}). Link do boleto: {{LinkBoleto}}",
+                Body = "Olá {{NomeCliente}}, seu título {{CodigoTitulo}} ({{Valor}}) vence amanhã ({{DataVencimento}}). Link do boleto: {{LinkBoleto}}",
                 Active = true,
             },
             new()
             {
                 Id = Guid.NewGuid(),
                 TenantId = tenantId,
-                Name = "Cobranca D+1 (WhatsApp)",
+                Name = "Cobrança D+1 (WhatsApp)",
                 Channel = CollectionChannel.WhatsApp,
                 Type = TemplateType.Collection,
                 Subject = null,
-                Body = "Ola {{NomeCliente}}, identificamos atraso de {{DiasAtraso}} dia(s) no titulo {{CodigoTitulo}}. Valor: {{Valor}}. Regularize em: {{LinkBoleto}}",
+                Body = "Olá {{NomeCliente}}, identificamos atraso de {{DiasAtraso}} dia(s) no título {{CodigoTitulo}}. Valor: {{Valor}}. Regularize em: {{LinkBoleto}}",
                 Active = true,
             },
             new()
             {
                 Id = Guid.NewGuid(),
                 TenantId = tenantId,
-                Name = "Cobranca D+7 (Email)",
+                Name = "Cobrança D+7 (E-mail)",
                 Channel = CollectionChannel.Email,
                 Type = TemplateType.Collection,
-                Subject = "Cobranca pendente: titulo {{CodigoTitulo}}",
-                Body = "Prezado(a), o titulo {{CodigoTitulo}} permanece em aberto ha {{DiasAtraso}} dia(s). Valor devido: {{Valor}}. Pagamento: {{LinkBoleto}}.",
+                Subject = "Cobrança pendente: título {{CodigoTitulo}}",
+                Body = "Prezado(a), o título {{CodigoTitulo}} permanece em aberto há {{DiasAtraso}} dia(s). Valor devido: {{Valor}}. Pagamento: {{LinkBoleto}}.",
                 Active = true,
             },
             new()
@@ -95,7 +95,7 @@ public class MessageTemplateService : IMessageTemplateService
                 Channel = CollectionChannel.Email,
                 Type = TemplateType.ThankYou,
                 Subject = "Pagamento confirmado - {{CodigoTitulo}}",
-                Body = "Recebemos o pagamento do titulo {{CodigoTitulo}}. Obrigado pelo retorno, {{NomeCliente}}.",
+                Body = "Recebemos o pagamento do título {{CodigoTitulo}}. Obrigado pelo retorno, {{NomeCliente}}.",
                 Active = true,
             },
         };
@@ -161,5 +161,23 @@ public class MessageTemplateService : IMessageTemplateService
         return new MessageTemplateResponse(
             template.Id, template.Name, template.Channel.ToString(),
             template.Subject, template.Body, template.Type.ToString(), template.Active);
+    }
+
+    public async Task<bool> DeleteAsync(Guid tenantId, Guid id)
+    {
+        var template = await _db.MessageTemplates
+            .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == tenantId);
+
+        if (template is null)
+            return false;
+
+        var inUse = await _db.Triggers.AnyAsync(t => t.TemplateId == id);
+        if (inUse)
+            throw new InvalidOperationException("Este template está vinculado a gatilhos de régua e não pode ser excluído.");
+
+        _db.MessageTemplates.Remove(template);
+        await _db.SaveChangesAsync();
+
+        return true;
     }
 }

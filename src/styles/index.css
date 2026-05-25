@@ -5,31 +5,31 @@
   --font-sans: 'Plus Jakarta Sans', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
-  --color-surface: #F9FAFB;
-  --color-surface-2: #F3F4F6;
-  --color-surface-3: #E5E7EB;
-  --color-border-subtle: rgba(31, 41, 55, 0.16);
-  --color-border-subtle-2: rgba(31, 41, 55, 0.24);
+  --color-surface: #F3F4F6;
+  --color-surface-2: #E5E7EB;
+  --color-surface-3: #D1D5DB;
+  --color-border-subtle: rgba(15, 23, 42, 0.2);
+  --color-border-subtle-2: rgba(15, 23, 42, 0.3);
   --color-accent: #DC2626;
   --color-danger: #DC2626;
   --color-warn: #EA580C;
   --color-success: #16A34A;
-  --color-text-primary: #1F2937;
-  --color-text-secondary: #4B5563;
-  --color-text-muted: #6B7280;
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #1F2937;
+  --color-text-muted: #4B5563;
   --color-wa: #25D366;
 }
 
 @layer base {
   :root {
-    --color-surface: #F9FAFB;
-    --color-surface-2: #F3F4F6;
-    --color-surface-3: #E5E7EB;
-    --color-border-subtle: rgba(31, 41, 55, 0.16);
-    --color-border-subtle-2: rgba(31, 41, 55, 0.24);
-    --color-text-primary: #1F2937;
-    --color-text-secondary: #4B5563;
-    --color-text-muted: #6B7280;
+    --color-surface: #F3F4F6;
+    --color-surface-2: #E5E7EB;
+    --color-surface-3: #D1D5DB;
+    --color-border-subtle: rgba(15, 23, 42, 0.2);
+    --color-border-subtle-2: rgba(15, 23, 42, 0.3);
+    --color-text-primary: #0F172A;
+    --color-text-secondary: #1F2937;
+    --color-text-muted: #4B5563;
   }
 
   .dark {

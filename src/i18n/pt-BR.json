@@ -607,6 +607,38 @@
     "channelEmail": "E-mail",
     "channelWhatsapp": "WhatsApp",
     "loading": "Carregando templates...",
+    "confirmDelete": "Tem certeza que deseja excluir o template",
+    "actionDeleting": "Excluindo...",
+    "layout": {
+      "open": "Layout do e-mail",
+      "title": "Layout do e-mail",
+      "enabled": "Ativar layout personalizado",
+      "enabledHint": "Use o layout com logomarca, imagem de rodape e redes sociais.",
+      "logoUpload": "Logo",
+      "logoUrl": "Logo (URL)",
+      "footerImageUpload": "Imagem de rodape",
+      "footerImageUrl": "Imagem de rodape (URL)",
+      "upload": "Enviar imagem",
+      "remove": "Remover",
+      "footerMessage": "Mensagem de rodapé",
+      "footerPlaceholder": "Ex: Dúvidas? Fale com nosso time.",
+      "instagram": "Instagram (URL)",
+      "linkedin": "LinkedIn (URL)",
+      "whatsapp": "WhatsApp (URL)",
+      "telegram": "Telegram (URL)",
+      "preview": "Prévia do layout",
+      "save": "Salvar layout",
+      "messages": {
+        "saved": "Layout do e-mail salvo com sucesso!"
+      },
+      "errors": {
+        "load": "Erro ao carregar layout do e-mail.",
+        "save": "Erro ao salvar layout do e-mail."
+      }
+    },
+    "messages": {
+      "deleted": "Template excluído com sucesso!"
+    },
     "validation": {
       "selectTenant": "Selecione uma empresa no topo para visualizar e editar templates.",
       "requiredFields": "Nome e mensagem são obrigatórios.",
@@ -614,7 +646,8 @@
     },
     "errors": {
       "load": "Erro ao carregar templates.",
-      "save": "Erro ao salvar template."
+      "save": "Erro ao salvar template.",
+      "delete": "Erro ao excluir template."
     }
   },
   "tenants": {

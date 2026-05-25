@@ -345,12 +345,10 @@ export const PageSequence = ({
                   <div
                     key={rule.id}
                     onClick={() => setSelectedRuleId(rule.id)}
-                    className={`flex items-center justify-between px-3 py-2 rounded-lg border cursor-pointer ${
-                      selectedRule?.id === rule.id
-                        ? "border-accent bg-accent/14 shadow-[inset_0_0_0_1px_rgba(59,130,246,0.25)]"
-                        : rule.active
-                          ? "border-success/40 bg-success/8"
-                          : "border-border-subtle bg-surface-2"
+                    className={`flex items-center justify-between px-3 py-2 rounded-lg border cursor-pointer hover:border-accent hover:bg-accent/10 hover:shadow-[inset_0_0_0_1px_rgba(59,130,246,0.25)] ${
+                      rule.active
+                        ? "border-success/40 bg-success/8"
+                        : "border-border-subtle bg-surface-2"
                     }`}
                   >
                     <div>

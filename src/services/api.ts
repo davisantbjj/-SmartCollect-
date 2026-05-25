@@ -296,6 +296,28 @@ export interface DispatchWindowConfigRequest {
   pauseAutomaticDispatchDuringProcessing: boolean;
 }
 
+export interface EmailLayoutConfigResponse {
+  enabled: boolean;
+  logoUrl?: string | null;
+  heroUrl?: string | null;
+  footerMessage?: string | null;
+  instagramUrl?: string | null;
+  linkedInUrl?: string | null;
+  whatsAppUrl?: string | null;
+  telegramUrl?: string | null;
+}
+
+export interface EmailLayoutConfigRequest {
+  enabled: boolean;
+  logoUrl?: string;
+  heroUrl?: string;
+  footerMessage?: string;
+  instagramUrl?: string;
+  linkedInUrl?: string;
+  whatsAppUrl?: string;
+  telegramUrl?: string;
+}
+
 export interface MessageTemplateResponse {
   id: string;
   name: string;
@@ -839,6 +861,12 @@ export async function updateTemplate(id: string, payload: UpdateTemplateRequest,
   });
 }
 
+export async function deleteTemplate(id: string, tenantId?: string) {
+  return request<void>(`/api/templates/${id}${tenantParam(tenantId)}`, {
+    method: "DELETE",
+  });
+}
+
 // ── Collection Rules ──────────────────────────────────────────────────────
 
 export async function getCollectionRules(tenantId?: string) {
@@ -910,6 +938,17 @@ export async function saveExternalApiConfig(payload: ExternalApiConfigRequest, t
 
 export async function testExternalApiConfig(tenantId?: string) {
   return request<{ message: string }>(`/api/config/external-api/test${tenantParam(tenantId)}`, { method: "POST" });
+}
+
+export async function getEmailLayoutConfig(tenantId?: string) {
+  return request<EmailLayoutConfigResponse>(`/api/config/email-layout${tenantParam(tenantId)}`);
+}
+
+export async function saveEmailLayoutConfig(payload: EmailLayoutConfigRequest, tenantId?: string) {
+  return request<{ message: string }>(`/api/config/email-layout${tenantParam(tenantId)}`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function getDispatchWindowConfig(tenantId?: string) {

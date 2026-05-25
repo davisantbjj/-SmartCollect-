@@ -57,4 +57,19 @@ public class TemplatesController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
+
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "Admin,Worker,Master")]
+    public async Task<IActionResult> Delete(Guid id, [FromQuery] Guid? tenantId = null)
+    {
+        try
+        {
+            var removed = await _service.DeleteAsync(ResolveTenantId(tenantId), id);
+            return removed ? NoContent() : NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 }

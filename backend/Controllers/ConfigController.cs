@@ -15,17 +15,20 @@ public class ConfigController : ControllerBase
     private readonly IWhatsAppConfigService _whatsAppService;
     private readonly ISyncService _syncService;
     private readonly IDispatchWindowConfigService _dispatchWindowService;
+    private readonly IEmailLayoutConfigService _emailLayoutService;
 
     public ConfigController(
         ISmtpConfigService smtpService,
         IWhatsAppConfigService whatsAppService,
         ISyncService syncService,
-        IDispatchWindowConfigService dispatchWindowService)
+        IDispatchWindowConfigService dispatchWindowService,
+        IEmailLayoutConfigService emailLayoutService)
     {
         _smtpService = smtpService;
         _whatsAppService = whatsAppService;
         _syncService = syncService;
         _dispatchWindowService = dispatchWindowService;
+        _emailLayoutService = emailLayoutService;
     }
 
     private Guid ResolveTenantId(Guid? tenantId) => TenantContextResolver.ResolveTenantOrThrow(User, tenantId);
@@ -183,6 +186,34 @@ public class ConfigController : ControllerBase
         {
             await _dispatchWindowService.SaveAsync(ResolveTenantId(tenantId), request, cancellationToken);
             return Ok(new { message = "Janela de envio salva com sucesso." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("email-layout")]
+    public async Task<IActionResult> GetEmailLayout([FromQuery] Guid? tenantId = null)
+    {
+        try
+        {
+            var result = await _emailLayoutService.GetAsync(ResolveTenantId(tenantId));
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("email-layout")]
+    public async Task<IActionResult> SaveEmailLayout([FromBody] EmailLayoutConfigRequest request, [FromQuery] Guid? tenantId = null)
+    {
+        try
+        {
+            await _emailLayoutService.SaveAsync(ResolveTenantId(tenantId), request);
+            return Ok(new { message = "Layout de e-mail salvo com sucesso." });
         }
         catch (InvalidOperationException ex)
         {

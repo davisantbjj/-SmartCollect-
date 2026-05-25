@@ -381,7 +381,7 @@ export default function SmartCollect() {
   // ── Main app ──────────────────────────────────────────────────────────────
   const pages: Record<PageId, React.ReactNode> = {
     dashboard:   <PageDashboard showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} onViewAllDefaulters={goOverdueTitles} />,
-    analytics:   <PageAnalytics showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} />,
+    analytics:   <PageAnalytics showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} isDark={isDark} />,
     titles:      <PageTitles showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} presetStatusFilter={titlesPreset?.status} presetFilterToken={titlesPreset?.token} />,
     import:      <PageImport showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} />,
     contacts:    <PageContacts showToast={showToast} session={session} selectedTenantId={selectedTenantId || undefined} onSubtitleChange={setContactsSubtitle} />,

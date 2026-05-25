@@ -54,6 +54,8 @@ export const PageTemplates = ({
   const [layout, setLayout] = useState<EmailLayoutConfigResponse>(emptyLayout);
   const [layoutLoading, setLayoutLoading] = useState(false);
   const [layoutSaving, setLayoutSaving] = useState(false);
+  const [logoFileName, setLogoFileName] = useState("");
+  const [heroFileName, setHeroFileName] = useState("");
   const logoInputRef = useRef<HTMLInputElement | null>(null);
   const heroInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -119,6 +121,8 @@ export const PageTemplates = ({
       setLayoutLoading(true);
       const data = await getEmailLayoutConfig(tenantId);
       setLayout({ ...emptyLayout, ...data });
+      setLogoFileName(extractFileName(data.logoUrl));
+      setHeroFileName(extractFileName(data.heroUrl));
       setLayoutOpen(true);
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("templates.layout.errors.load");
@@ -193,25 +197,77 @@ export const PageTemplates = ({
   const sanitizePreviewHtml = (html: string) =>
     html.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "");
 
+  const extractFileName = (value?: string | null) => {
+    if (!value) return "";
+    if (value.startsWith("data:")) return "";
+    try {
+      const url = new URL(value);
+      const last = url.pathname.split("/").filter(Boolean).pop();
+      return last ?? "";
+    } catch {
+      const last = value.split("/").filter(Boolean).pop();
+      return last ?? "";
+    }
+  };
+
   const handleImageUpload = (file: File | null, target: "logo" | "hero") => {
     if (!file) {
-      if (target === "logo")
+      if (target === "logo") {
         setLayout(l => ({ ...l, logoUrl: "" }));
-      else
+        setLogoFileName("");
+      } else {
         setLayout(l => ({ ...l, heroUrl: "" }));
+        setHeroFileName("");
+      }
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = typeof reader.result === "string" ? reader.result : "";
-      if (target === "logo")
+    optimizeLayoutImage(file, target).then(result => {
+      if (target === "logo") {
         setLayout(l => ({ ...l, logoUrl: result }));
-      else
+        setLogoFileName(file.name);
+      } else {
         setLayout(l => ({ ...l, heroUrl: result }));
-    };
-    reader.readAsDataURL(file);
+        setHeroFileName(file.name);
+      }
+    });
   };
+
+  const optimizeLayoutImage = (file: File, target: "logo" | "hero") =>
+    new Promise<string>(resolve => {
+      if (!file.type.startsWith("image/") || file.type === "image/svg+xml") {
+        const reader = new FileReader();
+        reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+        reader.readAsDataURL(file);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const source = typeof reader.result === "string" ? reader.result : "";
+        const image = new Image();
+        image.onload = () => {
+          const maxWidth = target === "logo" ? 320 : 720;
+          const maxHeight = target === "logo" ? 180 : 360;
+          const scale = Math.min(1, maxWidth / image.width, maxHeight / image.height);
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(image.width * scale));
+          canvas.height = Math.max(1, Math.round(image.height * scale));
+          const context = canvas.getContext("2d");
+
+          if (!context) {
+            resolve(source);
+            return;
+          }
+
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL(file.type === "image/png" ? "image/png" : "image/jpeg", 0.82));
+        };
+        image.onerror = () => resolve(source);
+        image.src = source;
+      };
+      reader.readAsDataURL(file);
+    });
 
   const buildLayoutPreview = (data: EmailLayoutConfigResponse) => {
     const safe = (value?: string | null) => (value ?? "").trim();
@@ -481,6 +537,18 @@ export const PageTemplates = ({
                   {t("templates.layout.remove")}
                 </button>
               </div>
+              {layout.logoUrl && (
+                <div className="mt-2 flex items-center gap-2">
+                  <img
+                    src={layout.logoUrl}
+                    alt="Logo"
+                    className="h-8 w-8 rounded-md border border-border-subtle object-contain bg-surface"
+                  />
+                  <span className="text-[11px] text-text-muted">
+                    Selecionado: {logoFileName || "imagem atual"}
+                  </span>
+                </div>
+              )}
               <input
                 ref={logoInputRef}
                 type="file"
@@ -507,6 +575,18 @@ export const PageTemplates = ({
                   {t("templates.layout.remove")}
                 </button>
               </div>
+              {layout.heroUrl && (
+                <div className="mt-2 flex items-center gap-2">
+                  <img
+                    src={layout.heroUrl}
+                    alt="Imagem principal"
+                    className="h-8 w-8 rounded-md border border-border-subtle object-cover bg-surface"
+                  />
+                  <span className="text-[11px] text-text-muted">
+                    Selecionado: {heroFileName || "imagem atual"}
+                  </span>
+                </div>
+              )}
               <input
                 ref={heroInputRef}
                 type="file"

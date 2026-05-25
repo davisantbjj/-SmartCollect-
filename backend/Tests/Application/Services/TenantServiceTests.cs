@@ -82,7 +82,7 @@ public class TenantServiceTests
     }
 
     [Fact]
-    public async Task UpdateAsync_DuplicateAdminEmailGlobally_Throws()
+    public async Task UpdateAsync_DuplicateTaxId_Throws()
     {
         var db = TestDbContextFactory.Create();
         var tenantA = new Tenant { Id = Guid.NewGuid(), CompanyName = "A", TaxId = "111", EmailDomain = "a.com" };
@@ -117,13 +117,9 @@ public class TenantServiceTests
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.UpdateAsync(tenantB.Id, new UpdateTenantRequest(
                 "B",
-                "222",
-                "b.com",
-                true,
-                "Admin B",
-                "admin-a@test.com",
-                null)));
+                "111",
+                "b.com")));
 
-        Assert.Equal("E-mail do administrador já cadastrado no sistema.", ex.Message);
+        Assert.Equal("A tenant with TaxId '111' already exists.", ex.Message);
     }
 }

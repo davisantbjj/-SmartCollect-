@@ -32,3 +32,4 @@ Fluxo canônico do projeto fica na raiz:
 - `docker compose up -d --build`
 
 Evite manter compose paralelo dentro de `backend/` para nao gerar ambiguidade de ambiente.
+.

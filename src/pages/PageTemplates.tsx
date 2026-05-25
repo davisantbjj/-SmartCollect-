@@ -55,9 +55,11 @@ export const PageTemplates = ({
   const [layoutLoading, setLayoutLoading] = useState(false);
   const [layoutSaving, setLayoutSaving] = useState(false);
   const [logoFileName, setLogoFileName] = useState("");
-  const [heroFileName, setHeroFileName] = useState("");
+  const [footerImageFileName, setFooterImageFileName] = useState("");
+  const [logoUrlInput, setLogoUrlInput] = useState("");
+  const [footerUrlInput, setFooterUrlInput] = useState("");
   const logoInputRef = useRef<HTMLInputElement | null>(null);
-  const heroInputRef = useRef<HTMLInputElement | null>(null);
+  const footerInputRef = useRef<HTMLInputElement | null>(null);
 
   const tenantId = session.role === "Master" ? selectedTenantId : undefined;
   const requiresTenantSelection = session.role === "Master" && !tenantId;
@@ -122,7 +124,9 @@ export const PageTemplates = ({
       const data = await getEmailLayoutConfig(tenantId);
       setLayout({ ...emptyLayout, ...data });
       setLogoFileName(extractFileName(data.logoUrl));
-      setHeroFileName(extractFileName(data.heroUrl));
+      setFooterImageFileName(extractFileName(data.heroUrl));
+      setLogoUrlInput(data.logoUrl?.startsWith("data:") ? "" : (data.logoUrl ?? ""));
+      setFooterUrlInput(data.heroUrl?.startsWith("data:") ? "" : (data.heroUrl ?? ""));
       setLayoutOpen(true);
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : t("templates.layout.errors.load");
@@ -210,14 +214,14 @@ export const PageTemplates = ({
     }
   };
 
-  const handleImageUpload = (file: File | null, target: "logo" | "hero") => {
+  const handleImageUpload = (file: File | null, target: "logo" | "footer") => {
     if (!file) {
       if (target === "logo") {
         setLayout(l => ({ ...l, logoUrl: "" }));
         setLogoFileName("");
       } else {
         setLayout(l => ({ ...l, heroUrl: "" }));
-        setHeroFileName("");
+        setFooterImageFileName("");
       }
       return;
     }
@@ -226,14 +230,16 @@ export const PageTemplates = ({
       if (target === "logo") {
         setLayout(l => ({ ...l, logoUrl: result }));
         setLogoFileName(file.name);
+        setLogoUrlInput("");
       } else {
         setLayout(l => ({ ...l, heroUrl: result }));
-        setHeroFileName(file.name);
+        setFooterImageFileName(file.name);
+        setFooterUrlInput("");
       }
     });
   };
 
-  const optimizeLayoutImage = (file: File, target: "logo" | "hero") =>
+  const optimizeLayoutImage = (file: File, target: "logo" | "footer") =>
     new Promise<string>(resolve => {
       if (!file.type.startsWith("image/") || file.type === "image/svg+xml") {
         const reader = new FileReader();
@@ -247,8 +253,9 @@ export const PageTemplates = ({
         const source = typeof reader.result === "string" ? reader.result : "";
         const image = new Image();
         image.onload = () => {
-          const maxWidth = target === "logo" ? 320 : 720;
-          const maxHeight = target === "logo" ? 180 : 360;
+          const maxWidth = target === "logo" ? 220 : 560;
+          const maxHeight = target === "logo" ? 120 : 180;
+          const quality = target === "logo" ? 0.72 : 0.7;
           const scale = Math.min(1, maxWidth / image.width, maxHeight / image.height);
           const canvas = document.createElement("canvas");
           canvas.width = Math.max(1, Math.round(image.width * scale));
@@ -261,7 +268,7 @@ export const PageTemplates = ({
           }
 
           context.drawImage(image, 0, 0, canvas.width, canvas.height);
-          resolve(canvas.toDataURL(file.type === "image/png" ? "image/png" : "image/jpeg", 0.82));
+          resolve(canvas.toDataURL(file.type === "image/png" ? "image/png" : "image/jpeg", quality));
         };
         image.onerror = () => resolve(source);
         image.src = source;
@@ -271,11 +278,13 @@ export const PageTemplates = ({
 
   const buildLayoutPreview = (data: EmailLayoutConfigResponse) => {
     const safe = (value?: string | null) => (value ?? "").trim();
-    const logo = safe(data.logoUrl)
-      ? `<div style="text-align:center;margin-bottom:16px;"><img src="${safe(data.logoUrl)}" alt="Logo" style="max-width:180px;height:auto;" /></div>`
+    const logoSource = safe(logoUrlInput) || safe(data.logoUrl);
+    const footerSource = safe(footerUrlInput) || safe(data.heroUrl);
+    const logo = logoSource
+      ? `<div style="text-align:center;margin-bottom:16px;"><img src="${logoSource}" alt="Logo" style="max-width:180px;height:auto;" /></div>`
       : "";
-    const hero = safe(data.heroUrl)
-      ? `<div style="text-align:center;margin:16px 0;"><img src="${safe(data.heroUrl)}" alt="Imagem" style="max-width:100%;height:auto;border-radius:10px;" /></div>`
+    const footerImage = footerSource
+      ? `<div style="text-align:center;margin:16px 0;"><img src="${footerSource}" alt="Imagem de rodape" style="max-width:100%;height:auto;border-radius:10px;" /></div>`
       : "";
     const footer = safe(data.footerMessage)
       ? `<div style="margin-top:18px;font-size:12px;color:#9CA3AF;line-height:1.5;">${safe(data.footerMessage)}</div>`
@@ -284,7 +293,7 @@ export const PageTemplates = ({
     const icon = (url?: string | null, label?: string, path?: string) =>
       safe(url)
         ? `<a href="${safe(url)}" style="display:inline-block;margin:0 6px;text-decoration:none;">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="#061C4B" xmlns="http://www.w3.org/2000/svg" aria-label="${label}">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="#DC2626" xmlns="http://www.w3.org/2000/svg" aria-label="${label}">
               <path d="${path}" />
             </svg>
           </a>`
@@ -302,16 +311,20 @@ export const PageTemplates = ({
       : "";
 
     return `
-      <div style="background:#1F2937;border:1px solid rgba(255,255,255,0.15);border-radius:14px;padding:22px;color:#D1D5DB;font-family:'Plus Jakarta Sans',Arial,sans-serif;">
-        <div style="font-size:18px;font-weight:800;color:#F9FAFB;">${session?.role ? "SmartCollect" : "SmartCollect"}</div>
-        <div style="font-size:12px;color:#9CA3AF;">Prévia do layout</div>
-        ${logo}
-        ${hero}
-        <div style="font-size:14px;line-height:1.6;">
-          Olá {{NomeCliente}}, aqui vai a mensagem do template.
+      <div style="background:#1F2937;border:1px solid rgba(255,255,255,0.15);border-radius:14px;overflow:hidden;font-family:'Plus Jakarta Sans',Arial,sans-serif;">
+        <div style="background:#374151;border-bottom:2px solid #DC2626;padding:16px 18px;text-align:center;">
+          <div style="font-size:18px;font-weight:800;color:#F9FAFB;">${session?.role ? "SmartCollect" : "SmartCollect"}</div>
+          <div style="font-size:12px;color:#D1D5DB;">Prévia do layout</div>
         </div>
-        ${footer}
-        ${socialRow}
+        <div style="padding:16px 18px 8px 18px;color:#D1D5DB;">
+          ${logo}
+          <div style="font-size:14px;line-height:1.6;">
+            Olá {{NomeCliente}}, aqui vai a mensagem do template.
+          </div>
+          ${footer}
+          ${footerImage}
+          ${socialRow}
+        </div>
       </div>
     `;
   };
@@ -477,8 +490,8 @@ export const PageTemplates = ({
                 setLayoutSaving(true);
                 await saveEmailLayoutConfig({
                   enabled: layout.enabled,
-                  logoUrl: layout.logoUrl || undefined,
-                  heroUrl: layout.heroUrl || undefined,
+                  logoUrl: (logoUrlInput.trim() || layout.logoUrl) || undefined,
+                  heroUrl: (footerUrlInput.trim() || layout.heroUrl) || undefined,
                   footerMessage: layout.footerMessage || undefined,
                   instagramUrl: layout.instagramUrl || undefined,
                   linkedInUrl: layout.linkedInUrl || undefined,
@@ -556,20 +569,35 @@ export const PageTemplates = ({
                 onChange={e => handleImageUpload(e.target.files?.[0] ?? null, "logo")}
                 className="hidden"
               />
+              <div className="mt-3">
+                <FormInput
+                  label={t("templates.layout.logoUrl")}
+                  value={logoUrlInput}
+                  onChange={e => {
+                    const value = e.target.value;
+                    setLogoUrlInput(value);
+                    if (value.trim()) {
+                      setLayout(l => ({ ...l, logoUrl: "" }));
+                      setLogoFileName("");
+                    }
+                  }}
+                  placeholder="https://..."
+                />
+              </div>
             </div>
             <div>
-              <label className="block text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted mb-[5px]">{t("templates.layout.heroUpload")}</label>
+              <label className="block text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted mb-[5px]">{t("templates.layout.footerImageUpload")}</label>
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => heroInputRef.current?.click()}
+                  onClick={() => footerInputRef.current?.click()}
                   className="px-3 py-2 rounded-lg border border-border-subtle bg-surface-2 text-xs text-text-secondary hover:border-border-subtle-2"
                 >
                   {t("templates.layout.upload")}
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleImageUpload(null, "hero")}
+                  onClick={() => handleImageUpload(null, "footer")}
                   className="text-xs text-text-muted hover:text-text-primary"
                 >
                   {t("templates.layout.remove")}
@@ -579,21 +607,36 @@ export const PageTemplates = ({
                 <div className="mt-2 flex items-center gap-2">
                   <img
                     src={layout.heroUrl}
-                    alt="Imagem principal"
+                    alt="Imagem de rodape"
                     className="h-8 w-8 rounded-md border border-border-subtle object-cover bg-surface"
                   />
                   <span className="text-[11px] text-text-muted">
-                    Selecionado: {heroFileName || "imagem atual"}
+                    Selecionado: {footerImageFileName || "imagem atual"}
                   </span>
                 </div>
               )}
               <input
-                ref={heroInputRef}
+                ref={footerInputRef}
                 type="file"
                 accept="image/*"
-                onChange={e => handleImageUpload(e.target.files?.[0] ?? null, "hero")}
+                onChange={e => handleImageUpload(e.target.files?.[0] ?? null, "footer")}
                 className="hidden"
               />
+              <div className="mt-3">
+                <FormInput
+                  label={t("templates.layout.footerImageUrl")}
+                  value={footerUrlInput}
+                  onChange={e => {
+                    const value = e.target.value;
+                    setFooterUrlInput(value);
+                    if (value.trim()) {
+                      setLayout(l => ({ ...l, heroUrl: "" }));
+                      setFooterImageFileName("");
+                    }
+                  }}
+                  placeholder="https://..."
+                />
+              </div>
             </div>
           </div>
           <div className="col-span-2">

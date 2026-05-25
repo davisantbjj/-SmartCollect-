@@ -335,39 +335,40 @@ public class DispatchDeliveryService : IDispatchDeliveryService
                 : RemoveBoletoUrlFromText(content, boletoHref);
 
         string? logoSource = null;
-        string? heroSource = null;
+        string? footerImageSource = null;
 
         if (tenant.EmailLayoutEnabled)
         {
             logoSource = ResolveInlineImageSource(builder, tenant.EmailLayoutLogoUrl, "logo");
-            heroSource = ResolveInlineImageSource(builder, tenant.EmailLayoutHeroUrl, "hero");
+            footerImageSource = ResolveInlineImageSource(builder, tenant.EmailLayoutHeroUrl, "footer");
         }
 
                 builder.TextBody = BuildTextBody(textContent, boletoHref);
                 builder.HtmlBody = tenant.EmailLayoutEnabled
-                ? BuildTenantLayoutHtml(htmlContent, subject, tenant, boletoHref, logoSource, heroSource)
-                        : BuildStyledHtml(htmlContent, subject, tenant.CompanyName, boletoHref);
+                ? BuildTenantLayoutHtml(builder, htmlContent, subject, tenant, boletoHref, logoSource, footerImageSource)
+                    : BuildStyledHtml(htmlContent, subject, tenant.CompanyName, boletoHref);
 
         return builder.ToMessageBody();
     }
 
         private static string BuildTenantLayoutHtml(
+            BodyBuilder builder,
             string contentHtml,
             string subject,
             Domain.Entities.Tenant tenant,
             string? boletoHref,
             string? logoSource = null,
-            string? heroSource = null)
+            string? footerImageSource = null)
         {
                 var safeSubject = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(subject) ? "Cobrança" : subject.Trim());
                 var safeCompanyName = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(tenant.CompanyName) ? "SmartCollect" : tenant.CompanyName.Trim());
-            var logo = BuildOptionalImageRow(logoSource ?? tenant.EmailLayoutLogoUrl, "Logo", 130, "20px 32px 8px 32px");
-            var hero = BuildOptionalImageRow(heroSource ?? tenant.EmailLayoutHeroUrl, "Imagem principal", 260, "18px 32px 0 32px");
+                var logo = BuildOptionalImageRow(logoSource ?? tenant.EmailLayoutLogoUrl, "Logo", 140, "16px 32px 4px 32px");
+                var footerImage = BuildOptionalImageRow(footerImageSource ?? tenant.EmailLayoutHeroUrl, "Imagem de rodape", 320, "10px 32px 4px 32px");
                 var footer = string.IsNullOrWhiteSpace(tenant.EmailLayoutFooterMessage)
                         ? string.Empty
-                        : $"<div style=\"margin-top:18px;font-family:'Plus Jakarta Sans',Arial,sans-serif;color:{EmailTextMuted};font-size:12px;line-height:1.5;\">{WebUtility.HtmlEncode(tenant.EmailLayoutFooterMessage.Trim())}</div>";
+                    : $"<div style=\"margin-top:18px;font-family:'Plus Jakarta Sans',Arial,sans-serif;color:{EmailTextMuted};font-size:12px;line-height:1.5;\">{WebUtility.HtmlEncode(tenant.EmailLayoutFooterMessage.Trim())}</div>";
 
-                var socialRow = BuildSocialRow(tenant, EmailAccent);
+                var socialRow = BuildSocialRow(builder, tenant);
 
                 var boletoButton = string.IsNullOrWhiteSpace(boletoHref)
                         ? string.Empty
@@ -382,54 +383,54 @@ public class DispatchDeliveryService : IDispatchDeliveryService
                             """;
 
                 return $"""
-                    <!doctype html>
-                    <html lang="pt-BR">
-                    <head>
-                        <meta charset="utf-8">
-                        <meta name="viewport" content="width=device-width, initial-scale=1">
-                        <title>{safeSubject}</title>
-                    </head>
-                    <body style="margin:0;padding:0;background:#eef8ff;">
-                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#eef8ff;margin:0;padding:0;">
-                            <tr>
-                                <td align="center">
-                                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#cfeeff;margin:0 auto;">
-                                        <tr>
-                                            <td align="center" style="background:#08245a;padding:30px 32px 76px 32px;">
-                                                <div style="font-family:Arial,sans-serif;color:#ffffff;font-size:22px;font-weight:800;line-height:1.25;">{safeCompanyName}</div>
-                                                <div style="font-family:Arial,sans-serif;color:#c7ddff;font-size:14px;line-height:1.45;margin-top:8px;">{safeSubject}</div>
-                                            </td>
-                                        </tr>
-                                        {logo}
-                                        {hero}
-                                        <tr>
-                                            <td align="center" style="padding:0 32px 12px 32px;">
-                                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:430px;background:#ffffff;border-radius:8px;margin:-54px auto 0 auto;">
-                                                    <tr>
-                                                        <td style="padding:28px 28px 22px 28px;font-family:Arial,sans-serif;color:#08245a;font-size:15px;line-height:1.55;text-align:left;">
-                                                            {contentHtml}
-                                                            {footer}
-                                                        </td>
-                                                    </tr>
-                                                </table>
-                                            </td>
-                                        </tr>
-                                        {boletoButton}
-                                        {socialRow}
-                                        <tr>
-                                            <td align="center" style="padding:24px 32px 30px 32px;background:#08245a;">
-                                                <div style="font-family:Arial,sans-serif;color:#c7ddff;font-size:12px;line-height:1.5;">
-                                                    Este e-mail é automático. Não responda.
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    </table>
-                                </td>
-                            </tr>
-                        </table>
-                    </body>
-                    </html>
-                    """;
+                        <!doctype html>
+                        <html lang="pt-BR">
+                        <head>
+                            <meta charset="utf-8">
+                            <meta name="viewport" content="width=device-width, initial-scale=1">
+                            <title>{safeSubject}</title>
+                        </head>
+                        <body style="margin:0;padding:0;background:{EmailSurface};">
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:{EmailSurface};margin:0;padding:28px 12px;">
+                                <tr>
+                                    <td align="center">
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:{EmailSurface2};border:1px solid {EmailBorder};border-radius:14px;overflow:hidden;">
+                                            <tr>
+                                                <td align="center" style="background:{EmailSurface3};padding:22px 32px;border-bottom:2px solid {EmailAccent};">
+                                                    <div style="font-family:'Plus Jakarta Sans',Arial,sans-serif;color:{EmailText};font-size:20px;font-weight:800;line-height:1.25;">{safeCompanyName}</div>
+                                                    <div style="font-family:'Plus Jakarta Sans',Arial,sans-serif;color:{EmailTextSecondary};font-size:13px;line-height:1.45;margin-top:6px;">{safeSubject}</div>
+                                                </td>
+                                            </tr>
+                                            {logo}
+                                            <tr>
+                                                <td align="center" style="padding:18px 32px 12px 32px;">
+                                                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:{EmailSurface3};border:1px solid {EmailBorder};border-radius:10px;margin:0 auto;">
+                                                        <tr>
+                                                            <td style="padding:26px 28px 22px 28px;font-family:'Plus Jakarta Sans',Arial,sans-serif;color:{EmailTextSecondary};font-size:15px;line-height:1.6;text-align:left;">
+                                                                {contentHtml}
+                                                                {footer}
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                            {boletoButton}
+                                            {footerImage}
+                                            {socialRow}
+                                            <tr>
+                                                <td align="center" style="padding:18px 32px 24px 32px;background:{EmailSurface3};">
+                                                    <div style="font-family:'Plus Jakarta Sans',Arial,sans-serif;color:{EmailTextMuted};font-size:12px;line-height:1.5;">
+                                                        Este e-mail é automático. Não responda.
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </body>
+                        </html>
+                        """;
         }
 
         private static string BuildOptionalImageRow(string? imageUrl, string alt, int maxWidth, string padding)
@@ -446,14 +447,14 @@ public class DispatchDeliveryService : IDispatchDeliveryService
                     """;
         }
 
-        private static string BuildSocialRow(Domain.Entities.Tenant tenant, string accent)
+        private static string BuildSocialRow(BodyBuilder builder, Domain.Entities.Tenant tenant)
         {
                 var links = new List<string>
                 {
-                        BuildSocialLink("Instagram", tenant.EmailLayoutInstagramUrl),
-                        BuildSocialLink("LinkedIn", tenant.EmailLayoutLinkedInUrl),
-                        BuildSocialLink("WhatsApp", tenant.EmailLayoutWhatsAppUrl),
-                        BuildSocialLink("Telegram", tenant.EmailLayoutTelegramUrl)
+                BuildSocialLink(builder, "Instagram", tenant.EmailLayoutInstagramUrl),
+                BuildSocialLink(builder, "LinkedIn", tenant.EmailLayoutLinkedInUrl),
+                BuildSocialLink(builder, "WhatsApp", tenant.EmailLayoutWhatsAppUrl),
+                BuildSocialLink(builder, "Telegram", tenant.EmailLayoutTelegramUrl)
                 };
 
                 var linksHtml = string.Join(string.Empty, links.Where(link => !string.IsNullOrWhiteSpace(link)));
@@ -462,8 +463,8 @@ public class DispatchDeliveryService : IDispatchDeliveryService
 
                 return $"""
                     <tr>
-                        <td align="center" style="padding: 12px 32px 26px 32px;background:#08245a;">
-                            <div style="font-family:Arial,sans-serif;color:#ffffff;font-size:14px;line-height:1.4;margin-bottom:12px;">
+                        <td align="center" style="padding: 10px 32px 18px 32px;background:{EmailSurface3};">
+                            <div style="font-family:'Plus Jakarta Sans',Arial,sans-serif;color:{EmailTextSecondary};font-size:12px;line-height:1.4;margin-bottom:8px;">
                                 Confira nossas redes sociais
                             </div>
                             <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 auto;">
@@ -476,19 +477,59 @@ public class DispatchDeliveryService : IDispatchDeliveryService
                     """;
         }
 
-        private static string BuildSocialLink(string label, string? url)
+        private static string BuildSocialLink(BodyBuilder builder, string label, string? url)
         {
                 if (!TryNormalizeHttpUrl(url, out var safeUrl))
                         return string.Empty;
 
+            var iconCid = ResolveInlineSocialIcon(builder, label);
+            var iconHtml = string.IsNullOrWhiteSpace(iconCid)
+                    ? string.Empty
+                : $"<img src=\"{iconCid}\" alt=\"{WebUtility.HtmlEncode(label)}\" width=\"18\" height=\"18\" style=\"display:block;\" />";
+
                 return $"""
                     <td align="center" style="padding:0 6px;">
-                        <a href="{WebUtility.HtmlEncode(safeUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#1b4aa0;color:#ffffff;text-decoration:none;font-family:Arial,sans-serif;font-size:12px;font-weight:700;line-height:1;padding:9px 11px;border-radius:6px;">
-                            {WebUtility.HtmlEncode(label)}
+                        <a href="{WebUtility.HtmlEncode(safeUrl)}" target="_blank" rel="noopener noreferrer" aria-label="{WebUtility.HtmlEncode(label)}" style="display:inline-block;background:transparent;color:#ffffff;text-decoration:none;font-family:'Plus Jakarta Sans',Arial,sans-serif;line-height:1;padding:6px;border-radius:999px;border:1px solid {EmailBorder};">
+                            {iconHtml}
                         </a>
                     </td>
                     """;
         }
+
+                private static string? ResolveInlineSocialIcon(BodyBuilder builder, string label)
+                {
+                    var base64 = GetSocialIconPngBase64(label);
+                    if (string.IsNullOrWhiteSpace(base64))
+                        return null;
+
+                    var bytes = Convert.FromBase64String(base64);
+                    var contentId = MimeUtils.GenerateMessageId();
+                    var part = new MimePart("image", "png")
+                    {
+                        Content = new MimeContent(new MemoryStream(bytes)),
+                        ContentId = contentId,
+                        ContentDisposition = new ContentDisposition(ContentDisposition.Inline),
+                        ContentTransferEncoding = ContentEncoding.Base64,
+                    };
+
+                    part.ContentDisposition.FileName = null;
+                    part.ContentType.Name = null;
+
+                    builder.LinkedResources.Add(part);
+                    return $"cid:{contentId}";
+                }
+
+                private static string GetSocialIconPngBase64(string label)
+                {
+                    return label switch
+                    {
+                        "Instagram" => "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAACXBIWXMAAAsTAAALEwEAmpwYAAADEklEQVRYhbWXu06VQRDHPw5YCh1gAoJCQEBeQS3EUrw0PgAijVLoi2CBvUZJsBALvDwBSKFILMUIgtyRBORigJ8ZMusZlt3v4yBM8iVndy7/mdnZOTtJEiCgFugGXgLDwDiwACybz6cNjz8HfAIGgEdAfQjLB64AngHbAYD/pR2gTzBi4K3AZIaRX16U3zU7y4HvT8SGYLSGIrfgks5eoA2oAooz0xcOqhK4DDwGfhv7E0C5FewzzK9Aw1EAM5xpUNuOnjpGvZ4P6uWxgQMXgPvARV03anbROqtNtEId9Rwj+DmT9k2gSfefGLxu2XhtNi4VAFAGtADN8jvAv+MVX4fut5m9/kTvqqPyIFre6CmgCxgBdo3eru51AiVJvgDnze2p0f1qozcsGzO62AKKUsClVr6QTWNAneqUA+3AGWOn2NTcpGws6mI1A3zBA5oGBvX76fHmnRMRe1sqNyuLFV2spKTdRj4FXLfZkt/ATc+RMXccAZtrKrMoi1VdLEWEuzzw6pTIzmpmHHVG5PJBA+subRHhEWOwPQZu5G8Z+aGIjDv2NXseMwHBMlPt02lFanRyprCl2EoDMo6/mZiKnAoItphoBrPAjd47o9cU4E8pb9s68CMg2GwMvS3AgfeFOLCpi9mA4EkdgbstW/uvRNjgBxPNjUM4cPsQRTin/PVE2yQpfeCeMTidcQ1rvF7QEZFbUv5qYjrcWkS4RJuKdUKaTs7I5DRyCz6a0oj29YH8lYhHVmf+WByJ3hspTqkfjyey51Psuea31wknTMFEn17qxGeyaTQDvGhf79Fnt6OqmGKSP467qrNj9OT3kJx5LO3GRoXR+ygb/WbjapqyZ6hU+4R8pwvQu2LwBhIdQBz1HtbQUUmefQbvoZuC3CAiD8bGEwRvMO/EnX/TkjyRjVcn9Sxv9J7lzy2z3NwG1MsePa/KIwLmdKi5pkPOhrE/eeD9mTGa+YPnst79cf2WPF7abDlxYDTzMvHCu2LHRdt61Kkvb+dIvQ4sr+Su6p+HjXAjAOAPrt+0X8g1f7A3BQXoLxjuPbrBzNYoAAAAAElFTkSuQmCC",
+                        "LinkedIn" => "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAACXBIWXMAAAsTAAALEwEAmpwYAAABN0lEQVRYhe2XsUoDQRRFh4T0FsZ8gRbRUvQH9F8sLSIIIqIgaVL5DWlTBNKIWkgkmmgjgoWCgoWCkCKNhSYeGdliGF5AFt5bi72wzdzLfYdld4ZxwBLQB8bYyc+6BKoOuDEcHGvgASYZAkxchsN/NQ3gDagDO8CtNcArMOcSASXgzBJgz0UC1iwBNgWAZUuAC6AQATQsAbxawEqySdU1N6l/+xum1QdwDjSBNvCQBuBU+Aj3A39b8D+BI2BW8FaBO22A3Xgt8svAiyZAIV4TMhtqAEFuHliY4lWAb603MOOP1iBzDBSF3LsWQE3oWRdy91oAHaFnS8h1tQB6Qs+BkDvRAhgIPYc5QA6QA6QFGCbB8HkK/EfBHwk9z0Ju+BcAU2V9NRt7gOsMAfoeYBG4Mr6efyXnR/UHnnaL6kM1MfMAAAAASUVORK5CYII=",
+                        "WhatsApp" => "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAACXBIWXMAAAsTAAALEwEAmpwYAAADNUlEQVRYha2Xa2jPYRTH/2zLfSG3GLkkUROlKbm8IC/UhEbk8kLeLCm3UCOJWkiR9oLUWHmFZSZkJOUWTeaWW8Qwl00sd9s+Ojo/Oz17/r//b/vtvHvO5Xu+v+d3nvOcJ5GIKEAXIA8oAq4D74FfQAPwEagEioGlQM+ouFES9wJ2AV+ILj+BEmBMnMRpwDrgkyeBkHkAXADOAFW6C678AfYCXVubPBMod8BqgJ3AJKBjkrixQAHw1IkVsiOjJs8C7pvgemAL0K0VH5AB5APvDM4HYHyqwG7AbRP0GBgVNbEHb4AWbCBSuCOSOXcAjhnnK1KAbU1ucDsDxw3uHdH5HJcYp+dA37jJDbYc4ZsGv9B16AS8UONvINuxS12sFZIxSAwC6jSH9I9h1rjasCtyAvsBr4x9YgwS6715gEeq/Ab0d4IOOkeqJAYBqYdqxZFe0kWU2Qa81BNU7RD4AfSJQWK3wcoVxSqjWOYJqKelxKmFqQZnjygOGMVQT0Clk/xlnMsGSNdCF6kQxTldNMlp8ARsdAhMa2tygxkU9RNZXNVFbRJnuRfeGALb2oFA0BNqZHFJF3UhAXMNAdm+mTEJVClWtSxKdSGDRVpI0D5DQgozx+MjV3hWBAK1inPXPRbZIUFpevcHIj1judwhxkeGkEb9qAlJcDK13vh37IGFBjQ/BXPp6WVOUcptNw/YSkspcwsbWGDsBUGrbVDF5QjbJ8fokCeZT2Q3ujvxR409J1BWqKIp7Dc4QIt0SgqTa07MYOC72p79/33AbBNUHoVAonmAkYvsrie53PvDHf9iY19jDTKM3DPGIVFJGAyZB1fotT3LnRuB6fpLRF63GFR1CBF5ayu7PUTGMDMLiOS5DiON8Ug7Jx+t/zuQvT6nlcZhsWNLj5E8F/hssM978YCT5hTIJDtOHyXSeL4CZ32dLyRxttO0RE4BPXzOGebZ9SfJCyeQW8AGYDLQO9HcIQcKQWATcMMUW/BRhckeMwIwJSRhgzMPutJomphPpEtOTrVd252gh8B+YE4weAAzdAt/hCSzpC5qe059moATwGF9Vg9M4ZuphbVZm4rUzmltrzuA+a19T/wFzXgQm91YhpIAAAAASUVORK5CYII=",
+                        "Telegram" => "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAACXBIWXMAAAsTAAALEwEAmpwYAAACO0lEQVRYhb2Xz0tUURTHn0E6RbpIgrKdYDtNaBMIBgZCtTarbetg/oQEKZQI2vgr27S2lS3EXZsZS4sgKGjXr4EpCFIrp7BPHDovno937ztv3jy/q+HOuef7vfeeXy8IjAC6gKvAfWAd+AL8Bn4Bn4FnwAJwBei0+rUQ9wDzwA/s+A4sAn15iA8Bk+qsWcjtTAOlrOQngKc5iOOoik8r+WngYwvJQ3wABtLIj6thUfgEnHSRl4C1AslDbEh8JQm4sw/kISbi5Kc0YvcLW/LcUQEPWkxQA5ZTUngmJO/KmeshfgIPgSHjwbaBI2J0LSfxG6AMHE2Iq6WUveOB1vas2AUeA6NAmyetX6b4mQ8yVrxvwL14jZer1LLdGVlr02v2YS3QrpaGt8CNpC4HjACv5TZi6z0Gv3UxbHgMVoCLwIEEYgneOQ2+Cwn/DxsE7PgEXPK8rbz9O83n8w6b61YBridYBcZi79qtff4P8BU46xF51yCgbgnChvaIZQ1CwSYw6CJXAasGAdVAx6iseOQjVwE1g5+5QGe4ZjAFtDvIu40+xsIcTstXF14BZxIEnDPs/VeKdcNikwLQLnoTOBgRUDbsW4gq7mtBO34uWQEcBl6k2Epg98avbTqngCy4nRQ4JZ1ei0YF6HCljgyl7wskdw+lEREDBU3GcrB+L3lExDHgSQvJK3tmQKOIDplec9QINNpvOd/cKETiYiajkG39oO01UJiFSMUc1xlAmlNdT9jQ37I2C1z+X+EM+AviE8UBuTSokAAAAABJRU5ErkJggg==",
+                        _ => string.Empty
+                    };
+                }
 
         private static bool TryNormalizeImageSource(string? value, out string? url)
         {

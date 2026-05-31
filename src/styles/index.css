@@ -30,6 +30,11 @@
     --color-text-primary: #0F172A;
     --color-text-secondary: #1F2937;
     --color-text-muted: #4B5563;
+    --badge-open-bg: #FDE047;
+    --badge-open-text: #92400E;
+    --badge-open-dot: #FACC15;
+    --badge-open-accent: #FACC15;
+    --badge-open-soft: #FEF9C3;
   }
 
   .dark {
@@ -41,6 +46,11 @@
     --color-text-primary: #F9FAFB;
     --color-text-secondary: #D1D5DB;
     --color-text-muted: #9CA3AF;
+    --badge-open-bg: #F59E0B33;
+    --badge-open-text: #FBBF24;
+    --badge-open-dot: #F59E0B;
+    --badge-open-accent: #F59E0B;
+    --badge-open-soft: rgba(245, 158, 11, 0.12);
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

@@ -3,6 +3,7 @@ namespace SmartCollect.Tests.Application.Services;
 
 using System.Net;
 using System.Net.Http;
+using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -428,6 +429,69 @@ public class SyncServiceTests
     }
 
     [Fact]
+    public async Task SyncPendingTitles_DuplicateUniqueCodes_CountsOnceAndKeepsLatestData()
+    {
+        var payload = "{\"TotalDeRegistros\":2,\"ItensPorPagina\":0,\"PaginaAtual\":0,\"Registros\":[" +
+                      "{\"nmCliente\":\"Cliente\",\"nrCNPJ\":\"999\",\"dsEmail\":\"contato@test.com\",\"nrTelefone\":\"\",\"cdTitulo\":1001,\"vlTitulo\":100.0,\"dtVencimento\":\"2099-12-31T00:00:00Z\",\"dtEmissao\":\"2099-12-01T00:00:00Z\",\"dsLinkBoleto\":null,\"dsStatus\":\"Aberto\"}," +
+                      "{\"nmCliente\":\"Cliente\",\"nrCNPJ\":\"999\",\"dsEmail\":\"contato@test.com\",\"nrTelefone\":\"\",\"cdTitulo\":1001,\"vlTitulo\":150.0,\"dtVencimento\":\"2099-12-31T00:00:00Z\",\"dtEmissao\":\"2099-12-01T00:00:00Z\",\"dsLinkBoleto\":null,\"dsStatus\":\"Aberto\"}]}");
+
+        var (svc, db, tenantId) = await SetupSyncServiceWithPayloadAsync(payload);
+
+        var processed = await svc.SyncPendingTitlesAsync(tenantId);
+
+        Assert.Equal(1, processed);
+
+        var title = await db.Titles.SingleAsync(t => t.TenantId == tenantId && t.UniqueCode == "1001");
+        Assert.Equal(150.0m, title.Amount);
+        Assert.Equal(1, await db.Titles.CountAsync(t => t.TenantId == tenantId));
+    }
+
+    [Fact]
+    public async Task SyncPendingTitles_WhenEnvelopeTotalExceedsFirstPage_FetchesRemainingPages()
+    {
+        var db = TestDbContextFactory.Create();
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        db.Tenants.Add(new Tenant
+        {
+            Id = tenantId,
+            CompanyName = "Tenant Paginated Sync",
+            TaxId = "123",
+            ExternalApiBaseUrl = "http://localhost/",
+            ExternalApiPendingTitlesPath = "reguacobranca?colecao=1&pageSize=0&pageNumber=0",
+            ExternalApiAuthScheme = "None",
+            Active = true
+        });
+        db.Users.Add(new User { Id = userId, TenantId = tenantId, Name = "Op", Email = "op@test.com", PasswordHash = "x" });
+        await db.SaveChangesAsync();
+
+        var firstPage = BuildPendingTitlesEnvelope(total: 86, pageSize: 80, pageNumber: 0, startCode: 1000, count: 80);
+        var secondPage = BuildPendingTitlesEnvelope(total: 86, pageSize: 80, pageNumber: 1, startCode: 1080, count: 6);
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ExternalApi:BaseUrl"] = "http://localhost/",
+                ["ExternalApi:DocsUrl"] = "http://localhost/docs"
+            })
+            .Build();
+
+        var sync = new SyncService(
+            db,
+            new PagedHttpClientFactory(firstPage, secondPage),
+            DataProtectionProvider.Create("SmartCollect.Tests"),
+            configuration,
+            NullLogger<SyncService>.Instance);
+
+        var processed = await sync.SyncPendingTitlesAsync(tenantId);
+
+        Assert.Equal(86, processed);
+        Assert.Equal(86, await db.Titles.CountAsync(t => t.TenantId == tenantId));
+        Assert.NotNull(await db.Titles.SingleOrDefaultAsync(t => t.TenantId == tenantId && t.UniqueCode == "1085"));
+    }
+
+    [Fact]
     public async Task SyncPendingTitles_ExternalDatesAreNormalizedToUtc()
     {
         var payload = "{\"TotalDeRegistros\":1,\"ItensPorPagina\":0,\"PaginaAtual\":0,\"Registros\":[{\"nmCliente\":\"Cliente\",\"nrCNPJ\":\"999\",\"dsEmail\":\"contato@test.com\",\"nrTelefone\":\"\",\"cdTitulo\":1001,\"vlTitulo\":100.0,\"dtVencimento\":\"2026-03-10T00:00:00\",\"dtEmissao\":\"2026-02-01T00:00:00\",\"dsLinkBoleto\":null,\"dsStatus\":\"Aberto\"}],\"Totais\":null}";
@@ -440,6 +504,31 @@ public class SyncServiceTests
         var title = await db.Titles.SingleAsync(t => t.UniqueCode == "1001");
         Assert.Equal(DateTimeKind.Utc, title.DueDate.Kind);
         Assert.Equal(DateTimeKind.Utc, title.IssueDate.Kind);
+    }
+
+    private static string BuildPendingTitlesEnvelope(int total, int pageSize, int pageNumber, int startCode, int count)
+    {
+        var records = Enumerable.Range(0, count).Select(index => new
+        {
+            nmCliente = $"Cliente {startCode + index}",
+            nrCNPJ = $"0000000000{startCode + index}",
+            dsEmail = $"cliente{startCode + index}@test.com",
+            nrTelefone = "",
+            cdTitulo = startCode + index,
+            vlTitulo = 100.0m + index,
+            dtVencimento = "2099-12-31T00:00:00Z",
+            dtEmissao = "2099-12-01T00:00:00Z",
+            dsLinkBoleto = (string?)null,
+            dsStatus = "Aberto"
+        });
+
+        return JsonSerializer.Serialize(new
+        {
+            TotalDeRegistros = total,
+            ItensPorPagina = pageSize,
+            PaginaAtual = pageNumber,
+            Registros = records
+        });
     }
 }
 
@@ -525,5 +614,44 @@ internal sealed class StaticHttpClientFactory : IHttpClientFactory
             {
                 Content = new StringContent(_payload)
             });
+    }
+}
+
+internal sealed class PagedHttpClientFactory : IHttpClientFactory
+{
+    private readonly string _firstPagePayload;
+    private readonly string _secondPagePayload;
+
+    public PagedHttpClientFactory(string firstPagePayload, string secondPagePayload)
+    {
+        _firstPagePayload = firstPagePayload;
+        _secondPagePayload = secondPagePayload;
+    }
+
+    public HttpClient CreateClient(string name)
+        => new(new PagedPayloadResponseHandler(_firstPagePayload, _secondPagePayload)) { BaseAddress = new Uri("http://localhost") };
+
+    private sealed class PagedPayloadResponseHandler : HttpMessageHandler
+    {
+        private readonly string _firstPagePayload;
+        private readonly string _secondPagePayload;
+
+        public PagedPayloadResponseHandler(string firstPagePayload, string secondPagePayload)
+        {
+            _firstPagePayload = firstPagePayload;
+            _secondPagePayload = secondPagePayload;
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var pageNumber = request.RequestUri?.Query.Contains("pageNumber=1", StringComparison.OrdinalIgnoreCase) == true
+                ? 1
+                : 0;
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(pageNumber == 1 ? _secondPagePayload : _firstPagePayload)
+            });
+        }
     }
 }

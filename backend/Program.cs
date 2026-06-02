@@ -125,6 +125,17 @@ builder.Services.AddAuthorization();
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        var retryAfter = TimeSpan.FromMinutes(5);
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var metadataRetryAfter))
+        {
+            retryAfter = metadataRetryAfter;
+        }
+
+        await LoginRateLimitResponse.WriteAsync(context.HttpContext, retryAfter, cancellationToken);
+    };
+
     options.AddPolicy("login", context =>
     {
         var ipAddress = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";

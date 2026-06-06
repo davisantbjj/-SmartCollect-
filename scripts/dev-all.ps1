@@ -23,10 +23,10 @@ if (-not $SkipDocker) {
     Write-Host "[1/3] Skipping Docker startup by request."
 }
 
-$shouldInstall = $ForceInstall -or -not (Test-Path "node_modules")
+$shouldInstall = $ForceInstall -or -not (Test-Path "frontend/node_modules")
 if ($shouldInstall) {
     Write-Host "[2/3] Installing npm dependencies..."
-    npm install
+    npm install --prefix frontend
     if ($LASTEXITCODE -ne 0) {
         throw "npm install failed"
     }
@@ -35,4 +35,4 @@ if ($shouldInstall) {
 }
 
 Write-Host "[3/3] Starting frontend dev server..."
-npm run dev
+npm run dev --prefix frontend

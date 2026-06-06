@@ -106,7 +106,20 @@ export default function SmartCollect() {
   const [password, setPassword] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [loginRateLimitedUntil, setLoginRateLimitedUntil] = useState<number | null>(null);
+  const [loginRateLimitedUntil, setLoginRateLimitedUntil] = useState<number | null>(() => {
+    try {
+      const stored = localStorage.getItem("smartcollect.loginRateLimitedUntil");
+      if (stored) {
+        const parsed = parseInt(stored, 10);
+        if (!isNaN(parsed) && parsed > Date.now()) {
+          return parsed;
+        }
+      }
+    } catch {
+      // Ignore storage read issues
+    }
+    return null;
+  });
   const [loginRateLimitRemaining, setLoginRateLimitRemaining] = useState(0);
   const loginFieldNonce = useMemo(() => Math.random().toString(36).slice(2, 10), []);
   const [recentEmails, setRecentEmails] = useState<string[]>(() => {
@@ -122,6 +135,14 @@ export default function SmartCollect() {
   });
   const isLoginRateLimited = loginRateLimitRemaining > 0;
   const loginRetryAfterLabel = formatLoginRetryAfter(loginRateLimitRemaining);
+
+  useEffect(() => {
+    if (loginRateLimitedUntil === null) {
+      localStorage.removeItem("smartcollect.loginRateLimitedUntil");
+    } else {
+      localStorage.setItem("smartcollect.loginRateLimitedUntil", loginRateLimitedUntil.toString());
+    }
+  }, [loginRateLimitedUntil]);
 
   useEffect(() => {
     if (!loginRateLimitedUntil) {

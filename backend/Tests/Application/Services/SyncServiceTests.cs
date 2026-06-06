@@ -433,7 +433,7 @@ public class SyncServiceTests
     {
         var payload = "{\"TotalDeRegistros\":2,\"ItensPorPagina\":0,\"PaginaAtual\":0,\"Registros\":[" +
                       "{\"nmCliente\":\"Cliente\",\"nrCNPJ\":\"999\",\"dsEmail\":\"contato@test.com\",\"nrTelefone\":\"\",\"cdTitulo\":1001,\"vlTitulo\":100.0,\"dtVencimento\":\"2099-12-31T00:00:00Z\",\"dtEmissao\":\"2099-12-01T00:00:00Z\",\"dsLinkBoleto\":null,\"dsStatus\":\"Aberto\"}," +
-                      "{\"nmCliente\":\"Cliente\",\"nrCNPJ\":\"999\",\"dsEmail\":\"contato@test.com\",\"nrTelefone\":\"\",\"cdTitulo\":1001,\"vlTitulo\":150.0,\"dtVencimento\":\"2099-12-31T00:00:00Z\",\"dtEmissao\":\"2099-12-01T00:00:00Z\",\"dsLinkBoleto\":null,\"dsStatus\":\"Aberto\"}]}");
+                      "{\"nmCliente\":\"Cliente\",\"nrCNPJ\":\"999\",\"dsEmail\":\"contato@test.com\",\"nrTelefone\":\"\",\"cdTitulo\":1001,\"vlTitulo\":150.0,\"dtVencimento\":\"2099-12-31T00:00:00Z\",\"dtEmissao\":\"2099-12-01T00:00:00Z\",\"dsLinkBoleto\":null,\"dsStatus\":\"Aberto\"}]}";
 
         var (svc, db, tenantId) = await SetupSyncServiceWithPayloadAsync(payload);
 

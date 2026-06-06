@@ -1,4 +1,4 @@
-import type { ComponentType, SVGProps } from "react";
+import React, { type ComponentType, SVGProps } from "react";
 import {
   AlertTriangle,
   ArrowDown,
@@ -125,4 +125,4 @@ export const Icon = ({
 
 export const ICONS = Object.fromEntries(
   Object.keys(iconMap).map(key => [key, <Icon key={key} name={key as IconKey} />])
-) as Record<IconKey, JSX.Element>;
+) as Record<IconKey, any>;

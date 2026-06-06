@@ -6,11 +6,11 @@ Este repositorio segue estrutura monorepo, com entrada principal na raiz.
 
 ## Estrutura
 
-- `src/`, `public/`: frontend (Vite + React + TypeScript)
+- `frontend/`: aplicação web (Vite + React + TypeScript)
 - `backend/`: API, regras de negocio e persistencia (.NET + EF Core)
 - `docker-compose.yml`: orquestracao oficial (PostgreSQL, API e pgAdmin)
 - `.env.example`: variaveis de ambiente base
-- `.env.local.example`: variaveis de frontend para desenvolvimento local
+- `frontend/.env.local.example`: variaveis de frontend para desenvolvimento local
 
 ## Arquitetura
 
@@ -25,26 +25,25 @@ Detalhes da arquitetura por camada em [ARCHITECTURE.md](ARCHITECTURE.md).
 Sempre execute pela raiz do projeto.
 
 1. Copie os arquivos de ambiente:
-- Copie `.env.example` para `.env`
-- Copie `.env.local.example` para `.env.local`
+   - Copie `.env.example` para `.env`
+   - Copie `frontend/.env.local.example` para `frontend/.env.local`
 
 2. Comando unico (recomendado no dia a dia):
-- `npm run dev:all`
+   - `npm run dev:all`
 
-Esse comando:
-- sobe db/api/pgadmin via Docker Compose
-- instala dependencias npm se necessario
-- inicia o frontend em modo dev
+   Esse comando:
+   - sobe db/api/pgadmin via Docker Compose
+   - instala dependencias npm se necessario
+   - inicia o frontend em modo dev
 
 3. Fluxo manual (alternativo):
-- `docker compose up -d --build`
+   - `docker compose up -d --build`
 
 4. Suba frontend:
-- `npm install`
-- `npm run dev`
+   - `cd frontend && npm install && npm run dev`
 
 Para parar os servicos Docker:
-- `npm run stop:all`
+   - `npm run stop:all`
 
 ## Endpoints Locais
 
@@ -58,12 +57,12 @@ Para parar os servicos Docker:
 
 - Backend build: `dotnet build backend/SmartCollect.Api.csproj`
 - Backend testes: `dotnet test backend/Tests/SmartCollect.Tests.csproj`
-- Frontend build: `npm run build`
+- Frontend build: `npm run build --prefix frontend`
 
 ## Politica de Ambientes
 
 - Arquivo principal de ambiente do projeto: `.env` na raiz
-- Frontend local: `.env.local`
+- Frontend local: `frontend/.env.local`
 - Nao utilizar `backend/.env` como fonte principal
 
 ## Organizacao Para Git

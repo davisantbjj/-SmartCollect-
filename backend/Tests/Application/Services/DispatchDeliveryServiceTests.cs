@@ -480,6 +480,126 @@ public class DispatchDeliveryServiceTests
         Assert.Equal(DispatchStatus.Pending, dispatch.Status);
     }
 
+    [Fact]
+    public async Task ProcessPendingDispatches_WithRateLimit_CancelsDuplicateDispatch()
+    {
+        var db = TestDbContextFactory.Create();
+
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var contactId = Guid.NewGuid();
+        var titleId = Guid.NewGuid();
+        var ruleId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+        var triggerId1 = Guid.NewGuid();
+        var triggerId2 = Guid.NewGuid();
+        var dispatchIdSent = Guid.NewGuid();
+        var dispatchIdPending = Guid.NewGuid();
+
+        db.Tenants.Add(new Tenant
+        {
+            Id = tenantId,
+            CompanyName = "Tenant Rate Limit",
+            TaxId = "123",
+            Active = true,
+            DispatchWindowEnabled = false
+        });
+
+        db.Users.Add(new User { Id = userId, TenantId = tenantId, Name = "U", Email = "u@test.com", PasswordHash = "x" });
+        db.Clients.Add(new Client { Id = clientId, TenantId = tenantId, UserId = userId, LegalName = "Cliente", TaxId = "999" });
+        db.Contacts.Add(new Contact { Id = contactId, ClientId = clientId, Name = "Contato", Email = "contato@test.com", IsPrimary = true });
+
+        db.Titles.Add(new Title
+        {
+            Id = titleId,
+            TenantId = tenantId,
+            ClientId = clientId,
+            UniqueCode = "TIT-RATELIMIT-001",
+            Amount = 100m,
+            DueDate = DateTime.UtcNow.AddDays(1),
+            IssueDate = DateTime.UtcNow,
+            Status = TitleStatus.Open
+        });
+
+        db.CollectionRules.Add(new CollectionRule { Id = ruleId, TenantId = tenantId, Name = "Regra", Active = true });
+        db.MessageTemplates.Add(new MessageTemplate
+        {
+            Id = templateId,
+            TenantId = tenantId,
+            Name = "Template",
+            Channel = CollectionChannel.Email,
+            Subject = "Assunto",
+            Body = "Body",
+            Type = TemplateType.Collection,
+            Active = true
+        });
+
+        db.Triggers.Add(new Trigger
+        {
+            Id = triggerId1,
+            CollectionRuleId = ruleId,
+            TemplateId = templateId,
+            Channel = CollectionChannel.Email,
+            DaysOffset = 0,
+            Reference = TriggerReference.DueDate,
+            Order = 1,
+            Active = true
+        });
+
+        db.Triggers.Add(new Trigger
+        {
+            Id = triggerId2,
+            CollectionRuleId = ruleId,
+            TemplateId = templateId,
+            Channel = CollectionChannel.Email,
+            DaysOffset = 0,
+            Reference = TriggerReference.DueDate,
+            Order = 2,
+            Active = true
+        });
+
+        // Already sent today
+        db.Dispatches.Add(new Dispatch
+        {
+            Id = dispatchIdSent,
+            TitleId = titleId,
+            ContactId = contactId,
+            TriggerId = triggerId1,
+            Channel = CollectionChannel.Email,
+            Status = DispatchStatus.Sent,
+            ScheduledFor = DateTime.UtcNow.AddHours(-2),
+            SentAt = DateTime.UtcNow.AddHours(-1)
+        });
+
+        // Pending dispatch for the same title/contact/channel today
+        db.Dispatches.Add(new Dispatch
+        {
+            Id = dispatchIdPending,
+            TitleId = titleId,
+            ContactId = contactId,
+            TriggerId = triggerId2,
+            Channel = CollectionChannel.Email,
+            Status = DispatchStatus.Pending,
+            ScheduledFor = DateTime.UtcNow.AddMinutes(-5)
+        });
+
+        await db.SaveChangesAsync();
+
+        using var keyDir = new TempKeyDirectory();
+        var dataProtection = DataProtectionProvider.Create(keyDir.Path);
+        var service = new DispatchDeliveryService(db, dataProtection, NullLogger<DispatchDeliveryService>.Instance);
+
+        var processed = await service.ProcessPendingDispatchesAsync(tenantId);
+
+        // Expect it to process and cancel it (so 0 successful sends? Wait, cancellation counts as processing loop but processed is incremented only on success. Wait, processed is incremented on success only).
+        // It returns processed = 0 because it was cancelled.
+        Assert.Equal(0, processed);
+
+        var dispatch = db.Dispatches.Single(d => d.Id == dispatchIdPending);
+        Assert.Equal(DispatchStatus.Cancelled, dispatch.Status);
+    }
+
     private sealed class TempKeyDirectory : IDisposable
     {
         public string Path { get; } = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "smartcollect-tests-keys-" + Guid.NewGuid());

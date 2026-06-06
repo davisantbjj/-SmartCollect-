@@ -42,7 +42,7 @@ public class DispatchDeliveryServiceEmailLayoutTests
         Assert.Contains("https://teste.com", html);
         Assert.Contains("Instagram", html);
         var inlineResources = GetInlineResources(entity).ToList();
-        Assert.Equal(2, inlineResources.Count);
+        Assert.Equal(3, inlineResources.Count);
         Assert.All(inlineResources, part =>
             Assert.Contains($"src=\"cid:{part.ContentId}\"", html));
         Assert.All(inlineResources, part =>

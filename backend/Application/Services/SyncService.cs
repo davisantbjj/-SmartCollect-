@@ -83,6 +83,7 @@ public class SyncService : ISyncService
         var terminalTitles = new HashSet<Guid>();
 
         var processed = 0;
+        var processedUniqueCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var item in externalTitles)
         {
             if (item is null)
@@ -96,6 +97,13 @@ public class SyncService : ISyncService
             {
                 if (string.IsNullOrWhiteSpace(uniqueCode) || string.IsNullOrWhiteSpace(item.TaxId))
                     throw new InvalidOperationException("External title is missing required fields.");
+
+                var isDuplicate = processedUniqueCodes.Contains(uniqueCode);
+                if (isDuplicate)
+                    _logger.LogWarning(
+                        "Duplicate external title {UniqueCode} for tenant {TenantId}. Counting once and applying latest data.",
+                        uniqueCode,
+                        tenantId);
 
                 if (!clientsByTaxId.TryGetValue(item.TaxId, out var client))
                 {
@@ -188,7 +196,11 @@ public class SyncService : ISyncService
                         titlesEligibleForAutomaticDispatch.Add(title.Id);
                 }
 
-                processed++;
+                if (!isDuplicate)
+                {
+                    processedUniqueCodes.Add(uniqueCode);
+                    processed++;
+                }
             }
             catch (Exception ex)
             {
@@ -429,6 +441,13 @@ public class SyncService : ISyncService
 
         await _db.Occurrences.AddAsync(occurrence);
         await _db.SaveChangesAsync();
+
+        // RN09: If occurrence returns title to Open/Overdue (or keeps it), ensure we schedule dispatches
+        if (newStatus is TitleStatus.Open or TitleStatus.Overdue)
+        {
+            await AutomaticDispatchScheduler.EnsureDispatchesForTitlesAsync(_db, tenantId, new[] { title.Id });
+            await _db.SaveChangesAsync();
+        }
     }
 
     private async Task<ThankYouDispatchResult> TrySendThankYouAsync(Guid tenantId, Domain.Entities.Title title)
@@ -770,16 +789,27 @@ public class SyncService : ISyncService
 
             results.AddRange(payload.Items);
 
-            if (!shouldPaginate)
-                break;
-
             if (payload.Items.Count == 0)
                 break;
 
+            var effectivePageSize = pageSize > 0
+                ? pageSize
+                : payload.PageSize.GetValueOrDefault(payload.Items.Count);
+            var hasMoreByTotal = payload.TotalRecords.HasValue && results.Count < payload.TotalRecords.Value;
+
+            if (!shouldPaginate)
+            {
+                if (!hasMoreByTotal || effectivePageSize <= 0)
+                    break;
+
+                shouldPaginate = true;
+                pageSize = effectivePageSize;
+                currentPage = payload.PageNumber.GetValueOrDefault(currentPage);
+            }
+
             if (payload.TotalRecords.HasValue && pageSize > 0)
             {
-                var nextIndex = (currentPage + 1) * pageSize;
-                if (nextIndex >= payload.TotalRecords.Value)
+                if (!hasMoreByTotal)
                     break;
             }
             else if (payload.Items.Count < pageSize)

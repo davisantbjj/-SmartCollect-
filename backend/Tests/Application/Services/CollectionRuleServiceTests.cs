@@ -337,4 +337,82 @@ public class CollectionRuleServiceTests
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => svc.DeleteAsync(tenantId, created.Id));
         Assert.Contains("régua padrão", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
+    [Fact]
+    public async Task CreateRule_WithActiveTriggers_AppliesRetroactivelyToOpenTitles()
+    {
+        var (svc, db, tenantId, templateId) = await SetupAsync();
+
+        var userId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var contactId = Guid.NewGuid();
+        var titleId = Guid.NewGuid();
+
+        db.Users.Add(new User { Id = userId, TenantId = tenantId, Name = "U", Email = "u@test.com", PasswordHash = "x", Role = UserRole.Admin, Active = true });
+        db.Clients.Add(new Client { Id = clientId, TenantId = tenantId, UserId = userId, LegalName = "Cliente", TaxId = "999" });
+        db.Contacts.Add(new Contact { Id = contactId, ClientId = clientId, Name = "Contato", Email = "contato@test.com", IsPrimary = true });
+        db.Titles.Add(new Title
+        {
+            Id = titleId,
+            TenantId = tenantId,
+            ClientId = clientId,
+            UniqueCode = "T-RETRO-C",
+            Amount = 100,
+            DueDate = DateTime.UtcNow.AddDays(5),
+            IssueDate = DateTime.UtcNow,
+            Status = TitleStatus.Open
+        });
+        await db.SaveChangesAsync();
+
+        var created = await svc.CreateAsync(tenantId, new CreateCollectionRuleRequest(
+            "Retroactive Create", "Test", true,
+            new List<CreateTriggerDto> { new(templateId, "Email", -2, "DueDate", 1, true) }));
+
+        var dispatch = await db.Dispatches.FirstOrDefaultAsync(d => d.TitleId == titleId);
+        Assert.NotNull(dispatch);
+        Assert.Equal(CollectionChannel.Email, dispatch!.Channel);
+        Assert.Equal(DispatchStatus.Pending, dispatch.Status);
+    }
+
+    [Fact]
+    public async Task UpdateRule_WithActiveTriggers_AppliesRetroactivelyToOpenTitles()
+    {
+        var (svc, db, tenantId, templateId) = await SetupAsync();
+
+        var created = await svc.CreateAsync(tenantId, new CreateCollectionRuleRequest(
+            "Retroactive Update", "Test", false, // initially inactive
+            new List<CreateTriggerDto> { new(templateId, "Email", -2, "DueDate", 1, true) }));
+
+        var userId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var contactId = Guid.NewGuid();
+        var titleId = Guid.NewGuid();
+
+        db.Users.Add(new User { Id = userId, TenantId = tenantId, Name = "U", Email = "u@test.com", PasswordHash = "x", Role = UserRole.Admin, Active = true });
+        db.Clients.Add(new Client { Id = clientId, TenantId = tenantId, UserId = userId, LegalName = "Cliente", TaxId = "999" });
+        db.Contacts.Add(new Contact { Id = contactId, ClientId = clientId, Name = "Contato", Email = "contato@test.com", IsPrimary = true });
+        db.Titles.Add(new Title
+        {
+            Id = titleId,
+            TenantId = tenantId,
+            ClientId = clientId,
+            UniqueCode = "T-RETRO-U",
+            Amount = 100,
+            DueDate = DateTime.UtcNow.AddDays(5),
+            IssueDate = DateTime.UtcNow,
+            Status = TitleStatus.Open
+        });
+        await db.SaveChangesAsync();
+
+        // Ensure no dispatch exists yet because rule was inactive
+        Assert.False(await db.Dispatches.AnyAsync(d => d.TitleId == titleId));
+
+        var updated = await svc.UpdateAsync(tenantId, created.Id, new CreateCollectionRuleRequest(
+            "Retroactive Update", "Test", true, // now active
+            new List<CreateTriggerDto> { new(templateId, "Email", -2, "DueDate", 1, true) }));
+
+        var dispatch = await db.Dispatches.FirstOrDefaultAsync(d => d.TitleId == titleId);
+        Assert.NotNull(dispatch);
+        Assert.Equal(CollectionChannel.Email, dispatch!.Channel);
+        Assert.Equal(DispatchStatus.Pending, dispatch.Status);
+    }
 }

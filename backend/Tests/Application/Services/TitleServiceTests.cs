@@ -121,6 +121,83 @@ public class TitleServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_WithOpenStatus_SchedulesDispatches()
+    {
+        var db = TestDbContextFactory.Create();
+
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+
+        db.Tenants.Add(new Tenant { Id = tenantId, CompanyName = "Tenant", TaxId = "111", Active = true });
+        db.Users.Add(new User { Id = userId, TenantId = tenantId, Name = "User", Email = "user@test.com", PasswordHash = "x" });
+        db.Clients.Add(new Client { Id = clientId, TenantId = tenantId, UserId = userId, LegalName = "Cliente", TaxId = "123" });
+        db.Contacts.Add(new Contact { Id = Guid.NewGuid(), ClientId = clientId, Name = "C", Email = "c@test.com", IsPrimary = true });
+        
+        var ruleId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+        db.CollectionRules.Add(new CollectionRule { Id = ruleId, TenantId = tenantId, Name = "R", Active = true });
+        db.MessageTemplates.Add(new MessageTemplate { Id = templateId, TenantId = tenantId, Name = "T", Active = true, Channel = CollectionChannel.Email });
+        db.Triggers.Add(new Trigger { Id = Guid.NewGuid(), CollectionRuleId = ruleId, TemplateId = templateId, Channel = CollectionChannel.Email, Active = true, DaysOffset = 0, Reference = TriggerReference.DueDate });
+
+        await db.SaveChangesAsync();
+
+        var service = new TitleService(db);
+        var created = await service.CreateAsync(tenantId, new CreateTitleRequest(
+            clientId,
+            "TIT-NEW-001",
+            100m,
+            DateTime.UtcNow.AddDays(1),
+            DateTime.UtcNow,
+            null));
+
+        var dispatchCount = await db.Dispatches.CountAsync(d => d.TitleId == created.Id);
+        Assert.Equal(1, dispatchCount);
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_ToOpen_SchedulesDispatches()
+    {
+        var db = TestDbContextFactory.Create();
+
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var titleId = Guid.NewGuid();
+
+        db.Tenants.Add(new Tenant { Id = tenantId, CompanyName = "Tenant", TaxId = "111", Active = true });
+        db.Users.Add(new User { Id = userId, TenantId = tenantId, Name = "User", Email = "user@test.com", PasswordHash = "x" });
+        db.Clients.Add(new Client { Id = clientId, TenantId = tenantId, UserId = userId, LegalName = "Cliente", TaxId = "123" });
+        db.Contacts.Add(new Contact { Id = Guid.NewGuid(), ClientId = clientId, Name = "C", Email = "c@test.com", IsPrimary = true });
+        
+        db.Titles.Add(new Title
+        {
+            Id = titleId,
+            TenantId = tenantId,
+            ClientId = clientId,
+            UniqueCode = "TIT-UPDATE-001",
+            Amount = 50m,
+            DueDate = DateTime.UtcNow.AddDays(1),
+            IssueDate = DateTime.UtcNow,
+            Status = TitleStatus.PendingData
+        });
+
+        var ruleId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+        db.CollectionRules.Add(new CollectionRule { Id = ruleId, TenantId = tenantId, Name = "R", Active = true });
+        db.MessageTemplates.Add(new MessageTemplate { Id = templateId, TenantId = tenantId, Name = "T", Active = true, Channel = CollectionChannel.Email });
+        db.Triggers.Add(new Trigger { Id = Guid.NewGuid(), CollectionRuleId = ruleId, TemplateId = templateId, Channel = CollectionChannel.Email, Active = true, DaysOffset = 0, Reference = TriggerReference.DueDate });
+
+        await db.SaveChangesAsync();
+
+        var service = new TitleService(db);
+        var updated = await service.UpdateStatusAsync(tenantId, titleId, "Open");
+
+        var dispatchCount = await db.Dispatches.CountAsync(d => d.TitleId == titleId);
+        Assert.Equal(1, dispatchCount);
+    }
+
+    [Fact]
     public async Task SendCollection_WithMultipleActiveRules_SchedulesFromAllAndInvokesEngine()
     {
         var db = TestDbContextFactory.Create();

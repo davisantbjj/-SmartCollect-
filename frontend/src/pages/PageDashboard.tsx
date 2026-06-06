@@ -178,7 +178,7 @@ export const PageDashboard = ({
   const waDeliveryRate    = safePercent(channelMetrics.whatsAppDelivered, channelMetrics.whatsAppSent);
   const waReadRate        = safePercent(channelMetrics.whatsAppViewed, channelMetrics.whatsAppSent);
   const areaData = sends.map(i => ({ month: i.day, email: i.email, wa: i.wa }));
-  const receivableColor = "#FDE047";
+  const receivableColor = colors.openAccent;
   const overdueColor = colors.accent;
   const totalAnalyzedTitles = statusBreakdown.open + statusBreakdown.pendingData + statusBreakdown.overdue + statusBreakdown.paid;
   const paymentRate = totalAnalyzedTitles > 0
@@ -192,7 +192,7 @@ export const PageDashboard = ({
   const criticalityItems = [
     { label: t("dashboard.statusOverdue"), value: statusBreakdown.overdue, tone: t("dashboardPage.tones.high"), color: overdueColor, bg: "bg-danger/10" },
     { label: t("dashboard.statusPending"), value: statusBreakdown.pendingData, tone: t("dashboardPage.tones.medium"), color: pendingColor, bg: "bg-orange-500/10" },
-    { label: t("dashboard.statusOpen"), value: statusBreakdown.open, tone: t("dashboardPage.tones.monitor"), color: receivableColor, bg: "bg-warn/10" },
+    { label: t("dashboard.statusOpen"), value: statusBreakdown.open, tone: t("dashboardPage.tones.monitor"), color: receivableColor, bgStyle: { backgroundColor: colors.openSoft } },
     { label: t("dashboard.statusPaid"), value: statusBreakdown.paid, tone: t("dashboardPage.tones.low"), color: colors.success, bg: "bg-success/10" },
     { label: t("dashboard.statusCancelled"), value: statusBreakdown.cancelled, tone: t("dashboardPage.tones.neutral"), color: colors.text3, bg: "bg-surface-2" },
   ];
@@ -217,7 +217,7 @@ export const PageDashboard = ({
         <CardHeader title={t("dashboard.criticalityMatrix")} subtitle={t("dashboard.criticalitySubtitle")} />
         <div className="p-5 grid grid-cols-5 gap-3">
           {criticalityItems.map(item => (
-            <div key={item.label} className={`rounded-[10px] border border-border-subtle p-3 ${item.bg}`}>
+            <div key={item.label} className={`rounded-[10px] border border-border-subtle p-3 ${item.bg ?? ""}`} style={item.bgStyle}>
               <div className="text-[11px] text-text-secondary mb-1">{item.label}</div>
               <div className="text-xl font-extrabold" style={{ color: item.color }}>{item.value.toLocaleString("pt-BR")}</div>
               <div className="text-[11px] font-semibold mt-1" style={{ color: item.color }}>{item.tone}</div>

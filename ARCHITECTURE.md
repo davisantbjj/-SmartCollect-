@@ -2,9 +2,9 @@
 
 ## Objective
 This project is split into three clear layers:
-- Frontend: React + Vite application in the repository root (`src/`, `public/`)
+- Frontend: React + Vite application in `frontend/` (`frontend/src/`, `frontend/public/`)
 - Backend: ASP.NET Core API in `backend/`
-- Infrastructure: Docker and runtime configuration in root (`docker-compose.yml`, `.env`, `.env.example`, `.env.local.example`)
+- Infrastructure: Docker and runtime configuration in root (`docker-compose.yml`, `.env`, `.env.example`, `frontend/.env.local.example`)
 
 ## Business Roles
 - Master:
@@ -21,10 +21,10 @@ This project is split into three clear layers:
   - Handles operational collection workflows
 
 ## Frontend Structure
-- `src/pages/`: route-level screens
-- `src/components/`: reusable UI/layout pieces
-- `src/services/api.ts`: backend contract and HTTP client
-- `src/i18n/`: translations
+- `frontend/src/pages/`: route-level screens
+- `frontend/src/components/`: reusable UI/layout pieces
+- `frontend/src/services/api.ts`: backend contract and HTTP client
+- `frontend/src/i18n/`: translations
 
 ## Backend Structure
 - `backend/Domain/`: entities and enums (pure domain)
@@ -39,15 +39,15 @@ This project is split into three clear layers:
 
 ## Environment Files
 - Project environment (canonical): `.env` in repository root
-- Frontend local environment: `.env.local` (see `.env.local.example`)
+- Frontend local environment: `frontend/.env.local` (see `frontend/.env.local.example`)
 - Backend local run: reads root `.env` first, with fallback only when root file is absent
 
 ## Validation Pipeline
 Recommended local checks before delivery:
 1. `dotnet build backend/SmartCollect.Api.csproj`
 2. `dotnet ef database update --project backend/SmartCollect.Api.csproj --startup-project backend/SmartCollect.Api.csproj`
-3. `npm run build`
-4. `npx tsc --noEmit`
+3. `npm run build --prefix frontend`
+4. `npx --prefix frontend tsc --noEmit`
 
 ## Next Improvements
 - Add integration tests for role boundaries (Master/Admin/Worker)

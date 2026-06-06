@@ -13,7 +13,8 @@ const SESSION_KEY = "smartcollect.session";
 export class ApiError extends Error {
   constructor(
     message: string,
-    public readonly status: number
+    public readonly status: number,
+    public readonly retryAfterSeconds?: number
   ) {
     super(message);
     this.name = "ApiError";
@@ -500,6 +501,19 @@ function clearSessionAndNotify(): void {
   window.dispatchEvent(new Event("smartcollect:unauthorized"));
 }
 
+function parseRetryAfterSeconds(value: string | null): number | undefined {
+  if (!value) return undefined;
+
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds > 0) return Math.ceil(seconds);
+
+  const retryDate = new Date(value);
+  if (Number.isNaN(retryDate.getTime())) return undefined;
+
+  const diffSeconds = Math.ceil((retryDate.getTime() - Date.now()) / 1000);
+  return diffSeconds > 0 ? diffSeconds : undefined;
+}
+
 // ── Core request ───────────────────────────────────────────────────────────
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -531,8 +545,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     let message = `Erro HTTP ${response.status}`;
+    let retryAfterSeconds = parseRetryAfterSeconds(response.headers.get("Retry-After"));
     try {
-      const payload = await response.json() as { message?: string; title?: string; errors?: Record<string, string[]> };
+      const payload = await response.json() as {
+        message?: string;
+        title?: string;
+        errors?: Record<string, string[]>;
+        retryAfterSeconds?: number;
+      };
       if (payload?.errors) {
         const list = Object.values(payload.errors).flat();
         message = list.length > 0 ? list.join(" | ") : (payload.title ?? message);
@@ -541,8 +561,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       } else if (payload?.title) {
         message = payload.title;
       }
+
+      if (typeof payload?.retryAfterSeconds === "number" && payload.retryAfterSeconds > 0) {
+        retryAfterSeconds = Math.ceil(payload.retryAfterSeconds);
+      }
     } catch { /* ignore */ }
-    throw new ApiError(message, response.status);
+    throw new ApiError(message, response.status, retryAfterSeconds);
   }
 
   if (response.status === 204) return undefined as T;

@@ -2,9 +2,11 @@ using System.Text;
 using DotNetEnv;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
+using System.Threading.RateLimiting;
 using SmartCollect.Application.Services;
 using SmartCollect.Infrastructure;
 
@@ -120,6 +122,33 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        var retryAfter = TimeSpan.FromMinutes(5);
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var metadataRetryAfter))
+        {
+            retryAfter = metadataRetryAfter;
+        }
+
+        await LoginRateLimitResponse.WriteAsync(context.HttpContext, retryAfter, cancellationToken);
+    };
+
+    options.AddPolicy("login", context =>
+    {
+        var ipAddress = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(ipAddress, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 5,
+            Window = TimeSpan.FromMinutes(5),
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = 0
+        });
+    });
+});
+
 // CORS for frontend dev server
 var corsOrigins = Environment.GetEnvironmentVariable("CORS_ORIGINS")
     ?? builder.Configuration["Cors:Origins"]
@@ -230,6 +259,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseCors("Frontend");
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

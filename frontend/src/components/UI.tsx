@@ -27,7 +27,7 @@ const badgeConfig: Record<string, { label: string; cls: string }> = {
 };
 
 const badgeStyles: Record<string, { bg: string; text: string; dot: string }> = {
-  open:      { bg: "bg-[#F59E0B33]", text: "text-[#FBBF24]", dot: "bg-[#F59E0B]" },
+  open:      { bg: "bg-[var(--badge-open-bg)]", text: "text-[var(--badge-open-text)]", dot: "bg-[var(--badge-open-dot)]" },
   overdue:   { bg: "bg-danger/12", text: "text-danger", dot: "bg-danger" },
   sent:      { bg: "bg-success/12", text: "text-success", dot: "bg-success" },
   paid:      { bg: "bg-success/12", text: "text-success", dot: "bg-success" },

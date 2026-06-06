@@ -18,4 +18,7 @@ export const colors = {
   get border()   { return getCssColor("--color-border-subtle"); },
   get border2()  { return getCssColor("--color-border-subtle-2"); },
   get wa()       { return getCssColor("--color-wa"); },
+  get open()     { return getCssColor("--badge-open-bg"); },
+  get openAccent() { return getCssColor("--badge-open-accent"); },
+  get openSoft() { return getCssColor("--badge-open-soft"); },
 };

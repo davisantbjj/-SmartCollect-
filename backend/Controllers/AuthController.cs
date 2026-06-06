@@ -2,6 +2,7 @@ namespace SmartCollect.Api.Controllers;
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 using SmartCollect.Api.Security;
 using SmartCollect.Application.DTOs.Auth;
@@ -24,6 +25,7 @@ public class AuthController : ControllerBase
     /// <summary>Login — works for all roles (Master, Admin, Worker)</summary>
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         try

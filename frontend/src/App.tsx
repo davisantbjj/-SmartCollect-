@@ -43,6 +43,16 @@ const ALL_PAGE_IDS: PageId[] = [
   "tenants",
 ];
 
+function formatLoginRetryAfter(totalSeconds: number): string {
+  const safeSeconds = Math.max(0, Math.ceil(totalSeconds));
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+
+  if (minutes <= 0) return `${seconds}s`;
+  if (seconds <= 0) return `${minutes}min`;
+  return `${minutes}min ${seconds}s`;
+}
+
 function isPageId(value: string): value is PageId {
   return ALL_PAGE_IDS.includes(value as PageId);
 }
@@ -63,6 +73,7 @@ export default function SmartCollect() {
   const [page, setPage] = useState<PageId>(() => getInitialPage());
   const [session, setSessionState] = useState<StoredSession | null>(() => getSession());
   const [tenants, setTenants] = useState<TenantResponse[]>([]);
+  const [tenantsLoaded, setTenantsLoaded] = useState(false);
   const [selectedTenantId, setSelectedTenantId] = useState(() => {
     try {
       return localStorage.getItem(MASTER_SELECTED_TENANT_KEY) ?? "";
@@ -96,6 +107,21 @@ export default function SmartCollect() {
   const [password, setPassword] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [loginRateLimitedUntil, setLoginRateLimitedUntil] = useState<number | null>(() => {
+    try {
+      const stored = localStorage.getItem("smartcollect.loginRateLimitedUntil");
+      if (stored) {
+        const parsed = parseInt(stored, 10);
+        if (!isNaN(parsed) && parsed > Date.now()) {
+          return parsed;
+        }
+      }
+    } catch {
+      // Ignore storage read issues
+    }
+    return null;
+  });
+  const [loginRateLimitRemaining, setLoginRateLimitRemaining] = useState(0);
   const loginFieldNonce = useMemo(() => Math.random().toString(36).slice(2, 10), []);
   const [recentEmails, setRecentEmails] = useState<string[]>(() => {
     try {
@@ -108,6 +134,36 @@ export default function SmartCollect() {
       return [];
     }
   });
+  const isLoginRateLimited = loginRateLimitRemaining > 0;
+  const loginRetryAfterLabel = formatLoginRetryAfter(loginRateLimitRemaining);
+
+  useEffect(() => {
+    if (loginRateLimitedUntil === null) {
+      localStorage.removeItem("smartcollect.loginRateLimitedUntil");
+    } else {
+      localStorage.setItem("smartcollect.loginRateLimitedUntil", loginRateLimitedUntil.toString());
+    }
+  }, [loginRateLimitedUntil]);
+
+  useEffect(() => {
+    if (!loginRateLimitedUntil) {
+      setLoginRateLimitRemaining(0);
+      return;
+    }
+
+    const updateRemaining = () => {
+      const remaining = Math.max(0, Math.ceil((loginRateLimitedUntil - Date.now()) / 1000));
+      setLoginRateLimitRemaining(remaining);
+
+      if (remaining <= 0) {
+        setLoginRateLimitedUntil(null);
+      }
+    };
+
+    updateRemaining();
+    const intervalId = window.setInterval(updateRemaining, 1000);
+    return () => window.clearInterval(intervalId);
+  }, [loginRateLimitedUntil]);
 
   const rememberRecentEmail = useCallback((rawEmail: string) => {
     const normalized = rawEmail.trim().toLowerCase();
@@ -150,6 +206,11 @@ export default function SmartCollect() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoginRateLimited) {
+      showToast(`Muitas tentativas. Tente novamente em ${loginRetryAfterLabel}.`, "warn");
+      return;
+    }
+
     if (!email.trim() || !password) {
       showToast(`Informe e-mail e senha.`, "warn");
       return;
@@ -159,9 +220,18 @@ export default function SmartCollect() {
       const emailValue = email.trim();
       const s = await login(emailValue, password);
       rememberRecentEmail(emailValue);
+      setLoginRateLimitedUntil(null);
       setSessionState(s);
       showToast(`Bem-vindo, ${s.userName}!`, "success");
     } catch (err) {
+      if (err instanceof ApiError && err.status === 429) {
+        const retryAfterSeconds = err.retryAfterSeconds ?? 300;
+        setLoginRateLimitRemaining(retryAfterSeconds);
+        setLoginRateLimitedUntil(Date.now() + retryAfterSeconds * 1000);
+        showToast(`Muitas tentativas. Tente novamente em ${formatLoginRetryAfter(retryAfterSeconds)}.`, "error");
+        return;
+      }
+
       const msg = err instanceof ApiError ? err.message : "Falha ao autenticar.";
       showToast(`${msg}`, "error");
     } finally {
@@ -198,10 +268,16 @@ export default function SmartCollect() {
     const loadTenants = async () => {
       try {
         const items = await getTenants();
-        if (!cancelled) setTenants(items);
+        if (!cancelled) {
+          setTenants(items);
+          setTenantsLoaded(true);
+        }
       } catch (err) {
         const msg = err instanceof ApiError ? err.message : "Falha ao carregar empresas.";
-        if (!cancelled) showToast(`${msg}`, "error");
+        if (!cancelled) {
+          showToast(`${msg}`, "error");
+          setTenantsLoaded(true);
+        }
       }
     };
 
@@ -217,10 +293,11 @@ export default function SmartCollect() {
     }
 
     if (!selectedTenantId) return;
+    if (!tenantsLoaded) return;
     if (tenants.some(tenant => tenant.id === selectedTenantId)) return;
 
     setSelectedTenantId("");
-  }, [session?.role, selectedTenantId, tenants]);
+  }, [session?.role, selectedTenantId, tenants, tenantsLoaded]);
 
   useEffect(() => {
     if (!session) return;
@@ -353,12 +430,21 @@ export default function SmartCollect() {
                 </div>
               </div>
 
+              {isLoginRateLimited && (
+                <div
+                  role="status"
+                  className="mb-4 rounded-lg border border-danger/25 bg-danger/10 px-3.5 py-2.5 text-[12px] font-medium text-danger"
+                >
+                  Muitas tentativas. Tente novamente em <strong>{loginRetryAfterLabel}</strong>.
+                </div>
+              )}
+
               <button
                 type="submit"
-                disabled={authLoading}
+                disabled={authLoading || isLoginRateLimited}
                 className="w-full rounded-lg bg-accent text-white font-bold py-2.5 text-[14px] hover:bg-[#B91C1C] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {authLoading ? "Entrando..." : "Entrar"}
+                {authLoading ? "Entrando..." : isLoginRateLimited ? `Aguarde ${loginRetryAfterLabel}` : "Entrar"}
               </button>
             </form>
 

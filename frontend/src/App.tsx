@@ -73,6 +73,7 @@ export default function SmartCollect() {
   const [page, setPage] = useState<PageId>(() => getInitialPage());
   const [session, setSessionState] = useState<StoredSession | null>(() => getSession());
   const [tenants, setTenants] = useState<TenantResponse[]>([]);
+  const [tenantsLoaded, setTenantsLoaded] = useState(false);
   const [selectedTenantId, setSelectedTenantId] = useState(() => {
     try {
       return localStorage.getItem(MASTER_SELECTED_TENANT_KEY) ?? "";
@@ -267,10 +268,16 @@ export default function SmartCollect() {
     const loadTenants = async () => {
       try {
         const items = await getTenants();
-        if (!cancelled) setTenants(items);
+        if (!cancelled) {
+          setTenants(items);
+          setTenantsLoaded(true);
+        }
       } catch (err) {
         const msg = err instanceof ApiError ? err.message : "Falha ao carregar empresas.";
-        if (!cancelled) showToast(`${msg}`, "error");
+        if (!cancelled) {
+          showToast(`${msg}`, "error");
+          setTenantsLoaded(true);
+        }
       }
     };
 
@@ -286,10 +293,11 @@ export default function SmartCollect() {
     }
 
     if (!selectedTenantId) return;
+    if (!tenantsLoaded) return;
     if (tenants.some(tenant => tenant.id === selectedTenantId)) return;
 
     setSelectedTenantId("");
-  }, [session?.role, selectedTenantId, tenants]);
+  }, [session?.role, selectedTenantId, tenants, tenantsLoaded]);
 
   useEffect(() => {
     if (!session) return;

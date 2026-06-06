@@ -226,6 +226,20 @@ public class CollectionRuleService : ICollectionRuleService
         await _db.CollectionRules.AddAsync(rule);
         await _db.SaveChangesAsync();
 
+        if (rule.Active && rule.Triggers.Any(t => t.Active))
+        {
+            var titleIds = await _db.Titles
+                .Where(t => t.TenantId == tenantId && (t.Status == TitleStatus.Open || t.Status == TitleStatus.Overdue))
+                .Select(t => t.Id)
+                .ToListAsync();
+
+            if (titleIds.Count > 0)
+            {
+                await AutomaticDispatchScheduler.EnsureDispatchesForTitlesAsync(_db, tenantId, titleIds);
+                await _db.SaveChangesAsync();
+            }
+        }
+
         return (await ListAsync(tenantId)).First(r => r.Id == rule.Id);
     }
 
@@ -294,6 +308,20 @@ public class CollectionRuleService : ICollectionRuleService
 
         await _db.Triggers.AddRangeAsync(nextTriggers);
         await _db.SaveChangesAsync();
+
+        if (request.Active && nextTriggers.Any(t => t.Active))
+        {
+            var titleIds = await _db.Titles
+                .Where(t => t.TenantId == tenantId && (t.Status == TitleStatus.Open || t.Status == TitleStatus.Overdue))
+                .Select(t => t.Id)
+                .ToListAsync();
+
+            if (titleIds.Count > 0)
+            {
+                await AutomaticDispatchScheduler.EnsureDispatchesForTitlesAsync(_db, tenantId, titleIds);
+                await _db.SaveChangesAsync();
+            }
+        }
 
         return (await ListAsync(tenantId)).FirstOrDefault(r => r.Id == id);
     }

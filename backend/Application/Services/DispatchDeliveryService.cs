@@ -170,6 +170,22 @@ public class DispatchDeliveryService : IDispatchDeliveryService
 
         var processingImportSet = tenantIdsWithProcessingImport.ToHashSet();
 
+        var titleIdsInBatch = pending.Select(d => d.TitleId).Distinct().ToList();
+        var startOfDayUtc = now.Date;
+        var endOfDayUtc = startOfDayUtc.AddDays(1);
+
+        var dispatchesSentToday = await _db.Dispatches
+            .Where(d => titleIdsInBatch.Contains(d.TitleId)
+                        && d.Status == DispatchStatus.Sent
+                        && d.SentAt >= startOfDayUtc
+                        && d.SentAt < endOfDayUtc)
+            .Select(d => new { d.TitleId, d.ContactId, d.Channel })
+            .ToListAsync(cancellationToken);
+
+        var sentTodaySet = dispatchesSentToday
+            .Select(d => $"{d.TitleId:N}_{d.ContactId:N}_{d.Channel}")
+            .ToHashSet();
+
         var processed = 0;
 
         foreach (var dispatch in pending)
@@ -191,6 +207,13 @@ public class DispatchDeliveryService : IDispatchDeliveryService
             if (!tenants.TryGetValue(dispatch.Title.TenantId, out var tenant) || !tenant.Active)
             {
                 MarkError(dispatch, "Tenant inativo ou não encontrado.");
+                continue;
+            }
+
+            var rateLimitKey = $"{dispatch.TitleId:N}_{dispatch.ContactId:N}_{dispatch.Channel}";
+            if (sentTodaySet.Contains(rateLimitKey))
+            {
+                dispatch.Status = DispatchStatus.Cancelled;
                 continue;
             }
 
@@ -266,6 +289,7 @@ public class DispatchDeliveryService : IDispatchDeliveryService
 
                 dispatch.Status = DispatchStatus.Sent;
                 dispatch.SentAt = DateTime.UtcNow;
+                sentTodaySet.Add(rateLimitKey);
 
                 var description = $"{dispatch.Channel}: enviado via {string.Join(" + ", sentChannels)}";
                 if (failedChannels.Count > 0)

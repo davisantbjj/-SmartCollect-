@@ -170,6 +170,12 @@ public class TitleService : ITitleService
         });
         await _db.SaveChangesAsync();
 
+        if (status is TitleStatus.Open or TitleStatus.Overdue)
+        {
+            await AutomaticDispatchScheduler.EnsureDispatchesForTitlesAsync(_db, tenantId, new[] { title.Id });
+            await _db.SaveChangesAsync();
+        }
+
         return (await GetByIdAsync(tenantId, title.Id))!;
     }
 
@@ -216,6 +222,13 @@ public class TitleService : ITitleService
         });
 
         await _db.SaveChangesAsync();
+
+        if (newStatus is TitleStatus.Open or TitleStatus.Overdue)
+        {
+            await AutomaticDispatchScheduler.EnsureDispatchesForTitlesAsync(_db, tenantId, new[] { title.Id });
+            await _db.SaveChangesAsync();
+        }
+
         return await GetByIdAsync(tenantId, id);
     }
 

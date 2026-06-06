@@ -441,6 +441,13 @@ public class SyncService : ISyncService
 
         await _db.Occurrences.AddAsync(occurrence);
         await _db.SaveChangesAsync();
+
+        // RN09: If occurrence returns title to Open/Overdue (or keeps it), ensure we schedule dispatches
+        if (newStatus is TitleStatus.Open or TitleStatus.Overdue)
+        {
+            await AutomaticDispatchScheduler.EnsureDispatchesForTitlesAsync(_db, tenantId, new[] { title.Id });
+            await _db.SaveChangesAsync();
+        }
     }
 
     private async Task<ThankYouDispatchResult> TrySendThankYouAsync(Guid tenantId, Domain.Entities.Title title)

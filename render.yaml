@@ -1,0 +1,48 @@
+services:
+  - type: web
+    name: smartcollect-api
+    env: docker
+    region: ohio
+    plan: free
+    dockerContext: backend
+    dockerfilePath: backend/Dockerfile
+    envVars:
+      - key: POSTGRES_HOST
+        fromDatabase:
+          name: smartcollect-db
+          property: host
+      - key: POSTGRES_PORT
+        fromDatabase:
+          name: smartcollect-db
+          property: port
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: smartcollect-db
+          property: database
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: smartcollect-db
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: smartcollect-db
+          property: password
+      - key: APPLY_MIGRATIONS_ON_STARTUP
+        value: "true"
+      - key: JWT_KEY
+        generateValue: true
+      - key: MASTER_EMAIL
+        sync: false
+      - key: MASTER_PASSWORD
+        sync: false
+      - key: MASTER_NAME
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+
+databases:
+  - name: smartcollect-db
+    databaseName: smartcollect
+    user: smartcollect
+    plan: free
+    region: ohio

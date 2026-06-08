@@ -28,6 +28,9 @@ export const PageTitles = ({
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [dueDateStartFilter, setDueDateStartFilter] = useState("");
+  const [dueDateEndFilter, setDueDateEndFilter] = useState("");
+  const [orderBy, setOrderBy] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -83,6 +86,9 @@ export const PageTitles = ({
         tenantId: session.role === "Master" ? selectedTenantId : undefined,
         status: statusFilter === "all" ? undefined : statusFilter,
         search: search || undefined,
+        dueDateStart: dueDateStartFilter || undefined,
+        dueDateEnd: dueDateEndFilter || undefined,
+        orderBy: orderBy || undefined,
         page,
         pageSize: 20,
       });
@@ -95,7 +101,7 @@ export const PageTitles = ({
     } finally {
       setLoading(false);
     }
-  }, [session.role, selectedTenantId, statusFilter, search, page, showToast]);
+  }, [session.role, selectedTenantId, statusFilter, search, dueDateStartFilter, dueDateEndFilter, orderBy, page, showToast]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -350,6 +356,41 @@ export const PageTitles = ({
           <option value="Overdue">{t("titles.filterOverdue")}</option>
           <option value="Cancelled">{t("badge.cancelled")}</option>
         </select>
+        <div className="flex items-center gap-1 bg-surface-2 border border-border-subtle-2 rounded-lg px-2 text-[13px] text-text-primary focus-within:border-accent">
+          <span className="text-text-muted text-[11px] font-bold uppercase ml-1">Vencimento</span>
+          <input
+            type="date"
+            value={dueDateStartFilter}
+            onChange={e => { setDueDateStartFilter(e.target.value); setPage(1); }}
+            className="bg-transparent border-none outline-none text-text-primary px-1 py-[9px] cursor-pointer"
+          />
+          <span className="text-text-muted">até</span>
+          <input
+            type="date"
+            value={dueDateEndFilter}
+            onChange={e => { setDueDateEndFilter(e.target.value); setPage(1); }}
+            className="bg-transparent border-none outline-none text-text-primary px-1 py-[9px] cursor-pointer"
+          />
+          {(dueDateStartFilter || dueDateEndFilter) && (
+            <button
+              type="button"
+              onClick={() => { setDueDateStartFilter(""); setDueDateEndFilter(""); setPage(1); }}
+              className="text-text-muted hover:text-danger p-0.5 rounded-full hover:bg-surface border-none bg-transparent cursor-pointer transition-colors ml-1 flex items-center justify-center"
+              title="Limpar datas"
+            >
+              {ICONS.close}
+            </button>
+          )}
+        </div>
+        <select
+          value={orderBy}
+          onChange={e => { setOrderBy(e.target.value); setPage(1); }}
+          className="bg-surface-2 border border-border-subtle-2 rounded-lg px-[13px] py-[9px] text-[13px] text-text-primary outline-none focus:border-accent cursor-pointer"
+        >
+          <option value="">Ordenar: Vencimento</option>
+          <option value="AmountDesc">Maior Valor</option>
+          <option value="AmountAsc">Menor Valor</option>
+        </select>
         {canWrite && (
           <Button variant="primary" onClick={() => setModalOpen(true)}>
             {t("titles.newTitle")}
@@ -397,7 +438,7 @@ export const PageTitles = ({
                     <div className="text-[11px] font-semibold text-danger mt-0.5">{t("titles.boletoOverdue")}</div>
                   )}
                 </td>
-                <td className="px-4 py-[13px] font-extrabold text-sm">{formatBRLFull(title.amount)}</td>
+                <td className="px-4 py-[13px] font-extrabold text-sm text-success">{formatBRLFull(title.amount)}</td>
                 <td className="px-4 py-[13px]"><Badge status={title.status.toLowerCase()} /></td>
                 <td className="px-4 py-[13px]">
                   <ChannelPills channels={toChannelPills(title.channels)} />
@@ -521,7 +562,7 @@ export const PageTitles = ({
             </div>
             <div>
               <div className="text-[11px] text-text-muted mb-1 uppercase font-bold tracking-wider">{t("titles.labels.amount")}</div>
-              <div className="text-base font-extrabold text-accent">{formatBRLFull(selected.amount)}</div>
+              <div className="text-base font-extrabold text-success">{formatBRLFull(selected.amount)}</div>
             </div>
             {selected.boletoUrl && (
               <div className="col-span-2">

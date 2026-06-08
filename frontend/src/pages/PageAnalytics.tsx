@@ -230,8 +230,8 @@ export const PageAnalytics = ({
               <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tick={{ fill: colors.text2, fontSize: 11 }} axisLine={false} tickLine={false} tickMargin={6} />
               <Tooltip content={<ChartTooltip />} cursor={{ fill: `${colors.accent}14` }} />
               <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} iconType="circle" iconSize={8} />
-              <Bar dataKey="recoveredRate" name={t("analytics.recovered")} stackId="a" fill={recoveredColor} barSize={28} radius={[6, 6, 0, 0]} />
-              <Bar dataKey="remainingRate" name="Em atraso" stackId="a" fill={colors.warn} barSize={28} radius={[6, 6, 0, 0]} />
+              <Bar dataKey="recoveredRate" name={t("analytics.recovered")} stackId="a" fill={recoveredColor} barSize={40} radius={[0, 0, 0, 0]} />
+              <Bar dataKey="remainingRate" name="Em atraso" stackId="a" fill={colors.warn} barSize={40} radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

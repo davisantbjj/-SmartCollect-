@@ -146,6 +146,16 @@ export const PageTemplates = ({
       showToast(`${t("templates.validation.requiredFields")}`, "warn");
       return;
     }
+
+    const extractVariables = (text: string) => text.match(/\{\{.*?\}\}/g) || [];
+    const usedVars = [...extractVariables(form.body), ...(form.subject ? extractVariables(form.subject) : [])];
+    const invalidVars = usedVars.filter(v => !TEMPLATE_VARIABLES.includes(v));
+
+    if (invalidVars.length > 0) {
+      showToast(`Variáveis inválidas: ${invalidVars.join(', ')}`, "warn");
+      return;
+    }
+
     try {
       setSaving(true);
       const payloadChannel = editing?.channel ?? "Email";

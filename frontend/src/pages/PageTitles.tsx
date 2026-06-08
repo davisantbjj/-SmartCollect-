@@ -363,7 +363,6 @@ export const PageTitles = ({
             value={dueDateStartFilter}
             onChange={e => { setDueDateStartFilter(e.target.value); setPage(1); }}
             className="bg-transparent border-none outline-none text-text-primary px-1 py-[9px] cursor-pointer"
-            style={{ colorScheme: 'dark' }}
           />
           <span className="text-text-muted">até</span>
           <input
@@ -371,8 +370,17 @@ export const PageTitles = ({
             value={dueDateEndFilter}
             onChange={e => { setDueDateEndFilter(e.target.value); setPage(1); }}
             className="bg-transparent border-none outline-none text-text-primary px-1 py-[9px] cursor-pointer"
-            style={{ colorScheme: 'dark' }}
           />
+          {(dueDateStartFilter || dueDateEndFilter) && (
+            <button
+              type="button"
+              onClick={() => { setDueDateStartFilter(""); setDueDateEndFilter(""); setPage(1); }}
+              className="text-text-muted hover:text-danger p-0.5 rounded-full hover:bg-surface border-none bg-transparent cursor-pointer transition-colors ml-1 flex items-center justify-center"
+              title="Limpar datas"
+            >
+              {ICONS.close}
+            </button>
+          )}
         </div>
         <select
           value={orderBy}

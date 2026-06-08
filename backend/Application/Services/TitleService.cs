@@ -42,13 +42,13 @@ public class TitleService : ITitleService
 
         if (filter.DueDateStart.HasValue)
         {
-            var startUtc = filter.DueDateStart.Value.ToUniversalTime().Date;
+            var startUtc = NormalizeToUtc(filter.DueDateStart.Value).Date;
             query = query.Where(t => t.DueDate >= startUtc);
         }
 
         if (filter.DueDateEnd.HasValue)
         {
-            var endUtc = filter.DueDateEnd.Value.ToUniversalTime().Date.AddDays(1).AddTicks(-1);
+            var endUtc = NormalizeToUtc(filter.DueDateEnd.Value).Date.AddDays(1).AddTicks(-1);
             query = query.Where(t => t.DueDate <= endUtc);
         }
 

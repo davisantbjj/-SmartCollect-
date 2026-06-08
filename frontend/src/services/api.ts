@@ -744,6 +744,9 @@ export async function getTitles(params: {
   tenantId?: string;
   status?: string;
   search?: string;
+  dueDateStart?: string;
+  dueDateEnd?: string;
+  orderBy?: string;
   page?: number;
   pageSize?: number;
 }) {
@@ -751,6 +754,9 @@ export async function getTitles(params: {
   if (params.tenantId) q.set("tenantId", params.tenantId);
   if (params.status) q.set("status", params.status);
   if (params.search) q.set("search", params.search);
+  if (params.dueDateStart) q.set("dueDateStart", params.dueDateStart);
+  if (params.dueDateEnd) q.set("dueDateEnd", params.dueDateEnd);
+  if (params.orderBy) q.set("orderBy", params.orderBy);
   q.set("page", String(params.page ?? 1));
   q.set("pageSize", String(params.pageSize ?? 20));
   return request<PaginatedResponse<TitleResponse>>(`/api/titles?${q.toString()}`);

@@ -146,6 +146,16 @@ export const PageTemplates = ({
       showToast(`${t("templates.validation.requiredFields")}`, "warn");
       return;
     }
+
+    const extractVariables = (text: string) => text.match(/\{\{.*?\}\}/g) || [];
+    const usedVars = [...extractVariables(form.body), ...(form.subject ? extractVariables(form.subject) : [])];
+    const invalidVars = usedVars.filter(v => !TEMPLATE_VARIABLES.includes(v));
+
+    if (invalidVars.length > 0) {
+      showToast(`Variáveis inválidas: ${invalidVars.join(', ')}`, "warn");
+      return;
+    }
+
     try {
       setSaving(true);
       const payloadChannel = editing?.channel ?? "Email";
@@ -361,19 +371,7 @@ export const PageTemplates = ({
               selected === i ? "border-accent bg-accent/[0.03]" : "border-border-subtle hover:border-border-subtle-2"
             }`}
           >
-            <div className={`inline-flex items-center gap-[5px] text-[11px] font-bold px-[9px] py-[3px] rounded-full mb-3 ${
-              tpl.channel === "Email"
-                ? "bg-blue-500/[0.12] text-blue-500"
-                : tpl.channel === "Both"
-                  ? "bg-accent/12 text-accent"
-                  : "bg-[#25d366]/[0.12] text-[#25d366]"
-            }`}>
-              {tpl.channel === "Email"
-                ? <>{ICONS.email} {t("templates.channelEmail")}</>
-                : tpl.channel === "Both"
-                  ? <>{ICONS.link} {t("common.both")}</>
-                  : <>{ICONS.chat} {t("templates.channelWhatsapp")}</>}
-            </div>
+
             <div className="font-extrabold text-sm mb-[5px]">{tpl.name}</div>
             <div className="text-xs text-text-secondary mb-1">{resolveTemplateTypeLabel(tpl.type)} · {tpl.active ? t("common.active") : t("common.inactive")}</div>
             <div className="bg-surface-2 rounded-lg p-3 text-xs text-text-secondary leading-[1.7] border-l-[3px] border-accent mt-2">

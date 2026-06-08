@@ -44,6 +44,11 @@ services:
       JWT_AUDIENCE: ${JWT_AUDIENCE:-SmartCollect}
       JWT_EXPIRATION_MINUTES: ${JWT_EXPIRATION_MINUTES:-480}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      EXTERNAL_API_BASE_URL: ${EXTERNAL_API_BASE_URL}
+      EXTERNAL_API_TOKEN: ${EXTERNAL_API_TOKEN}
+      MASTER_EMAIL: ${MASTER_EMAIL}
+      MASTER_PASSWORD: ${MASTER_PASSWORD}
+      MASTER_NAME: ${MASTER_NAME}
     depends_on:
       postgres:
         condition: service_healthy

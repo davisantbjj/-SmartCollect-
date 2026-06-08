@@ -40,14 +40,32 @@ public class TitleService : ITitleService
                 t.UniqueCode.ToLower().Contains(search));
         }
 
+        if (filter.DueDateStart.HasValue)
+        {
+            var startUtc = filter.DueDateStart.Value.ToUniversalTime().Date;
+            query = query.Where(t => t.DueDate >= startUtc);
+        }
+
+        if (filter.DueDateEnd.HasValue)
+        {
+            var endUtc = filter.DueDateEnd.Value.ToUniversalTime().Date.AddDays(1).AddTicks(-1);
+            query = query.Where(t => t.DueDate <= endUtc);
+        }
+
         var totalCount = await query.CountAsync();
+
+        if (string.Equals(filter.OrderBy, "AmountDesc", StringComparison.OrdinalIgnoreCase))
+            query = query.OrderByDescending(t => t.Amount).ThenByDescending(t => t.DueDate);
+        else if (string.Equals(filter.OrderBy, "AmountAsc", StringComparison.OrdinalIgnoreCase))
+            query = query.OrderBy(t => t.Amount).ThenByDescending(t => t.DueDate);
+        else
+            query = query.OrderByDescending(t => t.DueDate);
 
         var titles = await query
             .Include(t => t.Client)
                 .ThenInclude(c => c.Contacts)
             .Include(t => t.Dispatches)
             .Include(t => t.Histories)
-            .OrderByDescending(t => t.DueDate)
             .Skip((filter.Page - 1) * filter.PageSize)
             .Take(filter.PageSize)
             .ToListAsync();

@@ -27,6 +27,9 @@ services:
       dockerfile: Dockerfile
     container_name: smartcollect_api
     restart: unless-stopped
+    networks:
+      - default
+      - evolution-net
     ports:
       - "5013:5013"
     volumes:
@@ -85,3 +88,8 @@ services:
 volumes:
   pgdata:
   dpkeys:
+
+networks:
+  default:
+  evolution-net:
+    external: true

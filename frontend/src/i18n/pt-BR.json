@@ -331,7 +331,7 @@
     }
   },
   "titles": {
-    "searchPlaceholder": "Buscar por cliente, CNPJ ou código...",
+    "searchPlaceholder": "Buscar por cliente, CNPJ, código ou valor...",
     "newTitle": "+ Novo Título",
     "downloadExport": "Exportar",
     "foundCount": "títulos encontrados",

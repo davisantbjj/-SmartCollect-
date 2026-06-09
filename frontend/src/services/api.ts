@@ -286,15 +286,17 @@ export interface DispatchWindowConfigResponse {
   timeZone: string;
   startTime: string;
   endTime: string;
+  daysOfWeek: number[];
   pauseAutomaticDispatchDuringProcessing: boolean;
 }
 
 export interface DispatchWindowConfigRequest {
   enabled: boolean;
-  timeZone: string;
+  timeZone?: string;
   startTime: string;
   endTime: string;
-  pauseAutomaticDispatchDuringProcessing: boolean;
+  daysOfWeek: number[];
+  pauseAutomaticDispatchDuringProcessing?: boolean;
 }
 
 export interface EmailLayoutConfigResponse {

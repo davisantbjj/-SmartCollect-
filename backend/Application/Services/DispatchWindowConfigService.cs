@@ -28,6 +28,7 @@ public class DispatchWindowConfigService : IDispatchWindowConfigService
             ResolveStoredOrDefaultTimeZone(tenant.DispatchWindowTimeZone),
             FormatMinutes(tenant.DispatchWindowStartMinutes, DefaultStartMinutes),
             FormatMinutes(tenant.DispatchWindowEndMinutes, DefaultEndMinutes),
+            tenant.DispatchWindowDays ?? new List<int> { 1, 2, 3, 4, 5 },
             true);
     }
 
@@ -54,6 +55,7 @@ public class DispatchWindowConfigService : IDispatchWindowConfigService
         tenant.DispatchWindowTimeZone = timeZoneId;
         tenant.DispatchWindowStartMinutes = startMinutes;
         tenant.DispatchWindowEndMinutes = endMinutes;
+        tenant.DispatchWindowDays = request.DaysOfWeek ?? new List<int> { 1, 2, 3, 4, 5 };
         tenant.PauseAutomaticDispatchDuringProcessing = true;
 
         await _db.SaveChangesAsync(cancellationToken);

@@ -193,7 +193,7 @@ public class SyncServiceTests
     {
         var (svc, db, tenantId, _) = await SetupWithTitleAsync();
 
-        var day = DateTime.UtcNow.Date;
+        var day = SmartCollect.Application.Common.TimeUtils.GetBrazilToday();
         await svc.ProcessOccurrenceAsync(tenantId, "T001", TitleStatus.Overdue, day);
         await svc.ProcessOccurrenceAsync(tenantId, "T001", TitleStatus.Overdue, day.AddHours(3));
 
@@ -275,7 +275,7 @@ public class SyncServiceTests
         });
         await db.SaveChangesAsync();
 
-        var day = DateTime.UtcNow.Date;
+        var day = SmartCollect.Application.Common.TimeUtils.GetBrazilToday();
 
         mailer.EnqueueOutcome(false);
         await svc.ProcessOccurrenceAsync(tenantId, "T001", TitleStatus.Paid, day);

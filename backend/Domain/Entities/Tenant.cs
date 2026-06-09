@@ -31,6 +31,7 @@ public class Tenant : Entity
     public int DispatchWindowStartMinutes { get; set; } = 540;
     public int DispatchWindowEndMinutes { get; set; } = 1080;
     public string DispatchWindowTimeZone { get; set; } = "UTC";
+    public List<int> DispatchWindowDays { get; set; } = new() { 1, 2, 3, 4, 5 };
     public bool PauseAutomaticDispatchDuringProcessing { get; set; } = true;
     public TenantPlan Plan { get; set; } = TenantPlan.Basic;
     public bool Active { get; set; } = true;

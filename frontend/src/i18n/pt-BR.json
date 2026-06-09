@@ -906,6 +906,16 @@
       "loading": "Carregando configuracao...",
       "enableTitle": "Ativar janela de envio automatico",
       "timezoneLabel": "Fuso detectado automaticamente do navegador:",
+      "daysLabel": "Dias de envio",
+      "days": {
+        "0": "Dom",
+        "1": "Seg",
+        "2": "Ter",
+        "3": "Qua",
+        "4": "Qui",
+        "5": "Sex",
+        "6": "Sab"
+      },
       "startLabel": "Inicio",
       "endLabel": "Fim",
       "presetCommercial": "Comercial",

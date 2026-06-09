@@ -104,8 +104,9 @@ public class DashboardService : IDashboardService
             .Where(t => t.Status == TitleStatus.Open || t.Status == TitleStatus.Overdue)
             .SumAsync(t => t.Amount);
 
+        var today = SmartCollect.Application.Common.TimeUtils.GetBrazilToday();
         var totalOverdue = await titles
-            .Where(t => (t.Status == TitleStatus.Open || t.Status == TitleStatus.Overdue) && t.DueDate < DateTime.UtcNow)
+            .Where(t => (t.Status == TitleStatus.Open || t.Status == TitleStatus.Overdue) && t.DueDate < today)
             .SumAsync(t => t.Amount);
 
         // Renamed: TotalRecovered → TotalPaid (B-06)
@@ -139,13 +140,14 @@ public class DashboardService : IDashboardService
             .Where(t => t.CreatedAt >= sixMonthsAgo)
             .ToListAsync();
 
+        var today = SmartCollect.Application.Common.TimeUtils.GetBrazilToday();
         var items = titles
             .GroupBy(t => t.CreatedAt.ToString("yyyy-MM"))
             .OrderBy(g => g.Key)
             .Select(g => new FunnelItem(
                 g.Key,
                 g.Where(t => t.Status == TitleStatus.Open || t.Status == TitleStatus.Overdue).Sum(t => t.Amount),
-                g.Where(t => t.DueDate < DateTime.UtcNow && t.Status != TitleStatus.Paid).Sum(t => t.Amount),
+                g.Where(t => t.DueDate < today && t.Status != TitleStatus.Paid).Sum(t => t.Amount),
                 g.Where(t => t.Status == TitleStatus.Paid).Sum(t => t.Amount)))
             .ToList();
 
@@ -154,13 +156,13 @@ public class DashboardService : IDashboardService
 
     public async Task<AgingListResponse> GetAgingAsync(Guid? tenantId)
     {
+        var today = SmartCollect.Application.Common.TimeUtils.GetBrazilToday();
         var overdue = await TitlesFor(tenantId)
             .Where(t =>
                 (t.Status == TitleStatus.Open || t.Status == TitleStatus.Overdue || t.Status == TitleStatus.PendingData)
-                && t.DueDate < DateTime.UtcNow)
+                && t.DueDate < today)
             .ToListAsync();
 
-        var now = DateTime.UtcNow;
         var buckets = new (string Range, string Color, Func<int, bool> Pred)[]
         {
             ("1-30 dias",  "#F59E0B", d => d >= 1 && d <= 30),
@@ -171,7 +173,7 @@ public class DashboardService : IDashboardService
 
         var items = buckets.Select(b => new AgingItem(
             b.Range,
-            overdue.Where(t => b.Pred((now - t.DueDate).Days)).Sum(t => t.Amount),
+            overdue.Where(t => b.Pred((today - t.DueDate).Days)).Sum(t => t.Amount),
             b.Color)).ToList();
 
         return new AgingListResponse(items);
@@ -179,11 +181,12 @@ public class DashboardService : IDashboardService
 
     public async Task<TopDefaultersResponse> GetTopDefaultersAsync(Guid? tenantId)
     {
+        var today = SmartCollect.Application.Common.TimeUtils.GetBrazilToday();
         var overdueTitles = await TitlesFor(tenantId)
             .Include(t => t.Client)
             .Where(t =>
                 (t.Status == TitleStatus.Open || t.Status == TitleStatus.Overdue)
-                && t.DueDate < DateTime.UtcNow)
+                && t.DueDate < today)
             .ToListAsync();
 
         var items = overdueTitles
@@ -202,8 +205,8 @@ public class DashboardService : IDashboardService
 
     public async Task<CriticalMetricsResponse> GetCriticalMetricsAsync(Guid? tenantId)
     {
-        var now = DateTime.UtcNow;
-        var criticalCutoff = now.Date.AddDays(-10);
+        var today = SmartCollect.Application.Common.TimeUtils.GetBrazilToday();
+        var criticalCutoff = today.AddDays(-10);
 
         // Critical: unpaid titles with overdue greater than 10 days.
         var criticalTitles = await TitlesFor(tenantId)
@@ -213,7 +216,7 @@ public class DashboardService : IDashboardService
 
         // Recovery concept: titles that became overdue (due date in past) and are now paid.
         var overdueUniverse = await TitlesFor(tenantId)
-            .Where(t => t.DueDate.Date < now.Date && t.Status != TitleStatus.Cancelled)
+            .Where(t => t.DueDate.Date < today && t.Status != TitleStatus.Cancelled)
             .ToListAsync();
 
         var overdueBaseTitles = overdueUniverse.Count;
@@ -222,7 +225,7 @@ public class DashboardService : IDashboardService
             ? Math.Round((double)recoveredTitles / overdueBaseTitles * 100, 1)
             : 0;
 
-        var trendStart = now.Date.AddMonths(-5);
+        var trendStart = today.AddMonths(-5);
         var trendItems = overdueUniverse
             .Where(t => t.DueDate.Date >= trendStart)
             .GroupBy(t => t.DueDate.ToString("yyyy-MM"))
@@ -248,18 +251,18 @@ public class DashboardService : IDashboardService
 
     public async Task<SendsPerDayResponse> GetSendsPerDayAsync(Guid? tenantId)
     {
-        var end = DateTime.UtcNow;
-        var start = end.AddDays(-14);
+        var endUtc = DateTime.UtcNow;
+        var startUtc = endUtc.AddDays(-14);
 
         var dispatches = await DispatchesFor(tenantId)
             .Where(d => d.Status == DispatchStatus.Sent
                 || d.Status == DispatchStatus.Delivered
                 || d.Status == DispatchStatus.Viewed)
-            .Where(d => (d.SentAt ?? d.ScheduledFor) >= start && (d.SentAt ?? d.ScheduledFor) <= end)
+            .Where(d => (d.SentAt ?? d.ScheduledFor) >= startUtc && (d.SentAt ?? d.ScheduledFor) <= endUtc)
             .ToListAsync();
 
         var grouped = dispatches
-            .GroupBy(d => (d.SentAt ?? d.ScheduledFor).Date)
+            .GroupBy(d => SmartCollect.Application.Common.TimeUtils.ConvertToBrazilTime(d.SentAt ?? d.ScheduledFor).Date)
             .ToDictionary(
                 g => g.Key,
                 g => new
@@ -269,7 +272,7 @@ public class DashboardService : IDashboardService
                 });
 
         var quickManualHistories = (await TitleHistoriesFor(tenantId)
-            .Where(h => h.CreatedAt >= start && h.CreatedAt <= end)
+            .Where(h => h.CreatedAt >= startUtc && h.CreatedAt <= endUtc)
             .ToListAsync())
             .Where(h => IsQuickManualAction(h.Action));
 
@@ -279,7 +282,7 @@ public class DashboardService : IDashboardService
             if (parsed.EmailCount == 0 && parsed.WhatsAppCount == 0)
                 continue;
 
-            var day = history.CreatedAt.Date;
+            var day = SmartCollect.Application.Common.TimeUtils.ConvertToBrazilTime(history.CreatedAt).Date;
             if (grouped.TryGetValue(day, out var existing))
             {
                 grouped[day] = new
@@ -299,7 +302,10 @@ public class DashboardService : IDashboardService
         }
 
         var items = new List<SendsDayItem>();
-        for (var day = start.Date; day <= end.Date; day = day.AddDays(1))
+        var brazilStart = SmartCollect.Application.Common.TimeUtils.ConvertToBrazilTime(startUtc).Date;
+        var brazilEnd = SmartCollect.Application.Common.TimeUtils.ConvertToBrazilTime(endUtc).Date;
+
+        for (var day = brazilStart; day <= brazilEnd; day = day.AddDays(1))
         {
             grouped.TryGetValue(day, out var counts);
             items.Add(new SendsDayItem(

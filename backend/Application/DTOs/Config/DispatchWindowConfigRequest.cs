@@ -14,5 +14,7 @@ public class DispatchWindowConfigRequest
     [Required]
     public string EndTime { get; set; } = "18:00";
 
+    public List<int> DaysOfWeek { get; set; } = new() { 1, 2, 3, 4, 5 };
+
     public bool PauseAutomaticDispatchDuringProcessing { get; set; } = true;
 }

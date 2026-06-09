@@ -179,7 +179,7 @@ public class ContactService : IContactService
             HasMeaningfulEmail(c.Email) ||
             HasMeaningfulPhone(c.WhatsAppPhone));
 
-        var nowDate = DateTime.UtcNow.Date;
+        var nowDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday();
 
         foreach (var title in client.Titles.Where(t => t.Status is not TitleStatus.Paid and not TitleStatus.Cancelled))
         {

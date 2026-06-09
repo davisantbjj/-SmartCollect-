@@ -308,7 +308,7 @@ public class FileImportServiceTests
 
         await db.SaveChangesAsync();
 
-        var today = DateTime.UtcNow.Date.ToString("yyyy-MM-dd");
+        var today = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().ToString("yyyy-MM-dd");
         var csv = string.Join('\n',
             "nome_cliente;cnpj;codigo_titulo;valor;status;data_vencimento;email",
             $"Cliente D0;99.999.999/0001-99;TIT-D0-001;100.00;aberto;{today};d0@cliente.com");
@@ -368,7 +368,7 @@ public class FileImportServiceTests
 
         await db.SaveChangesAsync();
 
-        var tomorrow = DateTime.UtcNow.Date.AddDays(1).ToString("yyyy-MM-dd");
+        var tomorrow = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(1).ToString("yyyy-MM-dd");
         var csv = string.Join('\n',
             "nome_cliente;cnpj;codigo_titulo;valor;status;data_vencimento;email",
             $"Cliente D0;99.999.999/0001-99;TIT-D0-002;100.00;aberto;{tomorrow};d0@cliente.com");

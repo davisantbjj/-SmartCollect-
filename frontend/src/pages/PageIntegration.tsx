@@ -96,6 +96,7 @@ export const PageIntegration = ({
   const [dispatchWindowEnabled, setDispatchWindowEnabled] = useState(false);
   const [dispatchWindowStartTime, setDispatchWindowStartTime] = useState("09:00");
   const [dispatchWindowEndTime, setDispatchWindowEndTime] = useState("18:00");
+  const [dispatchWindowDays, setDispatchWindowDays] = useState<number[]>([1, 2, 3, 4, 5]);
 
   // Form state
   const [host, setHost] = useState("");
@@ -237,6 +238,7 @@ export const PageIntegration = ({
       setDispatchWindowEnabled(false);
       setDispatchWindowStartTime("09:00");
       setDispatchWindowEndTime("18:00");
+      setDispatchWindowDays([1, 2, 3, 4, 5]);
       return;
     }
 
@@ -246,12 +248,14 @@ export const PageIntegration = ({
       setDispatchWindowEnabled(data.enabled);
       setDispatchWindowStartTime(data.startTime || "09:00");
       setDispatchWindowEndTime(data.endTime || "18:00");
+      setDispatchWindowDays(data.daysOfWeek || [1, 2, 3, 4, 5]);
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) {
         // Backend antigo ou rota ainda não publicada: mantém defaults locais sem exibir erro.
         setDispatchWindowEnabled(false);
         setDispatchWindowStartTime("09:00");
         setDispatchWindowEndTime("18:00");
+        setDispatchWindowDays([1, 2, 3, 4, 5]);
       } else {
         const msg = err instanceof ApiError ? err.message : t("integrationPage.errors.loadDispatchWindow");
         showToast(`${msg}`, "error");
@@ -461,6 +465,7 @@ export const PageIntegration = ({
         timeZone: getBrowserTimeZone(),
         startTime: dispatchWindowStartTime.trim(),
         endTime: dispatchWindowEndTime.trim(),
+        daysOfWeek: dispatchWindowDays,
         pauseAutomaticDispatchDuringProcessing: true,
       }, tenantId);
       showToast(`${response.message}`, "success");
@@ -879,7 +884,7 @@ export const PageIntegration = ({
                   />
                 </div>
 
-                <div className="col-span-2 flex flex-wrap gap-2">
+                <div className="col-span-2 mt-2 flex flex-wrap gap-2">
                   {[
                     ["08:00", "18:00", t("integrationPage.window.presetCommercial")],
                     ["09:00", "18:00", t("integrationPage.window.presetStandard")],
@@ -898,6 +903,32 @@ export const PageIntegration = ({
                       {label}: {start} - {end}
                     </button>
                   ))}
+                </div>
+
+                <div className="col-span-2 mt-2">
+                  <label className="text-[11px] font-bold tracking-[0.6px] uppercase text-text-muted mb-2 block">{t("integrationPage.window.daysLabel")}</label>
+                  <div className="flex flex-wrap gap-2">
+                    {[0, 1, 2, 3, 4, 5, 6].map((dayIndex) => {
+                      const isSelected = dispatchWindowDays.includes(dayIndex);
+                      return (
+                        <button
+                          key={dayIndex}
+                          type="button"
+                          disabled={!canEditDispatchWindow}
+                          onClick={() => {
+                            setDispatchWindowDays(prev => 
+                              isSelected 
+                                ? prev.filter(d => d !== dayIndex) 
+                                : [...prev, dayIndex].sort()
+                            );
+                          }}
+                          className={`w-9 h-9 flex items-center justify-center rounded-full text-[12px] font-medium transition-colors border ${isSelected ? "bg-accent text-white border-accent" : "bg-surface-2 text-text-secondary border-border-subtle hover:border-accent/50 hover:text-text-primary"} disabled:opacity-60 disabled:cursor-not-allowed`}
+                        >
+                          {t(`integrationPage.window.days.${dayIndex}`)}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 

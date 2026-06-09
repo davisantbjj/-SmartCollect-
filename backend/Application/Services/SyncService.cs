@@ -231,7 +231,8 @@ public class SyncService : ISyncService
 
         var (http, settings) = await CreateTenantApiClientAsync(tenantId);
         var processed = 0;
-        var referenceDates = new[] { DateTime.UtcNow.Date.AddDays(-1), DateTime.UtcNow.Date };
+        var today = SmartCollect.Application.Common.TimeUtils.GetBrazilToday();
+        var referenceDates = new[] { today.AddDays(-1), today };
 
         foreach (var referenceDate in referenceDates)
         {
@@ -568,7 +569,7 @@ public class SyncService : ISyncService
 
     private static string RenderTemplate(string template, Domain.Entities.Title title, string companyName)
     {
-        var diasAtraso = Math.Max(0, (DateTime.UtcNow.Date - title.DueDate.Date).Days);
+        var diasAtraso = Math.Max(0, (SmartCollect.Application.Common.TimeUtils.GetBrazilToday() - title.DueDate.Date).Days);
 
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {

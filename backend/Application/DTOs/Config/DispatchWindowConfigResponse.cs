@@ -5,4 +5,5 @@ public record DispatchWindowConfigResponse(
     string TimeZone,
     string StartTime,
     string EndTime,
+    List<int> DaysOfWeek,
     bool PauseAutomaticDispatchDuringProcessing);

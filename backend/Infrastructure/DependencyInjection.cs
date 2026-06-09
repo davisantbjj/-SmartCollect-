@@ -23,12 +23,17 @@ public static class DependencyInjection
             options.UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsAssembly("SmartCollect.Api")));
 
-        var baseUrl = Environment.GetEnvironmentVariable("EXTERNAL_API_BASE_URL")
-            ?? configuration["ExternalApi:BaseUrl"]
-            ?? "https://api-mock.atoscapital.com.br/v1/";
+        var envBaseUrl = Environment.GetEnvironmentVariable("EXTERNAL_API_BASE_URL");
+        var baseUrl = !string.IsNullOrWhiteSpace(envBaseUrl) 
+            ? envBaseUrl 
+            : configuration["ExternalApi:BaseUrl"];
+        if (string.IsNullOrWhiteSpace(baseUrl))
+            baseUrl = "https://api-mock.atoscapital.com.br/v1/";
 
-        var bearerToken = Environment.GetEnvironmentVariable("EXTERNAL_API_TOKEN")
-            ?? configuration["ExternalApi:Token"];
+        var envToken = Environment.GetEnvironmentVariable("EXTERNAL_API_TOKEN");
+        var bearerToken = !string.IsNullOrWhiteSpace(envToken) 
+            ? envToken 
+            : configuration["ExternalApi:Token"];
 
         services.AddHttpClient("ExternalSyncApi", client =>
         {

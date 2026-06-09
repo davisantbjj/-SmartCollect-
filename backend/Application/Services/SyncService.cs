@@ -854,16 +854,20 @@ public class SyncService : ISyncService
 
     private ResolvedSyncSettings ResolveSyncSettings(Domain.Entities.Tenant tenant)
     {
-        var fallbackBaseUrl = Environment.GetEnvironmentVariable("EXTERNAL_API_BASE_URL")
-            ?? _configuration["ExternalApi:BaseUrl"]
-            ?? "https://api-mock.atoscapital.com.br/v1/";
+        var envBaseUrl = Environment.GetEnvironmentVariable("EXTERNAL_API_BASE_URL");
+        var configBaseUrl = _configuration["ExternalApi:BaseUrl"];
+        var fallbackBaseUrl = !string.IsNullOrWhiteSpace(envBaseUrl) ? envBaseUrl :
+                              !string.IsNullOrWhiteSpace(configBaseUrl) ? configBaseUrl :
+                              "https://api-mock.atoscapital.com.br/v1/";
 
-        var fallbackDocsUrl = Environment.GetEnvironmentVariable("EXTERNAL_API_DOCS_URL")
-            ?? _configuration["ExternalApi:DocsUrl"]
-            ?? "https://api-mock.atoscapital.com.br/swagger";
+        var envDocsUrl = Environment.GetEnvironmentVariable("EXTERNAL_API_DOCS_URL");
+        var configDocsUrl = _configuration["ExternalApi:DocsUrl"];
+        var fallbackDocsUrl = !string.IsNullOrWhiteSpace(envDocsUrl) ? envDocsUrl :
+                              !string.IsNullOrWhiteSpace(configDocsUrl) ? configDocsUrl :
+                              "https://api-mock.atoscapital.com.br/swagger";
 
-        var fallbackToken = Environment.GetEnvironmentVariable("EXTERNAL_API_TOKEN")
-            ?? _configuration["ExternalApi:Token"];
+        var envToken = Environment.GetEnvironmentVariable("EXTERNAL_API_TOKEN");
+        var fallbackToken = !string.IsNullOrWhiteSpace(envToken) ? envToken : _configuration["ExternalApi:Token"];
 
         var baseUrl = string.IsNullOrWhiteSpace(tenant.ExternalApiBaseUrl)
             ? fallbackBaseUrl

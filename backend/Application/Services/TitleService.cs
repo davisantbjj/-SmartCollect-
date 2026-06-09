@@ -33,11 +33,24 @@ public class TitleService : ITitleService
 
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
-            var search = filter.Search.ToLower();
+            var search = filter.Search.ToLower().Trim();
+            
+            var cleanSearchForNumber = search.Replace("r$", "").Trim();
+            var culture = cleanSearchForNumber.Contains('.') && !cleanSearchForNumber.Contains(',') 
+                ? CultureInfo.InvariantCulture 
+                : new CultureInfo("pt-BR");
+
+            var isNumeric = decimal.TryParse(
+                cleanSearchForNumber, 
+                NumberStyles.Any, 
+                culture, 
+                out var searchAmount);
+
             query = query.Where(t =>
                 t.Client.LegalName.ToLower().Contains(search) ||
                 t.Client.TaxId.Contains(search) ||
-                t.UniqueCode.ToLower().Contains(search));
+                t.UniqueCode.ToLower().Contains(search) ||
+                (isNumeric && t.Amount == searchAmount));
         }
 
         if (filter.DueDateStart.HasValue)

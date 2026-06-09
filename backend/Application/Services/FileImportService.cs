@@ -583,7 +583,7 @@ public class FileImportService : IFileImportService
         if (!hasContactInfo)
             return TitleStatus.PendingData;
 
-        return dueDate.Date < DateTime.UtcNow.Date
+        return dueDate.Date < SmartCollect.Application.Common.TimeUtils.GetBrazilToday()
             ? TitleStatus.Overdue
             : TitleStatus.Open;
     }

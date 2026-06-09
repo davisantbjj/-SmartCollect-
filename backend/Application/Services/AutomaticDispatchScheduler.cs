@@ -81,12 +81,17 @@ internal static class AutomaticDispatchScheduler
             {
                 var candidates = activeTriggers
                     .Where(trigger => ContactSupportsChannel(contact, trigger.Channel))
-                    .Select(trigger => new
+                    .Select(trigger => 
                     {
-                        Trigger = trigger,
-                        ScheduledDate = trigger.Reference == TriggerReference.DueDate
+                        var targetDate = trigger.Reference == TriggerReference.DueDate
                             ? title.DueDate.AddDays(trigger.DaysOffset)
-                            : title.IssueDate.AddDays(trigger.DaysOffset)
+                            : title.IssueDate.AddDays(trigger.DaysOffset);
+
+                        return new
+                        {
+                            Trigger = trigger,
+                            ScheduledDate = SmartCollect.Application.Common.TimeUtils.GetUtcTimeForBrazilMidnight(targetDate)
+                        };
                     })
                     .ToList();
 

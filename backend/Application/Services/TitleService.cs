@@ -173,7 +173,7 @@ public class TitleService : ITitleService
             !string.IsNullOrWhiteSpace(c.Email) ||
             !string.IsNullOrWhiteSpace(c.WhatsAppPhone));
 
-        var status = dueDateUtc.Date < DateTime.UtcNow.Date
+        var status = dueDateUtc.Date < SmartCollect.Application.Common.TimeUtils.GetBrazilToday()
             ? TitleStatus.Overdue
             : hasContactInfo ? TitleStatus.Open : TitleStatus.PendingData;
 
@@ -577,7 +577,7 @@ public class TitleService : ITitleService
 
     private static string RenderQuickTemplate(string template, Domain.Entities.Title title, string companyName)
     {
-        var diasAtraso = Math.Max(0, (DateTime.UtcNow.Date - title.DueDate.Date).Days);
+        var diasAtraso = Math.Max(0, (SmartCollect.Application.Common.TimeUtils.GetBrazilToday() - title.DueDate.Date).Days);
 
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -649,7 +649,7 @@ public class TitleService : ITitleService
         if (t.Status is TitleStatus.Paid or TitleStatus.Cancelled)
             return false;
 
-        return t.DueDate.Date < DateTime.UtcNow.Date;
+        return t.DueDate.Date < SmartCollect.Application.Common.TimeUtils.GetBrazilToday();
     }
 
     private static DateTime NormalizeToUtc(DateTime value)

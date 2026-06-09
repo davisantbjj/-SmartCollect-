@@ -143,7 +143,7 @@ public class PendingDispatchBackgroundService : BackgroundService
 
     private async Task RefreshTitleStatusesAsync(IServiceProvider services, CancellationToken cancellationToken)
     {
-        var nowDate = DateTime.UtcNow.Date;
+        var nowDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday();
         if (_lastStatusRefreshUtc.Date == nowDate)
             return;
 

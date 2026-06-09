@@ -319,7 +319,7 @@ public class DispatchDeliveryService : IDispatchDeliveryService
 
     private static string RenderTemplate(string template, Domain.Entities.Dispatch dispatch, string companyName)
     {
-        var diasAtraso = Math.Max(0, (DateTime.UtcNow.Date - dispatch.Title.DueDate.Date).Days);
+        var diasAtraso = Math.Max(0, (SmartCollect.Application.Common.TimeUtils.GetBrazilToday() - dispatch.Title.DueDate.Date).Days);
 
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {

@@ -19,9 +19,9 @@ public class DashboardServiceTests
         db.Clients.Add(new Client { Id = clientId, TenantId = tenantId, UserId = userId, LegalName = "Client A", TaxId = "456" });
 
         db.Titles.AddRange(
-            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "T1", Amount = 1000, DueDate = DateTime.UtcNow.AddDays(10), IssueDate = DateTime.UtcNow, Status = TitleStatus.Open },
-            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "T2", Amount = 500, DueDate = DateTime.UtcNow.AddDays(-20), IssueDate = DateTime.UtcNow.AddDays(-50), Status = TitleStatus.Open },
-            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "T3", Amount = 2000, DueDate = DateTime.UtcNow.AddDays(-5), IssueDate = DateTime.UtcNow.AddDays(-30), Status = TitleStatus.Paid }
+            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "T1", Amount = 1000, DueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(10), IssueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday(), Status = TitleStatus.Open },
+            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "T2", Amount = 500, DueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(-20), IssueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(-50), Status = TitleStatus.Open },
+            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "T3", Amount = 2000, DueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(-5), IssueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(-30), Status = TitleStatus.Paid }
         );
         await db.SaveChangesAsync();
 
@@ -87,9 +87,9 @@ public class DashboardServiceTests
         db.Clients.Add(new Client { Id = c2, TenantId = tenantId, UserId = userId, LegalName = "Big Debtor", TaxId = "B" });
 
         db.Titles.AddRange(
-            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = c1, UniqueCode = "S1", Amount = 100, DueDate = DateTime.UtcNow.AddDays(-10), IssueDate = DateTime.UtcNow, Status = TitleStatus.Open },
-            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = c2, UniqueCode = "B1", Amount = 5000, DueDate = DateTime.UtcNow.AddDays(-10), IssueDate = DateTime.UtcNow, Status = TitleStatus.Open },
-            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = c2, UniqueCode = "B2", Amount = 3000, DueDate = DateTime.UtcNow.AddDays(-5), IssueDate = DateTime.UtcNow, Status = TitleStatus.Open }
+            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = c1, UniqueCode = "S1", Amount = 100, DueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(-10), IssueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday(), Status = TitleStatus.Open },
+            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = c2, UniqueCode = "B1", Amount = 5000, DueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(-10), IssueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday(), Status = TitleStatus.Open },
+            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = c2, UniqueCode = "B2", Amount = 3000, DueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(-5), IssueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday(), Status = TitleStatus.Open }
         );
         await db.SaveChangesAsync();
 
@@ -109,7 +109,7 @@ public class DashboardServiceTests
         var userId = Guid.NewGuid();
         var clientId = Guid.NewGuid();
         var titleId = Guid.NewGuid();
-        var createdAt = DateTime.UtcNow.Date.AddDays(-1).AddHours(10);
+        var createdAt = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(-1).AddHours(10);
 
         db.Tenants.Add(new Tenant { Id = tenantId, CompanyName = "Test", TaxId = "123" });
         db.Users.Add(new User { Id = userId, TenantId = tenantId, Name = "Op", Email = "op@t.com", PasswordHash = "x" });
@@ -121,8 +121,8 @@ public class DashboardServiceTests
             ClientId = clientId,
             UniqueCode = "T-MANUAL-001",
             Amount = 100,
-            DueDate = DateTime.UtcNow.AddDays(5),
-            IssueDate = DateTime.UtcNow,
+            DueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(5),
+            IssueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday(),
             Status = TitleStatus.Open
         });
         db.TitleHistories.Add(new TitleHistory
@@ -154,7 +154,7 @@ public class DashboardServiceTests
         var userId = Guid.NewGuid();
         var clientId = Guid.NewGuid();
         var titleId = Guid.NewGuid();
-        var createdAt = DateTime.UtcNow.Date.AddDays(-2).AddHours(9);
+        var createdAt = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(-2).AddHours(9);
 
         db.Tenants.Add(new Tenant { Id = tenantId, CompanyName = "Test", TaxId = "123" });
         db.Users.Add(new User { Id = userId, TenantId = tenantId, Name = "Op", Email = "op@t.com", PasswordHash = "x" });
@@ -166,8 +166,8 @@ public class DashboardServiceTests
             ClientId = clientId,
             UniqueCode = "T-MANUAL-002",
             Amount = 100,
-            DueDate = DateTime.UtcNow.AddDays(5),
-            IssueDate = DateTime.UtcNow,
+            DueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(5),
+            IssueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday(),
             Status = TitleStatus.Open
         });
         db.TitleHistories.Add(new TitleHistory
@@ -216,10 +216,10 @@ public class DashboardServiceTests
         db.Clients.Add(new Client { Id = clientId, TenantId = tenantId, UserId = userId, LegalName = "Client A", TaxId = "456" });
 
         db.Titles.AddRange(
-            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "C1", Amount = 100, DueDate = DateTime.UtcNow.AddDays(-12), IssueDate = DateTime.UtcNow.AddDays(-20), Status = TitleStatus.Open },
-            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "C2", Amount = 100, DueDate = DateTime.UtcNow.AddDays(-11), IssueDate = DateTime.UtcNow.AddDays(-20), Status = TitleStatus.PendingData },
-            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "N1", Amount = 100, DueDate = DateTime.UtcNow.AddDays(-9), IssueDate = DateTime.UtcNow.AddDays(-20), Status = TitleStatus.Overdue },
-            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "N2", Amount = 100, DueDate = DateTime.UtcNow.AddDays(-20), IssueDate = DateTime.UtcNow.AddDays(-30), Status = TitleStatus.Paid }
+            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "C1", Amount = 100, DueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(-12), IssueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(-20), Status = TitleStatus.Open },
+            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "C2", Amount = 100, DueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(-11), IssueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(-20), Status = TitleStatus.PendingData },
+            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "N1", Amount = 100, DueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(-9), IssueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(-20), Status = TitleStatus.Overdue },
+            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "N2", Amount = 100, DueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(-20), IssueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(-30), Status = TitleStatus.Paid }
         );
         await db.SaveChangesAsync();
 
@@ -242,10 +242,10 @@ public class DashboardServiceTests
         db.Clients.Add(new Client { Id = clientId, TenantId = tenantId, UserId = userId, LegalName = "Client A", TaxId = "456" });
 
         db.Titles.AddRange(
-            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "R1", Amount = 100, DueDate = DateTime.UtcNow.AddDays(-30), IssueDate = DateTime.UtcNow.AddDays(-60), Status = TitleStatus.Paid },
-            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "R2", Amount = 100, DueDate = DateTime.UtcNow.AddDays(-20), IssueDate = DateTime.UtcNow.AddDays(-40), Status = TitleStatus.Open },
-            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "R3", Amount = 100, DueDate = DateTime.UtcNow.AddDays(-10), IssueDate = DateTime.UtcNow.AddDays(-20), Status = TitleStatus.Paid },
-            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "R4", Amount = 100, DueDate = DateTime.UtcNow.AddDays(5), IssueDate = DateTime.UtcNow.AddDays(-2), Status = TitleStatus.Open }
+            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "R1", Amount = 100, DueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(-30), IssueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(-60), Status = TitleStatus.Paid },
+            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "R2", Amount = 100, DueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(-20), IssueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(-40), Status = TitleStatus.Open },
+            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "R3", Amount = 100, DueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(-10), IssueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(-20), Status = TitleStatus.Paid },
+            new Title { Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clientId, UniqueCode = "R4", Amount = 100, DueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(5), IssueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(-2), Status = TitleStatus.Open }
         );
         await db.SaveChangesAsync();
 

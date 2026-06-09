@@ -30,6 +30,7 @@ public class DispatchWindowConfigServiceTests
             TimeZone = "UTC",
             StartTime = "08:00",
             EndTime = "19:30",
+            DaysOfWeek = new List<int> { 1, 3, 5 },
             PauseAutomaticDispatchDuringProcessing = true
         });
 
@@ -39,6 +40,7 @@ public class DispatchWindowConfigServiceTests
         Assert.Equal("UTC", result.TimeZone);
         Assert.Equal("08:00", result.StartTime);
         Assert.Equal("19:30", result.EndTime);
+        Assert.Equal(new List<int> { 1, 3, 5 }, result.DaysOfWeek);
         Assert.True(result.PauseAutomaticDispatchDuringProcessing);
     }
 
@@ -66,6 +68,7 @@ public class DispatchWindowConfigServiceTests
                 TimeZone = "Invalid/Zone",
                 StartTime = "09:00",
                 EndTime = "18:00",
+                DaysOfWeek = new List<int> { 1, 2, 3, 4, 5 },
                 PauseAutomaticDispatchDuringProcessing = true
             }));
     }

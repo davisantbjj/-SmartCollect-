@@ -64,8 +64,8 @@ public class TitleServiceTests
             ClientId = clientId,
             UniqueCode = "TIT-UTC-002",
             Amount = 50m,
-            DueDate = DateTime.UtcNow.Date,
-            IssueDate = DateTime.UtcNow.Date,
+            DueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday(),
+            IssueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday(),
             Status = TitleStatus.Open
         });
         await db.SaveChangesAsync();
@@ -214,8 +214,8 @@ public class TitleServiceTests
         var trigger1Id = Guid.NewGuid();
         var trigger2Id = Guid.NewGuid();
 
-        var dueDate = DateTime.UtcNow.Date.AddDays(10);
-        var issueDate = DateTime.UtcNow.Date;
+        var dueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(10);
+        var issueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday();
 
         db.Tenants.Add(new Tenant { Id = tenantId, CompanyName = "Tenant A", TaxId = "111" });
         db.Users.Add(new User { Id = userId, TenantId = tenantId, Name = "User", Email = "user@test.com", PasswordHash = "x" });
@@ -337,8 +337,8 @@ public class TitleServiceTests
             ClientId = clientId,
             UniqueCode = "TIT-QUICK-001",
             Amount = 100m,
-            DueDate = DateTime.UtcNow.Date.AddDays(2),
-            IssueDate = DateTime.UtcNow.Date,
+            DueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(2),
+            IssueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday(),
             Status = TitleStatus.Open
         });
 
@@ -402,8 +402,8 @@ public class TitleServiceTests
             ClientId = clientId,
             UniqueCode = "TIT-QUICK-ALL-001",
             Amount = 100m,
-            DueDate = DateTime.UtcNow.Date.AddDays(2),
-            IssueDate = DateTime.UtcNow.Date,
+            DueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(2),
+            IssueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday(),
             Status = TitleStatus.Open
         });
 
@@ -464,8 +464,8 @@ public class TitleServiceTests
             ClientId = clientId,
             UniqueCode = "TIT-RULE-ALL-001",
             Amount = 100m,
-            DueDate = DateTime.UtcNow.Date.AddDays(2),
-            IssueDate = DateTime.UtcNow.Date,
+            DueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(2),
+            IssueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday(),
             Status = TitleStatus.Open
         });
         db.MessageTemplates.Add(new MessageTemplate
@@ -551,8 +551,8 @@ public class TitleServiceTests
             ClientId = clientId,
             UniqueCode = "TIT-RULE-SELECT-001",
             Amount = 100m,
-            DueDate = DateTime.UtcNow.Date.AddDays(2),
-            IssueDate = DateTime.UtcNow.Date,
+            DueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday().AddDays(2),
+            IssueDate = SmartCollect.Application.Common.TimeUtils.GetBrazilToday(),
             Status = TitleStatus.Open
         });
         db.MessageTemplates.Add(new MessageTemplate

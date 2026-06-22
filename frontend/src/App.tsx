@@ -94,13 +94,22 @@ export default function SmartCollect() {
 
   // Theme toggle
   const [isDark, setIsDark] = useState(() => {
-    return localStorage.getItem("sc.theme") === "dark";
+    const dark = localStorage.getItem("sc.theme") === "dark";
+    // Sync DOM immediately on mount to prevent CSS variable read issues
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.toggle("dark", dark);
+    }
+    return dark;
   });
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", isDark);
-    localStorage.setItem("sc.theme", isDark ? "dark" : "light");
-  }, [isDark]);
-  const toggleTheme = useCallback(() => setIsDark(prev => !prev), []);
+
+  const toggleTheme = useCallback(() => {
+    setIsDark(prev => {
+      const next = !prev;
+      document.documentElement.classList.toggle("dark", next);
+      localStorage.setItem("sc.theme", next ? "dark" : "light");
+      return next;
+    });
+  }, []);
 
   // Login form state
   const [email, setEmail] = useState("");

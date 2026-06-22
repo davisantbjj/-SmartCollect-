@@ -51,9 +51,6 @@ public class AuthController : ControllerBase
         {
             var resolvedTenantId = TenantContextResolver.ResolveTenantOrThrow(User, tenantId);
             var result = await _authService.RegisterAsync(resolvedTenantId, request);
-            if (result is null)
-                return Conflict(new { message = "E-mail já cadastrado neste tenant." });
-
             return Created("", result);
         }
         catch (InvalidOperationException ex)
@@ -67,11 +64,15 @@ public class AuthController : ControllerBase
     [Authorize(Roles = "Master")]
     public async Task<IActionResult> RegisterMaster([FromBody] RegisterRequest request)
     {
-        var result = await _authService.RegisterMasterAsync(request);
-        if (result is null)
-            return Conflict(new { message = "E-mail já cadastrado como Master." });
-
-        return Created("", result);
+        try
+        {
+            var result = await _authService.RegisterMasterAsync(request);
+            return Created("", result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpPut("profile")]

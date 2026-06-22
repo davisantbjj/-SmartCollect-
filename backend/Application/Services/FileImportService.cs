@@ -128,6 +128,13 @@ public class FileImportService : IFileImportService
                 .Where(t => t.TenantId == tenantId)
                 .ToDictionaryAsync(t => t.UniqueCode, StringComparer.OrdinalIgnoreCase);
 
+            var primaryContactsList = await _db.Contacts
+                .Where(c => c.Client.TenantId == tenantId && c.IsPrimary)
+                .ToListAsync();
+            var primaryContactsByClientId = primaryContactsList
+                .GroupBy(c => c.ClientId)
+                .ToDictionary(g => g.Key, g => g.First());
+
             var totalRows = 0;
             var successRows = 0;
             var errorRows = 0;
@@ -187,10 +194,7 @@ public class FileImportService : IFileImportService
 
                     if (!string.IsNullOrWhiteSpace(email) || !string.IsNullOrWhiteSpace(phone))
                     {
-                        var contact = await _db.Contacts
-                            .FirstOrDefaultAsync(c => c.ClientId == client.Id && c.IsPrimary);
-
-                        if (contact is null)
+                        if (!primaryContactsByClientId.TryGetValue(client.Id, out var contact))
                         {
                             contact = new Domain.Entities.Contact
                             {
@@ -202,6 +206,7 @@ public class FileImportService : IFileImportService
                                 IsPrimary = true
                             };
                             await _db.Contacts.AddAsync(contact);
+                            primaryContactsByClientId[client.Id] = contact;
                         }
                         else
                         {

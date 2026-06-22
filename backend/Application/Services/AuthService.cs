@@ -74,10 +74,10 @@ public class AuthService : IAuthService
         var role = ResolveTenantUserRole(request.Role);
 
         var tenantExists = await _db.Tenants.AnyAsync(t => t.Id == tenantId && t.Active);
-        if (!tenantExists) return null;
+        if (!tenantExists) throw new InvalidOperationException("Empresa não encontrada ou inativa.");
 
         var exists = await _db.Users.AnyAsync(u => u.Email == normalizedEmail);
-        if (exists) return null;
+        if (exists) throw new InvalidOperationException("Este e-mail já está em uso.");
 
         var user = new Domain.Entities.User
         {
@@ -103,7 +103,7 @@ public class AuthService : IAuthService
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
 
         var exists = await _db.Users.AnyAsync(u => u.Email == normalizedEmail);
-        if (exists) return null;
+        if (exists) throw new InvalidOperationException("Este e-mail já está em uso.");
 
         var user = new Domain.Entities.User
         {

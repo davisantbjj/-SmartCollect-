@@ -15,10 +15,15 @@ public class TitleService : ITitleService
 
     private readonly IAppDbContext _db;
     private readonly IDispatchDeliveryService? _dispatchDeliveryService;
+    private readonly IServiceScopeFactory _scopeFactory;
 
-    public TitleService(IAppDbContext db, IDispatchDeliveryService? dispatchDeliveryService = null)
+    public TitleService(
+        IAppDbContext db,
+        IServiceScopeFactory scopeFactory,
+        IDispatchDeliveryService? dispatchDeliveryService = null)
     {
         _db = db;
+        _scopeFactory = scopeFactory;
         _dispatchDeliveryService = dispatchDeliveryService;
     }
 
@@ -354,7 +359,21 @@ public class TitleService : ITitleService
         await _db.SaveChangesAsync();
 
         if (_dispatchDeliveryService is not null)
-            await _dispatchDeliveryService.ProcessPendingDispatchesAsync(tenantId);
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using var scope = _scopeFactory.CreateScope();
+                    var deliveryService = scope.ServiceProvider.GetRequiredService<IDispatchDeliveryService>();
+                    await deliveryService.ProcessPendingDispatchesAsync(tenantId);
+                }
+                catch (Exception)
+                {
+                    // Fire and forget; background service will catch it later if it fails here.
+                }
+            });
+        }
 
         return true;
     }
@@ -408,81 +427,100 @@ public class TitleService : ITitleService
         var body = RenderQuickTemplate(request.Body!, title, tenantCompanyName);
         var subject = RenderQuickTemplate(subjectTemplate, title, tenantCompanyName);
 
-        var sentChannels = new List<string>();
-        var failedChannels = new List<string>();
+        var titleId = title.Id;
+        var boletoUrl = title.BoletoUrl;
+        var recipientContactIds = recipientContacts.Select(c => c.Id).ToList();
 
-        if (sendEmail)
+        // Run the actual delivery in the background to avoid blocking the UI
+        _ = Task.Run(async () =>
         {
-            foreach (var contact in recipientContacts)
+            try
             {
-                if (string.IsNullOrWhiteSpace(contact.Email))
+                using var scope = _scopeFactory.CreateScope();
+                var deliveryService = scope.ServiceProvider.GetRequiredService<IDispatchDeliveryService>();
+                var db = scope.ServiceProvider.GetRequiredService<IAppDbContext>();
+
+                var sentChannels = new List<string>();
+                var failedChannels = new List<string>();
+
+                var backgroundContacts = await db.Contacts
+                    .Where(c => recipientContactIds.Contains(c.Id))
+                    .ToListAsync();
+
+                if (sendEmail)
                 {
-                    failedChannels.Add($"E-mail ({contact.Name}): contato sem e-mail.");
-                    continue;
+                    foreach (var contact in backgroundContacts)
+                    {
+                        if (string.IsNullOrWhiteSpace(contact.Email))
+                        {
+                            failedChannels.Add($"E-mail ({contact.Name}): contato sem e-mail.");
+                            continue;
+                        }
+
+                        var emailResult = await deliveryService.SendQuickEmailAsync(
+                            tenantId,
+                            contact.Name,
+                            contact.Email,
+                            subject,
+                            body,
+                            isThankYouQuickTemplate ? null : boletoUrl);
+
+                        if (emailResult.Sent)
+                            sentChannels.Add($"E-mail enviado para {contact.Email}");
+                        else
+                            failedChannels.Add($"E-mail ({contact.Email}): {emailResult.Detail}");
+                    }
                 }
 
-                var emailResult = await _dispatchDeliveryService.SendQuickEmailAsync(
-                    tenantId,
-                    contact.Name,
-                    contact.Email,
-                    subject,
-                    body,
-                    isThankYouQuickTemplate ? null : title.BoletoUrl);
-
-                if (emailResult.Sent)
-                    sentChannels.Add($"E-mail enviado para {contact.Email}");
-                else
-                    failedChannels.Add($"E-mail ({contact.Email}): {emailResult.Detail}");
-            }
-        }
-
-        if (sendWhatsApp)
-        {
-            foreach (var contact in recipientContacts)
-            {
-                if (string.IsNullOrWhiteSpace(contact.WhatsAppPhone))
+                if (sendWhatsApp)
                 {
-                    failedChannels.Add($"WhatsApp ({contact.Name}): contato sem número.");
-                    continue;
+                    foreach (var contact in backgroundContacts)
+                    {
+                        if (string.IsNullOrWhiteSpace(contact.WhatsAppPhone))
+                        {
+                            failedChannels.Add($"WhatsApp ({contact.Name}): contato sem número.");
+                            continue;
+                        }
+
+                        var whatsAppResult = await deliveryService.SendQuickWhatsAppAsync(
+                            tenantId,
+                            contact.Name,
+                            contact.WhatsAppPhone,
+                            body);
+
+                        if (whatsAppResult.Sent)
+                            sentChannels.Add($"WhatsApp enviado para {contact.WhatsAppPhone}");
+                        else
+                            failedChannels.Add($"WhatsApp ({contact.WhatsAppPhone}): {whatsAppResult.Detail}");
+                    }
                 }
 
-                var whatsAppResult = await _dispatchDeliveryService.SendQuickWhatsAppAsync(
-                    tenantId,
-                    contact.Name,
-                    contact.WhatsAppPhone,
-                    body);
+                var details = sentChannels.Count > 0 
+                    ? string.Join(". ", sentChannels) 
+                    : "Falha total no envio.";
+                    
+                if (failedChannels.Count > 0)
+                    details = $"{details}. Falhas: {string.Join(" | ", failedChannels)}";
 
-                if (whatsAppResult.Sent)
-                    sentChannels.Add($"WhatsApp enviado para {contact.WhatsAppPhone}");
-                else
-                    failedChannels.Add($"WhatsApp ({contact.WhatsAppPhone}): {whatsAppResult.Detail}");
+                var actionLabel = isThankYouQuickTemplate ? "Agradecimento manual (background)" : "Cobranca manual rapida (background)";
+
+                await db.TitleHistories.AddAsync(new Domain.Entities.TitleHistory
+                {
+                    Id = Guid.NewGuid(),
+                    TitleId = titleId,
+                    TenantId = tenantId,
+                    Action = actionLabel,
+                    Description = details
+                });
+
+                await db.SaveChangesAsync();
             }
-        }
-
-        if (sentChannels.Count == 0)
-        {
-            var failureMessage = isThankYouQuickTemplate
-                ? "Falha ao enviar agradecimento rápido."
-                : "Falha ao enviar cobrança rápida.";
-            throw new InvalidOperationException($"{failureMessage} {string.Join(" | ", failedChannels)}");
-        }
-
-        var details = string.Join(". ", sentChannels);
-        if (failedChannels.Count > 0)
-            details = $"{details}. Falhas parciais: {string.Join(" | ", failedChannels)}";
-
-        var actionLabel = isThankYouQuickTemplate ? "Agradecimento manual enviado" : "Cobranca manual rapida";
-
-        await _db.TitleHistories.AddAsync(new Domain.Entities.TitleHistory
-        {
-            Id = Guid.NewGuid(),
-            TitleId = title.Id,
-            TenantId = tenantId,
-            Action = actionLabel,
-            Description = details
+            catch (Exception)
+            {
+                // Fire and forget background failure
+            }
         });
 
-        await _db.SaveChangesAsync();
         return true;
     }
 

@@ -79,6 +79,13 @@ public class SyncService : ISyncService
             .Where(t => t.TenantId == tenantId)
             .ToDictionaryAsync(t => t.UniqueCode, StringComparer.OrdinalIgnoreCase);
 
+        var primaryContactsList = await _db.Contacts
+            .Where(c => c.Client.TenantId == tenantId && c.IsPrimary)
+            .ToListAsync();
+        var primaryContactsByClientId = primaryContactsList
+            .GroupBy(c => c.ClientId)
+            .ToDictionary(g => g.Key, g => g.First());
+
         var titlesEligibleForAutomaticDispatch = new HashSet<Guid>();
         var terminalTitles = new HashSet<Guid>();
 
@@ -126,10 +133,7 @@ public class SyncService : ISyncService
 
                 if (!string.IsNullOrWhiteSpace(item.Email) || !string.IsNullOrWhiteSpace(item.Phone))
                 {
-                    var primaryContact = await _db.Contacts
-                        .FirstOrDefaultAsync(c => c.ClientId == client.Id && c.IsPrimary);
-
-                    if (primaryContact is null)
+                    if (!primaryContactsByClientId.TryGetValue(client.Id, out var primaryContact))
                     {
                         primaryContact = new Domain.Entities.Contact
                         {
@@ -142,6 +146,7 @@ public class SyncService : ISyncService
                         };
 
                         await _db.Contacts.AddAsync(primaryContact);
+                        primaryContactsByClientId[client.Id] = primaryContact;
                     }
                     else
                     {

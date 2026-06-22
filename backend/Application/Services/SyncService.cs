@@ -298,7 +298,11 @@ public class SyncService : ISyncService
         try
         {
             // We probe a real external route and treat auth errors as "reachable".
-            using var response = await http.GetAsync(settings.PendingTitlesPath, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            // Use a short 5-second timeout to prevent the UI from hanging on Polly retries if offline.
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            
+            using var response = await http.GetAsync(settings.PendingTitlesPath, HttpCompletionOption.ResponseHeadersRead, cts.Token);
 
             if (response.IsSuccessStatusCode)
                 return true;
